@@ -1,0 +1,34 @@
+name: Publication Windows
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+      - name: Installer .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Déterminer la version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          "value=$version" >> $env:GITHUB_OUTPUT
+      - name: Contrôles avant publication
+        run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release
+      - name: Publier l’application autonome
+        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish
+      - name: Créer la GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: gh release create "${{ github.ref_name }}" "publish/Atlas.exe" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes

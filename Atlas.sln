@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Core", "src\Atlas.Core\Atlas.Core.csproj", "{441A2A1E-2E4D-4CD6-8A70-50AF043A5E9A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.App", "src\Atlas.App\Atlas.App.csproj", "{5C30D5BC-5422-4191-9BE8-22F34EA2736B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Core.SmokeTests", "tests\Atlas.Core.SmokeTests\Atlas.Core.SmokeTests.csproj", "{3D76740B-D0A9-4DE1-93BD-971A020F9A15}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{441A2A1E-2E4D-4CD6-8A70-50AF043A5E9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{441A2A1E-2E4D-4CD6-8A70-50AF043A5E9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{441A2A1E-2E4D-4CD6-8A70-50AF043A5E9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{441A2A1E-2E4D-4CD6-8A70-50AF043A5E9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C30D5BC-5422-4191-9BE8-22F34EA2736B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C30D5BC-5422-4191-9BE8-22F34EA2736B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C30D5BC-5422-4191-9BE8-22F34EA2736B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C30D5BC-5422-4191-9BE8-22F34EA2736B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D76740B-D0A9-4DE1-93BD-971A020F9A15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D76740B-D0A9-4DE1-93BD-971A020F9A15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D76740B-D0A9-4DE1-93BD-971A020F9A15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D76740B-D0A9-4DE1-93BD-971A020F9A15}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>Atlas</AssemblyName>
+    <RootNamespace>Atlas.App</RootNamespace>
+    <Version>0.1.0</Version>
+    <ApplicationIcon>Assets\Atlas.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Atlas.Core/Atlas.Core.csproj" />
+    <Resource Include="Assets\IdeoLogo.png" />
+    <Resource Include="Assets\IdeoMark.png" />
+    <Resource Include="Assets\Atlas.ico" />
+  </ItemGroup>
+</Project>
