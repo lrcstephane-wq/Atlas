@@ -3,6 +3,7 @@ name: Publication Windows
 on:
   push:
     tags: ["v*"]
+    branches: ["release/**"]
 
 permissions:
   contents: write
@@ -21,8 +22,10 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          $name = "${{ github.ref_name }}"
+          $version = $name.Split('/')[-1].TrimStart('v')
           "value=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
       - name: Contrôles avant publication
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release
       - name: Publier l’application autonome
@@ -31,4 +34,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
-        run: gh release create "${{ github.ref_name }}" "publish/Atlas.exe" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas.exe" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
