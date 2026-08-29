@@ -52,15 +52,19 @@ public sealed class LibraryScanner
         {
             token.ThrowIfCancellationRequested();
             if (!visited.Add(directory)) continue;
+            IEnumerable<string> files;
             try
             {
-                foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly))
-                    if (Path.GetExtension(file).Equals(".top", StringComparison.OrdinalIgnoreCase)) yield return file;
+                files = Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly)
+                    .Where(file => Path.GetExtension(file).Equals(".top", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
             }
             catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
             {
                 warnings.Add($"Dossier inaccessible : {directory} ({exception.Message})");
+                files = [];
             }
+            foreach (var file in files) yield return file;
 
             IEnumerable<string> children;
             try { children = Directory.EnumerateDirectories(directory).ToArray(); }
