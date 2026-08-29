@@ -13,6 +13,8 @@ Assert(!ComponentNameParser.TryParse("nom_incomplet", out _), "Un nom incomplet 
 var demo = DemoCatalogFactory.Create();
 Assert(demo.Components.Count >= 2 && demo.Furniture.Count >= 1, "Le catalogue de démonstration doit permettre l’aperçu de la V0.1.");
 Assert(demo.Furniture[0].ComponentIds.All(id => demo.Components.Any(component => component.Id == id)), "La composition doit référencer des composants connus.");
+Assert(demo.Furniture[0].Universes.Count > 1, "Un meuble doit pouvoir appartenir à plusieurs univers.");
+Assert(demo.FurnitureFamilies.Any(family => family.Id == demo.Furniture[0].FamilyId), "Une variante doit pouvoir référencer sa famille.");
 
 var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, Atlas.Core.Models.UserPermissions.Administer);

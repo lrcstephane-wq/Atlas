@@ -1,4 +1,5 @@
 using System.Windows;
+using Atlas.App.Views;
 using Atlas.Core.Services;
 
 namespace Atlas.App;
@@ -28,7 +29,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "Biblidéo Atlas", MessageBoxButton.OK, MessageBoxImage.Error);
+            AtlasDialog.Error(exception.Message, "Démarrage impossible");
             Shutdown();
         }
     }

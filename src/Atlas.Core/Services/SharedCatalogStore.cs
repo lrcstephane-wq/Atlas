@@ -127,6 +127,11 @@ public static class DemoCatalogFactory
 {
     public static AtlasCatalog Create()
     {
+        var family = new FurnitureFamilyRecord
+        {
+            Id = "FAM-BAS-01", Name = "Meubles bas", Description = "Caissons bas modulaires pour l’agencement.",
+            TypeMeuble = "Meuble bas", Forme = "Droit", Universes = ["Cuisine", "Buanderie"], CreatedBy = "Démonstration"
+        };
         var componentA = new ComponentRecord
         {
             Id = "demo-tiroir", IsDemo = true, DisplayName = "Tiroir AvanTech YOU", Function = "Coulissant",
@@ -150,11 +155,14 @@ public static class DemoCatalogFactory
                 new FurnitureRecord
                 {
                     Id = "demo-meuble-bas", IsDemo = true, Reference = "MB-001", DisplayName = "Meuble bas 2 tiroirs", Family = "Meubles bas",
-                    Description = "Meuble de démonstration composé de fiches composants.", UseCasesCsv = "cuisine, rangement",
-                    PrincipleConstruction = "Caisson entre côtés", SensMontage = "Tous les sens prévus", Status = RecordStatus.Publiee,
+                    FamilyId = family.Id, Description = "Meuble de démonstration composé de fiches composants.", UseCasesCsv = "cuisine, rangement",
+                    Universes = ["Cuisine", "Buanderie"], TypeMeuble = "Meuble bas", UsageSpecifique = "Rangement", Forme = "Droit",
+                    PrincipleConstruction = "Montant filant", PositionDos = "Rainuré", TypeAssemblage = "Tourillons + vis",
+                    Tiroir = true, NombreTiroirs = 2, TypologieTiroir = "Applique", SensMontage = "Tous les sens prévus", Status = RecordStatus.Publiee,
                     ComponentIds = [componentA.Id, componentB.Id]
                 }
-            ]
+            ],
+            FurnitureFamilies = [family]
         };
     }
 }

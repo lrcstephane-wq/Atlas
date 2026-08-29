@@ -82,4 +82,11 @@ public partial class LoginWindow : Window
             await RefreshModeAsync();
         }
     }
+
+    private void Window_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+    }
+
+    private void Close_OnClick(object sender, RoutedEventArgs e) => Close();
 }
