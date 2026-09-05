@@ -27,10 +27,13 @@ jobs:
       - name: Contrôles métier
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release --no-build
       - name: Produire Atlas pour Windows
-        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output artifacts/Atlas-win-x64
+        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output artifacts/Atlas-win-x64
+      - name: Créer l’archive portable
+        shell: pwsh
+        run: Compress-Archive -Path artifacts/Atlas-win-x64/* -DestinationPath artifacts/Atlas-win-x64.zip
       - name: Publier l’artefact
         uses: actions/upload-artifact@v4
         with:
           name: Atlas-win-x64
-          path: artifacts/Atlas-win-x64/Atlas.exe
+          path: artifacts/Atlas-win-x64.zip
           if-no-files-found: error

@@ -22,7 +22,14 @@ La V0.2 pose deux espaces :
 - sélection multiple des composants et multi-univers sur une même fiche meuble ;
 - validation humaine et justification obligatoire en cas de forçage ;
 - recherche et virtualisation pour les volumes importants ;
-- mise à jour automatique via les GitHub Releases.
+- détection automatique des mises à jour via les GitHub Releases ;
+- distribution principale sous forme de dossier autonome archivé en ZIP, sans compression interne ni auto-extraction de l’exécutable, afin d’éviter les comportements de packaging assimilables à un logiciel malveillant.
+
+## Installation Windows
+
+Télécharger `Atlas-win-x64.zip`, extraire entièrement le dossier puis lancer `Atlas.exe` depuis ce dossier. Atlas n’essaie plus de remplacer son propre exécutable par un script temporaire. Le bouton de mise à jour ouvre le téléchargement officiel de la nouvelle version.
+
+L’exécutable reste non signé pendant la phase de développement : Windows peut donc encore afficher un avertissement d’éditeur inconnu. Une détection antivirus de type cheval de Troie ne doit en revanche jamais être ignorée ni autorisée manuellement.
 
 ## Données partagées
 

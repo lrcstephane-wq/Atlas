@@ -421,7 +421,9 @@ public sealed class MainViewModel : ObservableObject
         {
             var available = await _updater.CheckAsync();
             if (available is null) { UpdateLabel = "Application à jour"; if (!silent) AtlasDialog.Info("Vous utilisez la dernière version.", "Mise à jour"); return; }
-            UpdateLabel = $"Installer {available}"; if (AtlasDialog.Confirm($"La version {available} est disponible. L’installer maintenant ?", "Mise à jour")) await _updater.DownloadAndRestartAsync(progress => UpdateLabel = $"Téléchargement {progress}%");
+            UpdateLabel = $"Télécharger {available}";
+            if (AtlasDialog.Confirm($"La version {available} est disponible. Ouvrir son téléchargement officiel ?", "Mise à jour"))
+                _updater.OpenDownloadPage();
         }
         catch (Exception exception) { UpdateLabel = "Mise à jour indisponible"; if (!silent) ShowError(exception); }
         finally { IsBusy = false; }

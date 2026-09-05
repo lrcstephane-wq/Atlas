@@ -28,10 +28,15 @@ jobs:
           "tag=v$version" >> $env:GITHUB_OUTPUT
       - name: Contrôles avant publication
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release
-      - name: Publier l’application autonome
-        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish
+      - name: Publier le dossier autonome
+        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish/portable
+      - name: Créer l’archive portable
+        shell: pwsh
+        run: Compress-Archive -Path publish/portable/* -DestinationPath publish/Atlas-win-x64.zip
+      - name: Produire l’exécutable de transition
+        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish/legacy
       - name: Créer la GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
-        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas.exe" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-win-x64.zip" "publish/legacy/Atlas.exe" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
