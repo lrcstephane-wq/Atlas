@@ -81,6 +81,45 @@ public sealed class LocalBootstrap : BindableModel
     public string SharedRoot { get => _sharedRoot; set => Set(ref _sharedRoot, value); }
 }
 
+public sealed class CapabilityTagRecord : BindableModel
+{
+    private string _label = string.Empty;
+    private string _description = string.Empty;
+    private bool _isActive = true;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string Label { get => _label; set => Set(ref _label, value); }
+    public string Description { get => _description; set => Set(ref _description, value); }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    public List<string> DefaultFamilyNames { get; set; } = [];
+
+    [JsonIgnore]
+    public string DefaultFamiliesCsv
+    {
+        get => string.Join(", ", DefaultFamilyNames.Order(StringComparer.CurrentCultureIgnoreCase));
+        set
+        {
+            var parsed = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            if (DefaultFamilyNames.SequenceEqual(parsed, StringComparer.OrdinalIgnoreCase)) return;
+            DefaultFamilyNames = parsed;
+            Raise();
+        }
+    }
+
+    public void SetDefaultFamily(string familyName, bool enabled)
+    {
+        if (string.IsNullOrWhiteSpace(familyName)) return;
+        var existing = DefaultFamilyNames.FirstOrDefault(value => value.Equals(familyName, StringComparison.OrdinalIgnoreCase));
+        if (enabled && existing is null) DefaultFamilyNames.Add(familyName);
+        else if (!enabled && existing is not null) DefaultFamilyNames.Remove(existing);
+        else return;
+        Raise(nameof(DefaultFamiliesCsv));
+    }
+}
+
 public sealed class ComponentRecord : BindableModel
 {
     private string _displayName = string.Empty;
@@ -89,6 +128,9 @@ public sealed class ComponentRecord : BindableModel
     private string _usageNotes = string.Empty;
     private string _capabilitiesCsv = string.Empty;
     private string _compatibilityCsv = string.Empty;
+    private string _detectedFamilyName = string.Empty;
+    private string _familyName = string.Empty;
+    private bool _isFamilyOverridden;
     private RecordStatus _status;
     private string _forcedValidationReason = string.Empty;
 
@@ -96,7 +138,25 @@ public sealed class ComponentRecord : BindableModel
     public string SourceRelativePath { get; set; } = string.Empty;
     public string PreviewRelativePath { get; set; } = string.Empty;
     public string LibraryName { get; set; } = string.Empty;
-    public string FamilyName { get; set; } = string.Empty;
+    public string DetectedFamilyName
+    {
+        get => _detectedFamilyName;
+        set
+        {
+            if (!Set(ref _detectedFamilyName, value)) return;
+            UpdateFamilyOverride();
+        }
+    }
+    public string FamilyName
+    {
+        get => _familyName;
+        set
+        {
+            if (!Set(ref _familyName, value)) return;
+            UpdateFamilyOverride();
+        }
+    }
+    public bool IsFamilyOverridden { get => _isFamilyOverridden; private set => Set(ref _isFamilyOverridden, value); }
     public string TechnicalName { get; set; } = string.Empty;
     public string TypeCode { get; set; } = string.Empty;
     public string VariantCode { get; set; } = string.Empty;
@@ -113,12 +173,31 @@ public sealed class ComponentRecord : BindableModel
     public string UsageNotes { get => _usageNotes; set => Set(ref _usageNotes, value); }
     public string CapabilitiesCsv { get => _capabilitiesCsv; set => Set(ref _capabilitiesCsv, value); }
     public string CompatibilityCsv { get => _compatibilityCsv; set => Set(ref _compatibilityCsv, value); }
+    public List<string> AddedCapabilityIds { get; set; } = [];
+    public List<string> RemovedInheritedCapabilityIds { get; set; } = [];
     public RecordStatus Status { get => _status; set => Set(ref _status, value); }
     public string ForcedValidationReason { get => _forcedValidationReason; set => Set(ref _forcedValidationReason, value); }
     public string ValidatedBy { get; set; } = string.Empty;
     public DateTimeOffset? ValidatedUtc { get; set; }
 
     public string Classification => IsNameCompliant ? $"{TypeCode} · {VariantCode} · {IndexCode}" : "Non classé";
+
+    public void UseDetectedFamily() => FamilyName = DetectedFamilyName;
+
+    public void NormalizeFamily()
+    {
+        AddedCapabilityIds ??= [];
+        RemovedInheritedCapabilityIds ??= [];
+        if (string.IsNullOrWhiteSpace(DetectedFamilyName) && !string.IsNullOrWhiteSpace(FamilyName)) DetectedFamilyName = FamilyName;
+        if (string.IsNullOrWhiteSpace(FamilyName) && !string.IsNullOrWhiteSpace(DetectedFamilyName)) FamilyName = DetectedFamilyName;
+        UpdateFamilyOverride();
+    }
+
+    private void UpdateFamilyOverride()
+    {
+        IsFamilyOverridden = !string.IsNullOrWhiteSpace(DetectedFamilyName)
+            && !string.Equals(FamilyName, DetectedFamilyName, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public sealed class FurnitureRecord : BindableModel
@@ -249,12 +328,13 @@ public sealed class FurnitureFamilyRecord : BindableModel
 
 public sealed class AtlasCatalog
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
     public long Revision { get; set; }
     public DateTimeOffset ModifiedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string ModifiedBy { get; set; } = string.Empty;
     public WorkspaceSettings Settings { get; set; } = new();
     public List<ComponentRecord> Components { get; set; } = [];
+    public List<CapabilityTagRecord> CapabilityTags { get; set; } = [];
     public List<FurnitureRecord> Furniture { get; set; } = [];
     public List<FurnitureFamilyRecord> FurnitureFamilies { get; set; } = [];
     public List<string> Universes { get; set; } =
