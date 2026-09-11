@@ -1,3 +1,4 @@
+using Atlas.Core.Models;
 using Atlas.Core.Services;
 
 static void Assert(bool condition, string message)
@@ -16,8 +17,21 @@ Assert(demo.Furniture[0].ComponentIds.All(id => demo.Components.Any(component =>
 Assert(demo.Furniture[0].Universes.Count > 1, "Un meuble doit pouvoir appartenir à plusieurs univers.");
 Assert(demo.FurnitureFamilies.Any(family => family.Id == demo.Furniture[0].FamilyId), "Une variante doit pouvoir référencer sa famille.");
 
+var drawerTag = new CapabilityTagRecord { Id = "cap-tiroirs", Label = "Tiroirs", DefaultFamilyNames = ["Coulissants"] };
+var doorTag = new CapabilityTagRecord { Id = "cap-portes", Label = "Portes", DefaultFamilyNames = ["Charnières"] };
+var testComponent = new ComponentRecord { FamilyName = "Coulissants" };
+Assert(CapabilityTagStore.Resolve(testComponent, [drawerTag, doorTag]).Single().Id == drawerTag.Id, "Une capacité doit être héritée depuis la famille détectée.");
+testComponent.RemovedInheritedCapabilityIds.Add(drawerTag.Id);
+Assert(CapabilityTagStore.Resolve(testComponent, [drawerTag, doorTag]).Count == 0, "Une capacité héritée doit pouvoir être désactivée localement.");
+testComponent.AddedCapabilityIds.Add(doorTag.Id);
+Assert(CapabilityTagStore.Resolve(testComponent, [drawerTag, doorTag]).Single().Id == doorTag.Id, "Une capacité spécifique doit pouvoir être ajoutée localement.");
+testComponent.AtlasFamilyNameOverride = "Charnières";
+Assert(testComponent.EffectiveFamilyName == "Charnières" && testComponent.IsFamilyOverridden, "La famille Atlas doit pouvoir déroger à la famille Biblidéo.");
+testComponent.UseDetectedFamily();
+Assert(testComponent.EffectiveFamilyName == "Coulissants" && !testComponent.IsFamilyOverridden, "Le retour à la famille Biblidéo doit supprimer la dérogation.");
+
 var generatedSecret = Guid.NewGuid().ToString("N");
-var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, Atlas.Core.Models.UserPermissions.Administer);
+var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
 Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 0, "Le secret ne doit jamais être stocké en clair.");
 
 Console.WriteLine("Atlas.Core : contrôles métier réussis.");
