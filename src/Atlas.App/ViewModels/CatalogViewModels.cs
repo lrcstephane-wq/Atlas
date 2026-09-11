@@ -20,6 +20,11 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
         Record.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(ComponentRecord.DisplayName)) OnPropertyChanged(nameof(Name));
+            if (args.PropertyName is nameof(ComponentRecord.FamilyName) or nameof(ComponentRecord.AtlasFamilyNameOverride))
+            {
+                OnPropertyChanged(nameof(Family));
+                OnPropertyChanged(nameof(Location));
+            }
             if (args.PropertyName == nameof(ComponentRecord.Status)) OnPropertyChanged(nameof(Status));
         };
     }
@@ -29,7 +34,7 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
     public string Name => Record.DisplayName;
     public string TechnicalName => Record.TechnicalName;
     public string Library => Record.LibraryName;
-    public string Family => Record.FamilyName;
+    public string Family => Record.EffectiveFamilyName;
     public string Type => string.IsNullOrWhiteSpace(Record.TypeCode) ? "Non classé" : Record.TypeCode;
     public string Location => $"{Library}  ›  {Family}";
     public string Status => Record.IsMissing ? "Fichier absent" : Record.IsNameCompliant ? Record.Status.ToString() : "À contrôler";
@@ -150,5 +155,38 @@ public sealed class ToggleOptionViewModel : INotifyPropertyChanged
             _changed?.Invoke(this);
         }
     }
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class CapabilityChoiceViewModel : INotifyPropertyChanged
+{
+    private bool _isSelected;
+    private readonly Action<CapabilityChoiceViewModel> _changed;
+
+    public CapabilityChoiceViewModel(CapabilityTagRecord tag, bool inherited, bool selected, Action<CapabilityChoiceViewModel> changed)
+    {
+        Tag = tag;
+        IsInherited = inherited;
+        _isSelected = selected;
+        _changed = changed;
+    }
+
+    public CapabilityTagRecord Tag { get; }
+    public string Id => Tag.Id;
+    public string Label => Tag.Label;
+    public bool IsInherited { get; }
+    public string OriginLabel => IsInherited ? "Héritée de la famille" : "Spécifique";
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new(nameof(IsSelected)));
+            _changed(this);
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 }
