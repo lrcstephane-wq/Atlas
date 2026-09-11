@@ -108,16 +108,6 @@ public sealed class CapabilityTagRecord : BindableModel
             Raise();
         }
     }
-
-    public void SetDefaultFamily(string familyName, bool enabled)
-    {
-        if (string.IsNullOrWhiteSpace(familyName)) return;
-        var existing = DefaultFamilyNames.FirstOrDefault(value => value.Equals(familyName, StringComparison.OrdinalIgnoreCase));
-        if (enabled && existing is null) DefaultFamilyNames.Add(familyName);
-        else if (!enabled && existing is not null) DefaultFamilyNames.Remove(existing);
-        else return;
-        Raise(nameof(DefaultFamiliesCsv));
-    }
 }
 
 public sealed class ComponentRecord : BindableModel
@@ -128,9 +118,8 @@ public sealed class ComponentRecord : BindableModel
     private string _usageNotes = string.Empty;
     private string _capabilitiesCsv = string.Empty;
     private string _compatibilityCsv = string.Empty;
-    private string _detectedFamilyName = string.Empty;
     private string _familyName = string.Empty;
-    private bool _isFamilyOverridden;
+    private string _atlasFamilyNameOverride = string.Empty;
     private RecordStatus _status;
     private string _forcedValidationReason = string.Empty;
 
@@ -138,25 +127,35 @@ public sealed class ComponentRecord : BindableModel
     public string SourceRelativePath { get; set; } = string.Empty;
     public string PreviewRelativePath { get; set; } = string.Empty;
     public string LibraryName { get; set; } = string.Empty;
-    public string DetectedFamilyName
-    {
-        get => _detectedFamilyName;
-        set
-        {
-            if (!Set(ref _detectedFamilyName, value)) return;
-            UpdateFamilyOverride();
-        }
-    }
+
+    // Famille détectée depuis l'architecture Biblidéo. Le scanner peut la remettre à jour sans écraser un choix Atlas.
     public string FamilyName
     {
         get => _familyName;
         set
         {
             if (!Set(ref _familyName, value)) return;
-            UpdateFamilyOverride();
+            Raise(nameof(EffectiveFamilyName));
+            Raise(nameof(IsFamilyOverridden));
         }
     }
-    public bool IsFamilyOverridden { get => _isFamilyOverridden; private set => Set(ref _isFamilyOverridden, value); }
+
+    // Vide = Atlas suit automatiquement la famille Biblidéo. Renseignée = dérogation volontaire Stéphane/Thomas.
+    public string AtlasFamilyNameOverride
+    {
+        get => _atlasFamilyNameOverride;
+        set
+        {
+            var normalized = value?.Trim() ?? string.Empty;
+            if (!Set(ref _atlasFamilyNameOverride, normalized)) return;
+            Raise(nameof(EffectiveFamilyName));
+            Raise(nameof(IsFamilyOverridden));
+        }
+    }
+
+    [JsonIgnore] public string EffectiveFamilyName => string.IsNullOrWhiteSpace(AtlasFamilyNameOverride) ? FamilyName : AtlasFamilyNameOverride;
+    [JsonIgnore] public bool IsFamilyOverridden => !string.IsNullOrWhiteSpace(AtlasFamilyNameOverride) && !AtlasFamilyNameOverride.Equals(FamilyName, StringComparison.OrdinalIgnoreCase);
+
     public string TechnicalName { get; set; } = string.Empty;
     public string TypeCode { get; set; } = string.Empty;
     public string VariantCode { get; set; } = string.Empty;
@@ -171,10 +170,15 @@ public sealed class ComponentRecord : BindableModel
     public string Function { get => _function; set => Set(ref _function, value); }
     public string Description { get => _description; set => Set(ref _description, value); }
     public string UsageNotes { get => _usageNotes; set => Set(ref _usageNotes, value); }
+
+    // Compatibilité transitoire avec le moteur meuble existant : cette valeur est recalculée depuis les capacités structurées.
     public string CapabilitiesCsv { get => _capabilitiesCsv; set => Set(ref _capabilitiesCsv, value); }
     public string CompatibilityCsv { get => _compatibilityCsv; set => Set(ref _compatibilityCsv, value); }
+
+    // Exceptions par composant : ajouts spécifiques et désactivation de capacités héritées de la famille.
     public List<string> AddedCapabilityIds { get; set; } = [];
     public List<string> RemovedInheritedCapabilityIds { get; set; } = [];
+
     public RecordStatus Status { get => _status; set => Set(ref _status, value); }
     public string ForcedValidationReason { get => _forcedValidationReason; set => Set(ref _forcedValidationReason, value); }
     public string ValidatedBy { get; set; } = string.Empty;
@@ -182,21 +186,12 @@ public sealed class ComponentRecord : BindableModel
 
     public string Classification => IsNameCompliant ? $"{TypeCode} · {VariantCode} · {IndexCode}" : "Non classé";
 
-    public void UseDetectedFamily() => FamilyName = DetectedFamilyName;
+    public void UseDetectedFamily() => AtlasFamilyNameOverride = string.Empty;
 
-    public void NormalizeFamily()
+    public void NormalizeCapabilities()
     {
         AddedCapabilityIds ??= [];
         RemovedInheritedCapabilityIds ??= [];
-        if (string.IsNullOrWhiteSpace(DetectedFamilyName) && !string.IsNullOrWhiteSpace(FamilyName)) DetectedFamilyName = FamilyName;
-        if (string.IsNullOrWhiteSpace(FamilyName) && !string.IsNullOrWhiteSpace(DetectedFamilyName)) FamilyName = DetectedFamilyName;
-        UpdateFamilyOverride();
-    }
-
-    private void UpdateFamilyOverride()
-    {
-        IsFamilyOverridden = !string.IsNullOrWhiteSpace(DetectedFamilyName)
-            && !string.Equals(FamilyName, DetectedFamilyName, StringComparison.OrdinalIgnoreCase);
     }
 }
 
