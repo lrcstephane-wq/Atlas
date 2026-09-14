@@ -110,6 +110,44 @@ public sealed class CapabilityTagRecord : BindableModel
     }
 }
 
+public sealed class ComponentFamilyRecord : BindableModel
+{
+    private string _name = string.Empty;
+    private string _description = string.Empty;
+    private bool _isActive = true;
+    private bool _isDetected = true;
+    private bool _isMissing;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string LibraryName { get; set; } = string.Empty;
+    public string Name { get => _name; set => Set(ref _name, value); }
+    public string Description { get => _description; set => Set(ref _description, value); }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    public bool IsDetected { get => _isDetected; set => Set(ref _isDetected, value); }
+    public bool IsMissing { get => _isMissing; set => Set(ref _isMissing, value); }
+    public List<string> TagIds { get; set; } = [];
+    [JsonIgnore] public string QualifiedName => $"{LibraryName}  ›  {Name}";
+}
+
+public sealed class ComponentTagRecord : BindableModel
+{
+    private string _label = string.Empty;
+    private string _description = string.Empty;
+    private bool _isActive = true;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string Label { get => _label; set => Set(ref _label, value); }
+    public string Description { get => _description; set => Set(ref _description, value); }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+}
+
+public sealed class ComponentTaxonomy
+{
+    public int SchemaVersion { get; set; } = 1;
+    public List<ComponentFamilyRecord> Families { get; set; } = [];
+    public List<ComponentTagRecord> Tags { get; set; } = [];
+}
+
 public sealed class ComponentRecord : BindableModel
 {
     private string _displayName = string.Empty;
@@ -178,6 +216,8 @@ public sealed class ComponentRecord : BindableModel
     // Exceptions par composant : ajouts spécifiques et désactivation de capacités héritées de la famille.
     public List<string> AddedCapabilityIds { get; set; } = [];
     public List<string> RemovedInheritedCapabilityIds { get; set; } = [];
+    public List<string> AddedTagIds { get; set; } = [];
+    public List<string> RemovedInheritedTagIds { get; set; } = [];
 
     public RecordStatus Status { get => _status; set => Set(ref _status, value); }
     public string ForcedValidationReason { get => _forcedValidationReason; set => Set(ref _forcedValidationReason, value); }
@@ -192,6 +232,12 @@ public sealed class ComponentRecord : BindableModel
     {
         AddedCapabilityIds ??= [];
         RemovedInheritedCapabilityIds ??= [];
+    }
+
+    public void NormalizeTags()
+    {
+        AddedTagIds ??= [];
+        RemovedInheritedTagIds ??= [];
     }
 }
 
@@ -288,6 +334,8 @@ public sealed class FurnitureRecord : BindableModel
     public RecordStatus Status { get => _status; set => Set(ref _status, value); }
     public string ForcedValidationReason { get => _forcedValidationReason; set => Set(ref _forcedValidationReason, value); }
     public List<string> ComponentIds { get; set; } = [];
+    public List<string> AddedTagIds { get; set; } = [];
+    public List<string> RemovedInheritedTagIds { get; set; } = [];
     public string ValidatedBy { get; set; } = string.Empty;
     public DateTimeOffset? ValidatedUtc { get; set; }
 }

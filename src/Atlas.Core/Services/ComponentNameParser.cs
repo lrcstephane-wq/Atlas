@@ -4,6 +4,12 @@ using Atlas.Core.Models;
 
 public static class ComponentNameParser
 {
+    public static string SuggestDisplayName(string technicalName)
+    {
+        if (!TryParse(technicalName, out var parsed) || string.IsNullOrWhiteSpace(parsed.Variant)) return technicalName;
+        return string.Join(' ', parsed.Variant.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
     public static bool TryParse(string technicalName, out ParsedComponentName parsed)
     {
         var segments = technicalName.Split('#', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

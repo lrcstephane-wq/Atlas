@@ -2,10 +2,10 @@
 
 Biblidéo Atlas est la future application catalogue de la gamme Idéo. Elle est distincte de l’outil interne Biblidéo Post-production.
 
-La V0.2 pose deux espaces :
+La V0.3 pose deux espaces :
 
 - **Forge** pour parcourir visuellement les bibliothèques, documenter les composants, structurer les familles et variantes, composer les meubles et valider les fiches ;
-- **Catalogue Atlas** pour prévisualiser une expérience client filtrable par univers et type.
+- **Catalogue Atlas** pour prévisualiser une expérience client filtrable par univers, type, famille et tag.
 
 ## Principes déjà implémentés
 
@@ -20,14 +20,19 @@ La V0.2 pose deux espaces :
 - environnement global SC ou EP, jamais mélangé dans un catalogue ;
 - composition explicite des meubles à partir des fiches composants ;
 - sélection multiple des composants et multi-univers sur une même fiche meuble ;
+- filtres famille et type recalculés dans la bibliothèque sélectionnée ;
+- nom affiché proposé depuis le marqueur `#V=` sans écraser une modification manuelle ;
+- familles distinctes par bibliothèque, synchronisées depuis l’index ;
+- tags affectables à plusieurs familles et hérités par les composants puis les meubles, avec exceptions locales ;
+- menu de paramètres structuré par module, les capacités paramétriques restant explicitement hors MVP ;
 - validation humaine et justification obligatoire en cas de forçage ;
 - recherche et virtualisation pour les volumes importants ;
-- détection automatique des mises à jour via les GitHub Releases ;
+- détection, téléchargement, contrôle SHA-256 et installation automatique des futures mises à jour via les GitHub Releases ;
 - distribution principale sous forme de dossier autonome archivé en ZIP, sans compression interne ni auto-extraction de l’exécutable, afin d’éviter les comportements de packaging assimilables à un logiciel malveillant.
 
 ## Installation Windows
 
-Télécharger `Atlas-win-x64.zip`, extraire entièrement le dossier puis lancer `Atlas.exe` depuis ce dossier. Atlas n’essaie plus de remplacer son propre exécutable par un script temporaire. Le bouton de mise à jour ouvre le téléchargement officiel de la nouvelle version.
+Télécharger `Atlas-win-x64.zip`, extraire entièrement le dossier puis lancer `Atlas.exe` depuis ce dossier. Le passage depuis une version antérieure à la V0.3 demande cette dernière extraction manuelle. Ensuite, le bouton de mise à jour télécharge le pack officiel, vérifie son intégrité et relance Atlas grâce au module statique `Atlas.Updater.exe`, sans script temporaire.
 
 L’exécutable reste non signé pendant la phase de développement : Windows peut donc encore afficher un avertissement d’éditeur inconnu. Une détection antivirus de type cheval de Troie ne doit en revanche jamais être ignorée ni autorisée manuellement.
 

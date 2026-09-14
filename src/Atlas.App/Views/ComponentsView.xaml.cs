@@ -10,27 +10,36 @@ namespace Atlas.App.Views;
 
 public partial class ComponentsView : UserControl
 {
-    private readonly ObservableCollection<CapabilityChoiceViewModel> _capabilityChoices = [];
-    private List<CapabilityTagRecord> _tags = [];
+    private readonly ObservableCollection<TagChoiceViewModel> _tagChoices = [];
+    private ComponentTaxonomy _taxonomy = new();
     private bool _isRefreshing;
 
     public ComponentsView()
     {
         InitializeComponent();
-        CapabilityList.ItemsSource = _capabilityChoices;
+        TagList.ItemsSource = _tagChoices;
     }
 
     private async void ComponentsView_OnLoaded(object sender, RoutedEventArgs e)
     {
-        await ReloadCapabilitiesAsync();
+        await ReloadTaxonomyAsync();
         RefreshFamilyOptions();
         RefreshEditor();
     }
 
-    private async Task ReloadCapabilitiesAsync()
+    private async void ComponentsView_OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is not true || !IsLoaded) return;
+        await ReloadTaxonomyAsync();
+        RefreshFamilyOptions();
+        RefreshEditor();
+    }
+
+    private async Task ReloadTaxonomyAsync()
     {
         if (DataContext is not MainViewModel vm) return;
-        _tags = await CapabilityTagStore.LoadAsync(vm.SharedRoot);
+        _taxonomy = await ComponentTaxonomyStore.LoadAsync(vm.SharedRoot);
+        ComponentTaxonomyStore.SyncDetectedFamilies(_taxonomy, vm.Components);
     }
 
     private void ComponentSelection_OnChanged(object sender, SelectionChangedEventArgs e)
@@ -42,8 +51,10 @@ public partial class ComponentsView : UserControl
     private void RefreshFamilyOptions()
     {
         if (DataContext is not MainViewModel vm || AtlasFamilyCombo is null) return;
-        var values = vm.Components
-            .Select(component => component.FamilyName)
+        var library = vm.SelectedComponent?.LibraryName;
+        var values = _taxonomy.Families
+            .Where(family => family.IsActive && (string.IsNullOrWhiteSpace(library) || family.LibraryName.Equals(library, StringComparison.OrdinalIgnoreCase)))
+            .Select(family => family.Name)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.CurrentCultureIgnoreCase)
             .Order(StringComparer.CurrentCultureIgnoreCase)
@@ -57,45 +68,45 @@ public partial class ComponentsView : UserControl
         _isRefreshing = true;
         try
         {
-            component.NormalizeCapabilities();
+            component.NormalizeTags();
             DetectedFamilyText.Text = string.IsNullOrWhiteSpace(component.FamilyName) ? "Non détectée" : component.FamilyName;
             AtlasFamilyCombo.Text = component.EffectiveFamilyName;
             FamilyOverrideHint.Visibility = component.IsFamilyOverridden ? Visibility.Visible : Visibility.Collapsed;
 
-            _capabilityChoices.Clear();
-            foreach (var tag in _tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase))
+            _tagChoices.Clear();
+            var familyKey = ComponentTaxonomyStore.FamilyKey(component.LibraryName, component.EffectiveFamilyName);
+            var inheritedIds = _taxonomy.Families.FirstOrDefault(x => ComponentTaxonomyStore.FamilyKey(x.LibraryName, x.Name).Equals(familyKey, StringComparison.OrdinalIgnoreCase))?.TagIds ?? [];
+            foreach (var tag in _taxonomy.Tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase))
             {
-                var inherited = tag.DefaultFamilyNames.Any(family => family.Equals(component.EffectiveFamilyName, StringComparison.OrdinalIgnoreCase));
-                var removed = component.RemovedInheritedCapabilityIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
-                var added = component.AddedCapabilityIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
+                var inherited = inheritedIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
+                var removed = component.RemovedInheritedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
+                var added = component.AddedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
                 var selected = (inherited && !removed) || added;
-                _capabilityChoices.Add(new CapabilityChoiceViewModel(tag, inherited, selected, CapabilityChoice_OnChanged));
+                _tagChoices.Add(new TagChoiceViewModel(tag, inherited, selected, TagChoice_OnChanged));
             }
-            NoCapabilitiesText.Visibility = _capabilityChoices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            CapabilityTagStore.RebuildLegacyCapabilities(component, _tags);
+            NoTagsText.Visibility = _tagChoices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { _isRefreshing = false; }
     }
 
-    private void CapabilityChoice_OnChanged(CapabilityChoiceViewModel choice)
+    private void TagChoice_OnChanged(TagChoiceViewModel choice)
     {
         if (_isRefreshing || DataContext is not MainViewModel vm || vm.SelectedComponent is not { } component) return;
-        component.NormalizeCapabilities();
+        component.NormalizeTags();
 
-        RemoveIgnoreCase(component.AddedCapabilityIds, choice.Id);
-        RemoveIgnoreCase(component.RemovedInheritedCapabilityIds, choice.Id);
+        RemoveIgnoreCase(component.AddedTagIds, choice.Id);
+        RemoveIgnoreCase(component.RemovedInheritedTagIds, choice.Id);
 
         if (choice.IsInherited)
         {
-            if (!choice.IsSelected) component.RemovedInheritedCapabilityIds.Add(choice.Id);
+            if (!choice.IsSelected) component.RemovedInheritedTagIds.Add(choice.Id);
         }
         else if (choice.IsSelected)
         {
-            component.AddedCapabilityIds.Add(choice.Id);
+            component.AddedTagIds.Add(choice.Id);
         }
 
-        CapabilityTagStore.RebuildLegacyCapabilities(component, _tags);
-        vm.StatusText = "Capacités du composant modifiées. Pensez à enregistrer.";
+        vm.StatusText = "Tags du composant modifiés. Pensez à enregistrer.";
     }
 
     private void AtlasFamilyCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -116,7 +127,6 @@ public partial class ComponentsView : UserControl
     {
         var value = requested?.Trim() ?? string.Empty;
         component.AtlasFamilyNameOverride = string.IsNullOrWhiteSpace(value) || value.Equals(component.FamilyName, StringComparison.OrdinalIgnoreCase) ? string.Empty : value;
-        CapabilityTagStore.RebuildLegacyCapabilities(component, _tags);
         RefreshEditor();
     }
 
@@ -124,7 +134,6 @@ public partial class ComponentsView : UserControl
     {
         if (DataContext is not MainViewModel vm || vm.SelectedComponent is not { } component) return;
         component.UseDetectedFamily();
-        CapabilityTagStore.RebuildLegacyCapabilities(component, _tags);
         RefreshEditor();
         vm.StatusText = "Famille Atlas réalignée sur la famille Biblidéo.";
     }

@@ -28,6 +28,11 @@ jobs:
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release --no-build
       - name: Produire Atlas pour Windows
         run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output artifacts/Atlas-win-x64
+      - name: Produire le module de mise à jour
+        run: dotnet publish src/Atlas.Updater/Atlas.Updater.csproj --configuration Release -p:DebugType=None -p:DebugSymbols=false --output artifacts/updater
+      - name: Ajouter le module au pack
+        shell: pwsh
+        run: Copy-Item artifacts/updater/Atlas.Updater.exe artifacts/Atlas-win-x64/Atlas.Updater.exe -Force
       - name: Créer l’archive portable
         shell: pwsh
         run: Compress-Archive -Path artifacts/Atlas-win-x64/* -DestinationPath artifacts/Atlas-win-x64.zip

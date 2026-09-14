@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -16,9 +17,9 @@ public sealed class ApplicationUpdateService
 
     public ApplicationUpdateService()
     {
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Biblideo-Atlas-Updater/0.2.1");
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Biblideo-Atlas-Updater/0.3.0");
         _httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        _httpClient.Timeout = TimeSpan.FromMinutes(5);
     }
 
     public string CurrentVersion => GetCurrentVersion().ToString(3);
@@ -41,6 +42,54 @@ public sealed class ApplicationUpdateService
         return AvailableVersion;
     }
 
+    public async Task<bool> DownloadAndInstallAsync(Action<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        if (_availableAsset is null || AvailableVersion is null) throw new InvalidOperationException("Aucune mise à jour disponible.");
+        var updater = Path.Combine(AppContext.BaseDirectory, "Atlas.Updater.exe");
+        if (!File.Exists(updater)) return false;
+
+        var updateDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Biblideo", "Atlas", "Updates");
+        Directory.CreateDirectory(updateDirectory);
+        var archive = Path.Combine(updateDirectory, $"Atlas-{AvailableVersion}.zip");
+        using (var response = await _httpClient.GetAsync(_availableAsset.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+        {
+            response.EnsureSuccessStatusCode();
+            var total = response.Content.Headers.ContentLength;
+            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var output = File.Create(archive);
+            var buffer = new byte[1024 * 128];
+            long received = 0;
+            int read;
+            while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                received += read;
+                if (total > 0) progress?.Invoke((int)Math.Clamp(received * 100 / total.Value, 0, 100));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_availableAsset.Digest) && _availableAsset.Digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+        {
+            await using var stream = File.OpenRead(archive);
+            var actual = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken)).ToLowerInvariant();
+            var expected = _availableAsset.Digest["sha256:".Length..].Trim().ToLowerInvariant();
+            if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(archive);
+                throw new InvalidDataException("Le contrôle d’intégrité de la mise à jour a échoué.");
+            }
+        }
+
+        var launch = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Atlas.exe");
+        var start = new ProcessStartInfo(updater) { UseShellExecute = false };
+        start.ArgumentList.Add("--pid"); start.ArgumentList.Add(Environment.ProcessId.ToString());
+        start.ArgumentList.Add("--archive"); start.ArgumentList.Add(archive);
+        start.ArgumentList.Add("--target"); start.ArgumentList.Add(AppContext.BaseDirectory);
+        start.ArgumentList.Add("--launch"); start.ArgumentList.Add(launch);
+        Process.Start(start);
+        return true;
+    }
+
     public void OpenDownloadPage()
     {
         if (_availableAsset is null) throw new InvalidOperationException("Aucune mise à jour disponible.");
@@ -58,5 +107,6 @@ public sealed class ApplicationUpdateService
         [property: JsonPropertyName("assets")] IReadOnlyList<ReleaseAsset> Assets);
     private sealed record ReleaseAsset(
         [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("browser_download_url")] string DownloadUrl);
+        [property: JsonPropertyName("browser_download_url")] string DownloadUrl,
+        [property: JsonPropertyName("digest")] string? Digest);
 }

@@ -22,8 +22,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly LibraryScanner _scanner = new();
     private readonly ApplicationUpdateService _updater = new();
     private AtlasCatalog _catalog = new();
+    private ComponentTaxonomy _taxonomy = new();
     private string _currentPage = "Dashboard", _componentSearch = "", _furnitureSearch = "", _clientSearch = "", _statusText = "Initialisation…", _updateLabel = "Rechercher une mise à jour";
-    private string _sharedRoot, _activeFamilyFilter = "Toutes", _selectedComponentType = "Tous les types", _selectedClientUniverse = "Tous les univers", _selectedClientType = "Tous les types";
+    private string _sharedRoot, _activeFamilyFilter = "Toutes", _selectedComponentType = "Tous les types", _selectedClientUniverse = "Tous les univers", _selectedClientType = "Tous les types", _selectedClientFamily = "Toutes les familles", _selectedClientTag = "Tous les tags";
     private string _currentFurnitureStep = "Identity", _creationMode = "Quick", _newUniverseName = "";
     private ComponentCardViewModel? _selectedComponentCard;
     private FurnitureRecord? _selectedFurniture;
@@ -81,9 +82,12 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<LibraryFilterViewModel> LibraryFilters { get; } = [];
     public ObservableCollection<FilterOptionViewModel> FamilyFilters { get; } = [];
     public ObservableCollection<ToggleOptionViewModel> UniverseOptions { get; } = [];
+    public ObservableCollection<ToggleOptionViewModel> FurnitureTagOptions { get; } = [];
     public ObservableCollection<string> ClientUniverseOptions { get; } = ["Tous les univers"];
     public ObservableCollection<string> ComponentTypeOptions { get; } = ["Tous les types"];
     public ObservableCollection<string> ClientTypeOptions { get; } = ["Tous les types"];
+    public ObservableCollection<string> ClientFamilyOptions { get; } = ["Toutes les familles"];
+    public ObservableCollection<string> ClientTagOptions { get; } = ["Tous les tags"];
     public ICollectionView ComponentView { get; }
     public ICollectionView FurnitureView { get; }
     public ICollectionView ClientFurnitureView { get; }
@@ -98,6 +102,7 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<string> AssemblyTypes { get; } = ["Vis", "Tourillons", "Tourillons + vis", "Excentrique", "Tourillons + excentriques", "Clamex", "Cabineo", "Vis auto-tourillonnante"];
     public IReadOnlyList<string> DoorTypes { get; } = ["Applique", "Semi-applique", "Encastrée"];
     public IReadOnlyList<string> DrawerTypes { get; } = ["Applique", "Encastré"];
+    public IReadOnlyList<string> CatalogUniverses => _catalog.Universes;
 
     public WorkspaceSettings Settings => _catalog.Settings;
     public string Version => _updater.CurrentVersion;
@@ -116,7 +121,7 @@ public sealed class MainViewModel : ObservableObject
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
     public int HealthIssueCount => Components.Count(item => !item.IsNameCompliant || item.IsMissing) + Furniture.Count(item => item.ComponentIds.Count == 0);
     public int MarkedComponentCount => ComponentCards.Count(item => item.IsMarked);
-    public string VisibleComponentLabel => $"{ComponentView.Cast<object>().Count():N0} affichés sur {ComponentCards.Count:N0}";
+    public string VisibleComponentLabel => $"{ComponentView.Cast<object>().Count():N0} affichés sur {ScopedComponentCards().Count():N0}";
     public string LastModification => _catalog.Revision == 0 ? "Espace de découverte" : $"Révision {_catalog.Revision} · {_catalog.ModifiedBy}";
 
     public string ComponentSearch { get => _componentSearch; set { if (SetProperty(ref _componentSearch, value)) RefreshComponentView(); } }
@@ -126,10 +131,22 @@ public sealed class MainViewModel : ObservableObject
     public string SelectedComponentType { get => _selectedComponentType; set { if (SetProperty(ref _selectedComponentType, value)) RefreshComponentView(); } }
     public string SelectedClientUniverse { get => _selectedClientUniverse; set { if (SetProperty(ref _selectedClientUniverse, value)) ClientFurnitureView.Refresh(); } }
     public string SelectedClientType { get => _selectedClientType; set { if (SetProperty(ref _selectedClientType, value)) ClientFurnitureView.Refresh(); } }
+    public string SelectedClientFamily { get => _selectedClientFamily; set { if (SetProperty(ref _selectedClientFamily, value)) ClientFurnitureView.Refresh(); } }
+    public string SelectedClientTag { get => _selectedClientTag; set { if (SetProperty(ref _selectedClientTag, value)) ClientFurnitureView.Refresh(); } }
     public string CurrentFurnitureStep { get => _currentFurnitureStep; set => SetProperty(ref _currentFurnitureStep, value); }
     public string CreationMode { get => _creationMode; set { if (SetProperty(ref _creationMode, value)) OnPropertyChanged(nameof(IsFamilyMode)); } }
     public string NewUniverseName { get => _newUniverseName; set { if (SetProperty(ref _newUniverseName, value)) AddUniverseCommand.RaiseCanExecuteChanged(); } }
-    public LibraryFilterViewModel? SelectedLibraryFilter { get => _selectedLibraryFilter; set { if (SetProperty(ref _selectedLibraryFilter, value)) RefreshComponentView(); } }
+    public LibraryFilterViewModel? SelectedLibraryFilter
+    {
+        get => _selectedLibraryFilter;
+        set
+        {
+            if (!SetProperty(ref _selectedLibraryFilter, value)) return;
+            ActiveFamilyFilter = "Toutes";
+            RebuildScopedComponentFilters();
+            RefreshComponentView();
+        }
+    }
     public FurnitureFamilyRecord? SelectedFurnitureFamily { get => _selectedFurnitureFamily; set => SetProperty(ref _selectedFurnitureFamily, value); }
     public ComponentCardViewModel? SelectedComponentCard { get => _selectedComponentCard; set { if (SetProperty(ref _selectedComponentCard, value)) { OnPropertyChanged(nameof(SelectedComponent)); RaiseCommandStates(); } } }
     public ComponentRecord? SelectedComponent => SelectedComponentCard?.Record;
@@ -138,7 +155,7 @@ public sealed class MainViewModel : ObservableObject
     public ComponentRecord? SelectedLinkedComponent { get => _selectedLinkedComponent; set { if (SetProperty(ref _selectedLinkedComponent, value)) RaiseCommandStates(); } }
     public FurnitureCardViewModel? SelectedClientFurnitureCard { get => _selectedClientFurnitureCard; set { if (SetProperty(ref _selectedClientFurnitureCard, value)) OnPropertyChanged(nameof(SelectedClientFurniture)); } }
     public FurnitureRecord? SelectedClientFurniture => SelectedClientFurnitureCard?.Record;
-    public string InheritedCapabilities => JoinInherited(item => item.CapabilitiesCsv);
+    public string InheritedTags => SelectedFurniture is null ? string.Empty : string.Join(" · ", ComponentTaxonomyStore.Resolve(SelectedFurniture, Components, _taxonomy).Select(x => x.Label));
     public string InheritedCompatibility => JoinInherited(item => item.CompatibilityCsv);
 
     public RelayCommand NavigateCommand { get; }
@@ -193,7 +210,7 @@ public sealed class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            _catalog = await _store.LoadAsync(); NormalizeCatalog();
+            _catalog = await _store.LoadAsync(); _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot); NormalizeCatalog();
             Components.Clear(); foreach (var item in _catalog.Components) Components.Add(item);
             Furniture.Clear(); foreach (var item in _catalog.Furniture) Furniture.Add(item);
             FurnitureFamilies.Clear(); foreach (var item in _catalog.FurnitureFamilies) FurnitureFamilies.Add(item);
@@ -210,8 +227,9 @@ public sealed class MainViewModel : ObservableObject
     {
         _catalog.Settings ??= new(); _catalog.Components ??= []; _catalog.Furniture ??= []; _catalog.FurnitureFamilies ??= []; _catalog.Universes ??= [];
         if (_catalog.Universes.Count == 0) _catalog.Universes.AddRange(DefaultUniverses);
-        foreach (var item in _catalog.Furniture) { item.Universes ??= []; item.ComponentIds ??= []; }
-        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 2);
+        foreach (var item in _catalog.Components) item.NormalizeTags();
+        foreach (var item in _catalog.Furniture) { item.Universes ??= []; item.ComponentIds ??= []; item.AddedTagIds ??= []; item.RemovedInheritedTagIds ??= []; }
+        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 4);
     }
 
     private async Task SaveAsync()
@@ -240,12 +258,24 @@ public sealed class MainViewModel : ObservableObject
             foreach (var item in scan.Components)
             {
                 var record = Components.FirstOrDefault(component => component.Id == item.StableId);
-                if (record is null) { record = new() { Id = item.StableId, DisplayName = item.TechnicalName, Status = RecordStatus.Brouillon }; Components.Add(record); }
+                if (record is null)
+                {
+                    record = new() { Id = item.StableId, DisplayName = ComponentNameParser.SuggestDisplayName(item.TechnicalName), Status = RecordStatus.Brouillon };
+                    Components.Add(record);
+                }
+                else if (string.IsNullOrWhiteSpace(record.DisplayName) || record.DisplayName.Equals(record.TechnicalName, StringComparison.OrdinalIgnoreCase) || record.DisplayName.Equals(ComponentNameParser.SuggestDisplayName(record.TechnicalName), StringComparison.OrdinalIgnoreCase))
+                {
+                    record.DisplayName = ComponentNameParser.SuggestDisplayName(item.TechnicalName);
+                }
                 record.SourceRelativePath = item.RelativeTopPath; record.PreviewRelativePath = item.PreviewRelativePath; record.LibraryName = item.Library; record.FamilyName = item.Family; record.TechnicalName = item.TechnicalName;
                 record.TypeCode = item.Parsed.Type; record.VariantCode = item.Parsed.Variant; record.IndexCode = item.Parsed.Index; record.RangeCode = item.Parsed.Range; record.ConstructionCode = item.Parsed.Construction;
                 record.IsNameCompliant = item.IsCompliant; record.IsMissing = false; record.LastSeenUtc = DateTimeOffset.UtcNow;
             }
+            var taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot);
+            var addedFamilies = ComponentTaxonomyStore.SyncDetectedFamilies(taxonomy, Components);
+            await ComponentTaxonomyStore.SaveAsync(SharedRoot, taxonomy);
             RebuildComponentCards(); RebuildClientCards(); NotifySummary(); StatusText = $"{scan.Components.Count:N0} composants indexés · {scan.Warnings.Count} avertissement(s).";
+            if (addedFamilies > 0) StatusText += $" · {addedFamilies} nouvelle(s) famille(s) détectée(s).";
         }
         catch (Exception exception) { ShowError(exception); }
         finally { IsBusy = false; }
@@ -264,18 +294,34 @@ public sealed class MainViewModel : ObservableObject
         LibraryFilters.Add(new() { Name = "Toutes les bibliothèques", TotalCount = ComponentCards.Count });
         foreach (var group in ComponentCards.GroupBy(item => NormalizeBucket(item.Library)).OrderBy(item => item.Key, StringComparer.CurrentCultureIgnoreCase)) LibraryFilters.Add(new() { Name = group.Key, TotalCount = group.Count() });
         SelectedLibraryFilter = LibraryFilters.FirstOrDefault(item => item.Name == previous) ?? LibraryFilters.FirstOrDefault();
-        FamilyFilters.Clear(); FamilyFilters.Add(new() { Label = "Toutes", Count = ComponentCards.Count, IsActive = ActiveFamilyFilter == "Toutes" });
-        foreach (var group in ComponentCards.GroupBy(item => NormalizeBucket(item.Family)).OrderByDescending(item => item.Count()).ThenBy(item => item.Key, StringComparer.CurrentCultureIgnoreCase)) FamilyFilters.Add(new() { Label = group.Key, Count = group.Count(), IsActive = ActiveFamilyFilter == group.Key });
+        RebuildScopedComponentFilters();
+    }
+
+    private void RebuildScopedComponentFilters()
+    {
+        var scoped = ScopedComponentCards().ToArray();
+        FamilyFilters.Clear(); FamilyFilters.Add(new() { Label = "Toutes", Count = scoped.Length, IsActive = ActiveFamilyFilter == "Toutes" });
+        foreach (var group in scoped.GroupBy(item => NormalizeBucket(item.Family)).OrderByDescending(item => item.Count()).ThenBy(item => item.Key, StringComparer.CurrentCultureIgnoreCase)) FamilyFilters.Add(new() { Label = group.Key, Count = group.Count(), IsActive = ActiveFamilyFilter == group.Key });
+        if (!FamilyFilters.Any(x => x.Label.Equals(ActiveFamilyFilter, StringComparison.OrdinalIgnoreCase))) ActiveFamilyFilter = "Toutes";
         ComponentTypeOptions.Clear(); ComponentTypeOptions.Add("Tous les types");
-        foreach (var type in ComponentCards.Select(item => item.Type).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ComponentTypeOptions.Add(type);
+        foreach (var type in scoped.Select(item => item.Type).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ComponentTypeOptions.Add(type);
         if (!ComponentTypeOptions.Contains(SelectedComponentType)) SelectedComponentType = "Tous les types";
     }
+
+    private IEnumerable<ComponentCardViewModel> ScopedComponentCards() =>
+        SelectedLibraryFilter is { Name: not "Toutes les bibliothèques" }
+            ? ComponentCards.Where(item => NormalizeBucket(item.Library) == SelectedLibraryFilter.Name)
+            : ComponentCards;
 
     private void RebuildClientCards()
     {
         ClientFurnitureCards.Clear(); foreach (var item in Furniture) ClientFurnitureCards.Add(new(item, Settings.LibraryRoot));
         ClientUniverseOptions.Clear(); ClientUniverseOptions.Add("Tous les univers"); foreach (var item in _catalog.Universes.Order(StringComparer.CurrentCultureIgnoreCase)) ClientUniverseOptions.Add(item);
         ClientTypeOptions.Clear(); ClientTypeOptions.Add("Tous les types"); foreach (var item in Furniture.Select(x => x.TypeMeuble).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ClientTypeOptions.Add(item);
+        ClientFamilyOptions.Clear(); ClientFamilyOptions.Add("Toutes les familles"); foreach (var item in Furniture.Select(x => x.Family).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ClientFamilyOptions.Add(item);
+        ClientTagOptions.Clear(); ClientTagOptions.Add("Tous les tags"); foreach (var tag in _taxonomy.Tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)) ClientTagOptions.Add(tag.Label);
+        if (!ClientFamilyOptions.Contains(SelectedClientFamily)) SelectedClientFamily = "Toutes les familles";
+        if (!ClientTagOptions.Contains(SelectedClientTag)) SelectedClientTag = "Tous les tags";
         ClientFurnitureView.Refresh();
     }
 
@@ -321,6 +367,40 @@ public sealed class MainViewModel : ObservableObject
     {
         UniverseOptions.Clear(); var selected = SelectedFurniture?.Universes ?? [];
         foreach (var universe in _catalog.Universes) UniverseOptions.Add(new(universe, selected.Contains(universe, StringComparer.OrdinalIgnoreCase), ToggleUniverse));
+        RebuildFurnitureTagOptions();
+    }
+
+    public async Task ReloadTaxonomyAsync()
+    {
+        _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot);
+        RebuildFurnitureTagOptions();
+        RebuildClientCards();
+        OnPropertyChanged(nameof(InheritedTags));
+    }
+
+    private void RebuildFurnitureTagOptions()
+    {
+        FurnitureTagOptions.Clear();
+        if (SelectedFurniture is null) return;
+        SelectedFurniture.AddedTagIds ??= [];
+        SelectedFurniture.RemovedInheritedTagIds ??= [];
+        var inheritedIds = LinkedComponents.SelectMany(component => ComponentTaxonomyStore.Resolve(component, _taxonomy)).Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var tag in _taxonomy.Tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var selected = (inheritedIds.Contains(tag.Id) && !SelectedFurniture.RemovedInheritedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase)) || SelectedFurniture.AddedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
+            FurnitureTagOptions.Add(new ToggleOptionViewModel(tag.Label, selected, option => ToggleFurnitureTag(tag, inheritedIds.Contains(tag.Id), option.IsSelected)));
+        }
+    }
+
+    private void ToggleFurnitureTag(ComponentTagRecord tag, bool inherited, bool selected)
+    {
+        if (SelectedFurniture is null) return;
+        RemoveIgnoreCase(SelectedFurniture.AddedTagIds, tag.Id);
+        RemoveIgnoreCase(SelectedFurniture.RemovedInheritedTagIds, tag.Id);
+        if (selected && !inherited) SelectedFurniture.AddedTagIds.Add(tag.Id);
+        if (!selected && inherited) SelectedFurniture.RemovedInheritedTagIds.Add(tag.Id);
+        OnPropertyChanged(nameof(InheritedTags));
+        StatusText = "Tags du meuble modifiés. Pensez à enregistrer.";
     }
 
     private void ToggleUniverse(ToggleOptionViewModel option)
@@ -336,6 +416,14 @@ public sealed class MainViewModel : ObservableObject
         var name = NewUniverseName.Trim();
         if (_catalog.Universes.Contains(name, StringComparer.OrdinalIgnoreCase)) { AtlasDialog.Info("Cet univers existe déjà.", "Univers"); return; }
         _catalog.Universes.Add(name); NewUniverseName = ""; RebuildUniverseOptions(); RebuildClientCards(); StatusText = $"Univers « {name} » ajouté au référentiel.";
+    }
+
+    public void ReplaceUniverses(IEnumerable<string> universes)
+    {
+        _catalog.Universes = universes.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+        RebuildUniverseOptions();
+        RebuildClientCards();
+        StatusText = "Référentiel des univers modifié. Pensez à enregistrer le catalogue.";
     }
 
     private void AddComponent()
@@ -367,7 +455,7 @@ public sealed class MainViewModel : ObservableObject
     {
         LinkedComponents.Clear();
         if (SelectedFurniture is not null) foreach (var id in SelectedFurniture.ComponentIds) if (Components.FirstOrDefault(item => item.Id == id) is { } component) LinkedComponents.Add(component);
-        OnPropertyChanged(nameof(InheritedCapabilities)); OnPropertyChanged(nameof(InheritedCompatibility));
+        RebuildFurnitureTagOptions(); OnPropertyChanged(nameof(InheritedTags)); OnPropertyChanged(nameof(InheritedCompatibility));
     }
 
     private string JoinInherited(Func<ComponentRecord, string> selector) => string.Join(", ", LinkedComponents.SelectMany(item => selector(item).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase));
@@ -393,11 +481,20 @@ public sealed class MainViewModel : ObservableObject
         if (item is not FurnitureCardViewModel card || card.Record.Status != RecordStatus.Publiee) return false;
         if (SelectedClientUniverse != "Tous les univers" && !card.Record.Universes.Contains(SelectedClientUniverse, StringComparer.OrdinalIgnoreCase)) return false;
         if (SelectedClientType != "Tous les types" && !card.Record.TypeMeuble.Equals(SelectedClientType, StringComparison.OrdinalIgnoreCase)) return false;
+        if (SelectedClientFamily != "Toutes les familles" && !card.Record.Family.Equals(SelectedClientFamily, StringComparison.OrdinalIgnoreCase)) return false;
+        var resolvedTags = ComponentTaxonomyStore.Resolve(card.Record, Components, _taxonomy);
+        if (SelectedClientTag != "Tous les tags" && !resolvedTags.Any(tag => tag.Label.Equals(SelectedClientTag, StringComparison.OrdinalIgnoreCase))) return false;
         if (string.IsNullOrWhiteSpace(ClientSearch)) return true;
-        var query = ClientSearch.Trim(); return new[] { card.Reference, card.DisplayName, card.Record.Family, card.Description, card.Record.UsageSpecifique, card.Universes }.Any(value => value.Contains(query, StringComparison.OrdinalIgnoreCase));
+        var query = ClientSearch.Trim(); return new[] { card.Reference, card.DisplayName, card.Record.Family, card.Description, card.Record.UsageSpecifique, card.Universes, string.Join(" ", resolvedTags.Select(x => x.Label)) }.Any(value => value.Contains(query, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string NormalizeBucket(string value) => string.IsNullOrWhiteSpace(value) ? "Non classés" : value;
+
+    private static void RemoveIgnoreCase(List<string> values, string id)
+    {
+        var existing = values.FirstOrDefault(value => value.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null) values.Remove(existing);
+    }
 
     private void ChooseLibrary()
     {
@@ -421,9 +518,21 @@ public sealed class MainViewModel : ObservableObject
         {
             var available = await _updater.CheckAsync();
             if (available is null) { UpdateLabel = "Application à jour"; if (!silent) AtlasDialog.Info("Vous utilisez la dernière version.", "Mise à jour"); return; }
-            UpdateLabel = $"Télécharger {available}";
-            if (AtlasDialog.Confirm($"La version {available} est disponible. Ouvrir son téléchargement officiel ?", "Mise à jour"))
+            UpdateLabel = $"Installer {available}";
+            if (!AtlasDialog.Confirm($"La version {available} est disponible. La télécharger et redémarrer Atlas ?", "Mise à jour automatique")) return;
+            UpdateLabel = "Téléchargement…";
+            var automatic = await _updater.DownloadAndInstallAsync(progress => UpdateLabel = $"Téléchargement {progress}%");
+            if (automatic)
+            {
+                StatusText = "Mise à jour téléchargée. Atlas va redémarrer.";
+                System.Windows.Application.Current.Shutdown();
+            }
+            else
+            {
+                UpdateLabel = $"Télécharger {available}";
+                AtlasDialog.Info("Cette installation ne contient pas encore le nouveau module de mise à jour. Le téléchargement va s’ouvrir : extrayez une dernière fois le pack complet. Les versions suivantes s’installeront automatiquement.", "Une dernière installation manuelle");
                 _updater.OpenDownloadPage();
+            }
         }
         catch (Exception exception) { UpdateLabel = "Mise à jour indisponible"; if (!silent) ShowError(exception); }
         finally { IsBusy = false; }

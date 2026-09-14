@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using Atlas.App.ViewModels;
 using Atlas.Core.Models;
 using Atlas.Core.Services;
 
@@ -8,88 +9,162 @@ namespace Atlas.App.Views;
 
 public partial class SettingsView : UserControl
 {
-    private readonly ObservableCollection<CapabilityTagRecord> _capabilityTags = [];
+    private readonly ObservableCollection<ComponentFamilyRecord> _families = [];
+    private readonly ObservableCollection<ComponentTagRecord> _tags = [];
+    private readonly ObservableCollection<ToggleOptionViewModel> _familyTagChoices = [];
+    private readonly ObservableCollection<ToggleOptionViewModel> _tagFamilyChoices = [];
+    private readonly ObservableCollection<string> _universes = [];
+    private ComponentTaxonomy _taxonomy = new();
+    private Dictionary<string, HashSet<string>> _savedAssignments = new(StringComparer.OrdinalIgnoreCase);
+    private bool _refreshing;
 
     public SettingsView()
     {
         InitializeComponent();
-        CapabilityGrid.ItemsSource = _capabilityTags;
+        FamilyList.ItemsSource = _families;
+        TagList.ItemsSource = _tags;
+        FamilyTagChoices.ItemsSource = _familyTagChoices;
+        TagFamilyChoices.ItemsSource = _tagFamilyChoices;
+        UniverseList.ItemsSource = _universes;
     }
 
     private async void SettingsView_OnLoaded(object sender, RoutedEventArgs e)
     {
-        await ReloadCapabilitiesAsync();
+        if (_families.Count > 0 || _tags.Count > 0) return;
+        await ReloadTaxonomyAsync();
+        if (DataContext is MainViewModel vm) foreach (var universe in vm.CatalogUniverses.Order(StringComparer.CurrentCultureIgnoreCase)) _universes.Add(universe);
     }
 
-    private async Task ReloadCapabilitiesAsync()
+    private async Task ReloadTaxonomyAsync()
     {
         if (DataContext is not MainViewModel vm) return;
-        _capabilityTags.Clear();
-        foreach (var tag in await CapabilityTagStore.LoadAsync(vm.SharedRoot)) _capabilityTags.Add(tag);
-        CapabilityStatus.Text = _capabilityTags.Count == 0
-            ? "Aucune capacité créée pour le moment. Ajoutez vos premières capacités ici."
-            : $"{_capabilityTags.Count} capacité(s) dans le référentiel partagé.";
+        _taxonomy = await ComponentTaxonomyStore.LoadAsync(vm.SharedRoot);
+        var added = ComponentTaxonomyStore.SyncDetectedFamilies(_taxonomy, vm.Components);
+        RefreshCollections();
+        _savedAssignments = _taxonomy.Families.ToDictionary(x => x.Id, x => x.TagIds.ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        TaxonomyStatus.Text = added == 0 ? $"{_families.Count} famille(s) · {_tags.Count} tag(s)." : $"{added} nouvelle(s) famille(s) détectée(s). Enregistrez pour les partager.";
     }
 
-    private void AddCapability_OnClick(object sender, RoutedEventArgs e)
+    private void RefreshCollections()
     {
-        if (DataContext is not MainViewModel vm || !vm.CanEdit) return;
-        var tag = new CapabilityTagRecord { Label = "Nouvelle capacité", IsActive = true };
-        _capabilityTags.Add(tag);
-        CapabilityGrid.SelectedItem = tag;
-        CapabilityGrid.ScrollIntoView(tag);
-        CapabilityStatus.Text = "Nouvelle capacité ajoutée. Renseignez son libellé et ses familles par défaut.";
-    }
-
-    private void DeleteCapability_OnClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm || !vm.CanEdit || CapabilityGrid.SelectedItem is not CapabilityTagRecord selected) return;
-        _capabilityTags.Remove(selected);
-        foreach (var component in vm.Components)
+        _refreshing = true;
+        var selectedFamilyId = (FamilyList.SelectedItem as ComponentFamilyRecord)?.Id;
+        var selectedTagId = (TagList.SelectedItem as ComponentTagRecord)?.Id;
+        _families.Clear();
+        foreach (var family in _taxonomy.Families.OrderBy(x => x.LibraryName, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)) _families.Add(family);
+        _tags.Clear();
+        foreach (var tag in _taxonomy.Tags.OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)) _tags.Add(tag);
+        FamilyList.SelectedItem = _families.FirstOrDefault(x => x.Id == selectedFamilyId) ?? _families.FirstOrDefault();
+        TagList.SelectedItem = _tags.FirstOrDefault(x => x.Id == selectedTagId) ?? _tags.FirstOrDefault();
+        if (DataContext is MainViewModel vm)
         {
-            RemoveIgnoreCase(component.AddedCapabilityIds, selected.Id);
-            RemoveIgnoreCase(component.RemovedInheritedCapabilityIds, selected.Id);
-            CapabilityTagStore.RebuildLegacyCapabilities(component, _capabilityTags);
+            var libraries = vm.Components.Select(x => x.LibraryName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+            if (libraries.Count == 0) libraries.Add("Atlas");
+            NewFamilyLibrary.ItemsSource = libraries;
+            NewFamilyLibrary.SelectedIndex = 0;
         }
-        CapabilityStatus.Text = "Capacité supprimée du référentiel local. Enregistrez pour confirmer.";
+        _refreshing = false;
+        RefreshFamilyTagChoices();
+        RefreshTagFamilyChoices();
     }
 
-    private async void SaveCapabilities_OnClick(object sender, RoutedEventArgs e)
+    private void SettingsNavigation_OnClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainViewModel vm || !vm.CanEdit) return;
-        try
-        {
-            var duplicates = _capabilityTags
-                .Where(x => !string.IsNullOrWhiteSpace(x.Label))
-                .GroupBy(x => x.Label.Trim(), StringComparer.OrdinalIgnoreCase)
-                .Where(group => group.Count() > 1)
-                .Select(group => group.Key)
-                .ToArray();
-            if (duplicates.Length > 0)
-            {
-                CapabilityStatus.Text = $"Libellé en double : {string.Join(", ", duplicates)}";
-                return;
-            }
+        if (sender is not Button { Tag: string target }) return;
+        foreach (var panel in new FrameworkElement[] { GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
+            panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
+    }
 
-            foreach (var tag in _capabilityTags)
-            {
-                tag.Label = tag.Label.Trim();
-                if (string.IsNullOrWhiteSpace(tag.Label))
+    private void FamilySelection_OnChanged(object sender, SelectionChangedEventArgs e) { if (!_refreshing) RefreshFamilyTagChoices(); }
+    private void TagSelection_OnChanged(object sender, SelectionChangedEventArgs e) { if (!_refreshing) RefreshTagFamilyChoices(); }
+
+    private void RefreshFamilyTagChoices()
+    {
+        _refreshing = true;
+        _familyTagChoices.Clear();
+        if (FamilyList.SelectedItem is ComponentFamilyRecord family)
+            foreach (var tag in _tags.Where(x => x.IsActive))
+                _familyTagChoices.Add(new ToggleOptionViewModel(tag.Label, family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                 {
-                    CapabilityStatus.Text = "Chaque capacité doit avoir un libellé.";
-                    return;
-                }
-            }
+                    SetMembership(family.TagIds, tag.Id, choice.IsSelected);
+                    TaxonomyStatus.Text = "Affectation modifiée. Enregistrez pour la propager.";
+                    RefreshTagFamilyChoices();
+                }));
+        _refreshing = false;
+    }
 
-            await CapabilityTagStore.SaveAsync(vm.SharedRoot, _capabilityTags);
-            foreach (var component in vm.Components) CapabilityTagStore.RebuildLegacyCapabilities(component, _capabilityTags);
-            vm.StatusText = "Référentiel des capacités enregistré. Pensez aussi à enregistrer le catalogue si des composants ont été recalculés.";
-            CapabilityStatus.Text = $"Référentiel enregistré · {_capabilityTags.Count} capacité(s).";
-        }
-        catch (Exception exception)
-        {
-            CapabilityStatus.Text = exception.Message;
-        }
+    private void RefreshTagFamilyChoices()
+    {
+        _refreshing = true;
+        _tagFamilyChoices.Clear();
+        if (TagList.SelectedItem is ComponentTagRecord tag)
+            foreach (var family in _families.Where(x => x.IsActive))
+                _tagFamilyChoices.Add(new ToggleOptionViewModel(family.QualifiedName, family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
+                {
+                    SetMembership(family.TagIds, tag.Id, choice.IsSelected);
+                    TaxonomyStatus.Text = "Affectation modifiée. Enregistrez pour la propager.";
+                    RefreshFamilyTagChoices();
+                }));
+        _refreshing = false;
+    }
+
+    private void AddFamily_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true }) return;
+        var name = NewFamilyName.Text.Trim();
+        var library = NewFamilyLibrary.SelectedItem?.ToString() ?? "Atlas";
+        if (string.IsNullOrWhiteSpace(name)) { TaxonomyStatus.Text = "Renseignez le nom de la famille."; return; }
+        if (_families.Any(x => ComponentTaxonomyStore.FamilyKey(x.LibraryName, x.Name).Equals(ComponentTaxonomyStore.FamilyKey(library, name), StringComparison.OrdinalIgnoreCase))) { TaxonomyStatus.Text = "Cette famille existe déjà dans cette bibliothèque."; return; }
+        var family = new ComponentFamilyRecord { LibraryName = library, Name = name, IsDetected = false };
+        _taxonomy.Families.Add(family); NewFamilyName.Clear(); RefreshCollections(); FamilyList.SelectedItem = family;
+        TaxonomyStatus.Text = "Famille manuelle créée. Affectez-lui ses tags puis enregistrez.";
+    }
+
+    private void AddTag_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true }) return;
+        var tag = new ComponentTagRecord { Label = "Nouveau tag" };
+        _taxonomy.Tags.Add(tag); RefreshCollections(); TagList.SelectedItem = tag;
+        TaxonomyStatus.Text = "Tag créé. Renommez-le et choisissez une ou plusieurs familles.";
+    }
+
+    private void DeleteTag_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } || TagList.SelectedItem is not ComponentTagRecord tag) return;
+        var affected = _families.Count(x => x.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase));
+        if (!AtlasDialog.Confirm($"Supprimer le tag « {tag.Label} » ?", "Suppression du tag", $"{affected} famille(s) le référencent actuellement.")) return;
+        _taxonomy.Tags.Remove(tag);
+        foreach (var family in _taxonomy.Families) RemoveIgnoreCase(family.TagIds, tag.Id);
+        RefreshCollections();
+        TaxonomyStatus.Text = "Tag supprimé. Enregistrez pour confirmer.";
+    }
+
+    private void SyncFamilies_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var added = ComponentTaxonomyStore.SyncDetectedFamilies(_taxonomy, vm.Components);
+        RefreshCollections();
+        TaxonomyStatus.Text = added == 0 ? "Les familles détectées sont déjà synchronisées." : $"{added} nouvelle(s) famille(s) trouvée(s). Enregistrez pour les partager.";
+    }
+
+    private async void SaveTaxonomy_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        var duplicateTags = _tags.Where(x => !string.IsNullOrWhiteSpace(x.Label)).GroupBy(x => x.Label.Trim(), StringComparer.OrdinalIgnoreCase).FirstOrDefault(x => x.Count() > 1);
+        if (duplicateTags is not null) { TaxonomyStatus.Text = $"Tag en double : {duplicateTags.Key}"; return; }
+        if (_tags.Any(x => string.IsNullOrWhiteSpace(x.Label)) || _families.Any(x => string.IsNullOrWhiteSpace(x.Name))) { TaxonomyStatus.Text = "Chaque famille et chaque tag doit avoir un nom."; return; }
+
+        var changedFamilies = _families.Where(f => !_savedAssignments.TryGetValue(f.Id, out var saved) || !saved.SetEquals(f.TagIds)).ToArray();
+        var impacted = vm.Components.Count(component => changedFamilies.Any(f => ComponentTaxonomyStore.FamilyKey(f.LibraryName, f.Name).Equals(ComponentTaxonomyStore.FamilyKey(component.LibraryName, component.EffectiveFamilyName), StringComparison.OrdinalIgnoreCase)));
+        if (impacted > 0 && !AtlasDialog.Confirm("Appliquer ces changements de tags ?", "Propagation aux composants", $"{changedFamilies.Length} famille(s) modifiée(s) · {impacted} composant(s) verront leurs tags hérités évoluer. Les exceptions manuelles seront conservées.")) return;
+
+        foreach (var tag in _tags) { tag.Label = tag.Label.Trim(); tag.Description = tag.Description.Trim(); }
+        foreach (var family in _families) { family.Name = family.Name.Trim(); family.Description = family.Description.Trim(); }
+        await ComponentTaxonomyStore.SaveAsync(vm.SharedRoot, _taxonomy);
+        await vm.ReloadTaxonomyAsync();
+        _savedAssignments = _taxonomy.Families.ToDictionary(x => x.Id, x => x.TagIds.ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        TaxonomyStatus.Text = $"Référentiel enregistré · {_families.Count} famille(s) · {_tags.Count} tag(s).";
+        vm.StatusText = "Familles et tags partagés enregistrés.";
     }
 
     private async void CreateUser_OnClick(object sender, RoutedEventArgs e)
@@ -102,6 +177,28 @@ public partial class SettingsView : UserControl
             NewLogin.Clear(); NewDisplayName.Clear(); NewPassword.Clear();
         }
         catch (Exception exception) { UserError.Text = exception.Message; }
+    }
+
+    private void AddUniverseSetting_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        var name = NewUniverseSetting.Text.Trim();
+        if (string.IsNullOrWhiteSpace(name) || _universes.Contains(name, StringComparer.OrdinalIgnoreCase)) return;
+        _universes.Add(name); NewUniverseSetting.Clear(); vm.ReplaceUniverses(_universes);
+    }
+
+    private void DeleteUniverseSetting_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || UniverseList.SelectedItem is not string selected) return;
+        var count = vm.Furniture.Count(x => x.Universes.Contains(selected, StringComparer.OrdinalIgnoreCase));
+        if (!AtlasDialog.Confirm($"Supprimer l’univers « {selected} » ?", "Suppression d’un univers", $"{count} meuble(s) utilisent encore cet univers. Leur fiche conservera la valeur jusqu’à modification manuelle.")) return;
+        _universes.Remove(selected); vm.ReplaceUniverses(_universes);
+    }
+
+    private static void SetMembership(List<string> values, string id, bool selected)
+    {
+        if (selected && !values.Contains(id, StringComparer.OrdinalIgnoreCase)) values.Add(id);
+        if (!selected) RemoveIgnoreCase(values, id);
     }
 
     private static void RemoveIgnoreCase(List<string> values, string id)

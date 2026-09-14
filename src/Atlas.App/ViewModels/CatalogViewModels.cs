@@ -158,12 +158,12 @@ public sealed class ToggleOptionViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
-public sealed class CapabilityChoiceViewModel : INotifyPropertyChanged
+public sealed class TagChoiceViewModel : INotifyPropertyChanged
 {
     private bool _isSelected;
-    private readonly Action<CapabilityChoiceViewModel> _changed;
+    private readonly Action<TagChoiceViewModel> _changed;
 
-    public CapabilityChoiceViewModel(CapabilityTagRecord tag, bool inherited, bool selected, Action<CapabilityChoiceViewModel> changed)
+    public TagChoiceViewModel(ComponentTagRecord tag, bool inherited, bool selected, Action<TagChoiceViewModel> changed)
     {
         Tag = tag;
         IsInherited = inherited;
@@ -171,7 +171,7 @@ public sealed class CapabilityChoiceViewModel : INotifyPropertyChanged
         _changed = changed;
     }
 
-    public CapabilityTagRecord Tag { get; }
+    public ComponentTagRecord Tag { get; }
     public string Id => Tag.Id;
     public string Label => Tag.Label;
     public bool IsInherited { get; }

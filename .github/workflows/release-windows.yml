@@ -30,13 +30,16 @@ jobs:
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release
       - name: Publier le dossier autonome
         run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish/portable
+      - name: Produire le module de mise à jour
+        run: dotnet publish src/Atlas.Updater/Atlas.Updater.csproj --configuration Release -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish/updater
+      - name: Ajouter le module au pack
+        shell: pwsh
+        run: Copy-Item publish/updater/Atlas.Updater.exe publish/portable/Atlas.Updater.exe -Force
       - name: Créer l’archive portable
         shell: pwsh
         run: Compress-Archive -Path publish/portable/* -DestinationPath publish/Atlas-win-x64.zip
-      - name: Produire l’exécutable de transition
-        run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=false -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.value }} --output publish/legacy
       - name: Créer la GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
-        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-win-x64.zip" "publish/legacy/Atlas.exe" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-win-x64.zip" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
