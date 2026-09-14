@@ -62,12 +62,15 @@ public sealed class MainViewModel : ObservableObject
         CreateFamilyCommand = new(_ => CreateFamily(), _ => CanEdit);
         SetCreationModeCommand = new(value => CreationMode = value?.ToString() ?? "Quick");
         NavigateFurnitureStepCommand = new(value => CurrentFurnitureStep = value?.ToString() ?? "Identity");
+        PreviousFurnitureStepCommand = new(_ => MoveFurnitureStep(-1), _ => FurnitureStepIndex > 0);
+        NextFurnitureStepCommand = new(_ => MoveFurnitureStep(1), _ => FurnitureStepIndex < FurnitureSteps.Count - 1);
         ChooseFurnitureTopCommand = new(_ => ChooseFurnitureTop(), _ => CanEdit && SelectedFurniture is not null);
         OpenFurnitureFolderCommand = new(_ => OpenFurnitureFolder(), _ => SelectedFurniture is not null && !string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath));
         AddUniverseCommand = new(_ => AddUniverse(), _ => CanEdit && !string.IsNullOrWhiteSpace(NewUniverseName));
         AddComponentCommand = new(_ => AddComponent(), _ => CanEdit && SelectedFurniture is not null && SelectedCompositionCandidate is not null);
         AddMarkedComponentsCommand = new(_ => AddMarkedComponents(), _ => CanEdit && SelectedFurniture is not null && MarkedComponentCount > 0);
         RemoveComponentCommand = new(_ => RemoveComponent(), _ => CanEdit && SelectedFurniture is not null && SelectedLinkedComponent is not null);
+        RemoveMarkedCompositionCommand = new(_ => RemoveMarkedComposition(), _ => CanEdit && SelectedFurniture is not null && CompositionLines.Any(x => x.IsMarked));
         PublishFurnitureCommand = new(_ => PublishFurniture(), _ => CanValidate && SelectedFurniture is not null);
         OpenSharedRootCommand = new(_ => OpenSharedRoot());
         CheckUpdateCommand = new(_ => _ = CheckUpdateAsync(false), _ => !IsBusy);
@@ -83,6 +86,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<FurnitureFamilyRecord> FurnitureFamilies { get; } = [];
     public ObservableCollection<FurnitureCardViewModel> ClientFurnitureCards { get; } = [];
     public ObservableCollection<ComponentRecord> LinkedComponents { get; } = [];
+    public ObservableCollection<FurnitureCompositionLineViewModel> CompositionLines { get; } = [];
     public ObservableCollection<UserAccount> Users { get; } = [];
     public ObservableCollection<LibraryFilterViewModel> LibraryFilters { get; } = [];
     public ObservableCollection<FilterOptionViewModel> FamilyFilters { get; } = [];
@@ -121,7 +125,21 @@ public sealed class MainViewModel : ObservableObject
 
     public WorkspaceSettings Settings => _catalog.Settings;
     public string Version => _updater.CurrentVersion;
-    public string CurrentPage { get => _currentPage; set => SetProperty(ref _currentPage, value); }
+    public string CurrentPage
+    {
+        get => _currentPage;
+        set
+        {
+            if (!SetProperty(ref _currentPage, value)) return;
+            foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
+        }
+    }
+    public string DashboardNavBackground => NavBackground("Dashboard");
+    public string ComponentsNavBackground => NavBackground("Components");
+    public string FurnitureNavBackground => NavBackground("Furniture");
+    public string FutureNavBackground => NavBackground("Future");
+    public string CatalogNavBackground => NavBackground("Catalog");
+    public string SettingsNavBackground => NavBackground("Settings");
     public string SharedRoot { get => _sharedRoot; set => SetProperty(ref _sharedRoot, value); }
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
     public string UpdateLabel { get => _updateLabel; set => SetProperty(ref _updateLabel, value); }
@@ -142,7 +160,7 @@ public sealed class MainViewModel : ObservableObject
     public string ComponentSearch { get => _componentSearch; set { if (SetProperty(ref _componentSearch, value)) RefreshComponentView(); } }
     public string FurnitureSearch { get => _furnitureSearch; set { if (SetProperty(ref _furnitureSearch, value)) FurnitureView.Refresh(); } }
     public string ClientSearch { get => _clientSearch; set { if (SetProperty(ref _clientSearch, value)) ClientFurnitureView.Refresh(); } }
-    public string ActiveFamilyFilter { get => _activeFamilyFilter; set { if (SetProperty(ref _activeFamilyFilter, value)) { UpdateFamilyFilterStates(); RefreshComponentView(); } } }
+    public string ActiveFamilyFilter { get => _activeFamilyFilter; set { if (SetProperty(ref _activeFamilyFilter, value)) { UpdateFamilyFilterStates(); RebuildComponentTypeOptions(); RefreshComponentView(); } } }
     public string SelectedComponentType { get => _selectedComponentType; set { if (SetProperty(ref _selectedComponentType, value)) RefreshComponentView(); } }
     public string SelectedClientUniverse { get => _selectedClientUniverse; set { if (SetProperty(ref _selectedClientUniverse, value)) ClientFurnitureView.Refresh(); } }
     public string SelectedClientType { get => _selectedClientType; set { if (SetProperty(ref _selectedClientType, value)) ClientFurnitureView.Refresh(); } }
@@ -156,9 +174,15 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _currentFurnitureStep, value)) return;
             foreach (var step in FurnitureSteps) step.IsActive = step.Key.Equals(value, StringComparison.OrdinalIgnoreCase);
             OnPropertyChanged(nameof(FurnitureStepIndicator));
+            OnPropertyChanged(nameof(IsReviewStep));
+            PreviousFurnitureStepCommand.RaiseCanExecuteChanged();
+            NextFurnitureStepCommand.RaiseCanExecuteChanged();
         }
     }
     public string FurnitureStepIndicator => $"Étape {Math.Max(1, FurnitureSteps.ToList().FindIndex(x => x.Key.Equals(CurrentFurnitureStep, StringComparison.OrdinalIgnoreCase)) + 1)} sur 5";
+    public bool IsReviewStep => CurrentFurnitureStep == "Review";
+    public int CompositionTotalQuantity => CompositionLines.Sum(x => x.Quantity);
+    public int MarkedCompositionLineCount => CompositionLines.Count(x => x.IsMarked);
     public string CreationMode { get => _creationMode; set { if (SetProperty(ref _creationMode, value)) OnPropertyChanged(nameof(IsFamilyMode)); } }
     public string NewUniverseName { get => _newUniverseName; set { if (SetProperty(ref _newUniverseName, value)) AddUniverseCommand.RaiseCanExecuteChanged(); } }
     public LibraryFilterViewModel? SelectedLibraryFilter
@@ -214,12 +238,15 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand CreateFamilyCommand { get; }
     public RelayCommand SetCreationModeCommand { get; }
     public RelayCommand NavigateFurnitureStepCommand { get; }
+    public RelayCommand PreviousFurnitureStepCommand { get; }
+    public RelayCommand NextFurnitureStepCommand { get; }
     public RelayCommand ChooseFurnitureTopCommand { get; }
     public RelayCommand OpenFurnitureFolderCommand { get; }
     public RelayCommand AddUniverseCommand { get; }
     public RelayCommand AddComponentCommand { get; }
     public RelayCommand AddMarkedComponentsCommand { get; }
     public RelayCommand RemoveComponentCommand { get; }
+    public RelayCommand RemoveMarkedCompositionCommand { get; }
     public RelayCommand PublishFurnitureCommand { get; }
     public RelayCommand OpenSharedRootCommand { get; }
     public RelayCommand CheckUpdateCommand { get; }
@@ -270,12 +297,15 @@ public sealed class MainViewModel : ObservableObject
         foreach (var item in _catalog.Components) item.NormalizeTags();
         foreach (var item in _catalog.Furniture)
         {
-            item.Universes ??= []; item.Usages ??= []; item.ComponentIds ??= []; item.AddedTagIds ??= []; item.RemovedInheritedTagIds ??= [];
+            item.Universes ??= []; item.Usages ??= []; item.ComponentIds ??= []; item.ComponentLines ??= []; item.AddedTagIds ??= []; item.RemovedInheritedTagIds ??= [];
+            if (item.ComponentLines.Count == 0)
+                item.ComponentLines.AddRange(item.ComponentIds.Distinct(StringComparer.OrdinalIgnoreCase).Select(id => new FurnitureComponentLine { ComponentId = id, Quantity = 1 }));
+            SyncLegacyComponentIds(item);
             if (item.Usages.Count == 0 && !string.IsNullOrWhiteSpace(item.UsageSpecifique))
                 item.Usages.AddRange(item.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             item.ConceptionDate ??= DateTime.Today;
         }
-        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 5);
+        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 6);
     }
 
     private async Task SaveAsync()
@@ -349,7 +379,15 @@ public sealed class MainViewModel : ObservableObject
         FamilyFilters.Clear(); FamilyFilters.Add(new() { Label = "Toutes", Count = scoped.Length, IsActive = ActiveFamilyFilter == "Toutes" });
         foreach (var group in scoped.GroupBy(item => NormalizeBucket(item.Family)).OrderByDescending(item => item.Count()).ThenBy(item => item.Key, StringComparer.CurrentCultureIgnoreCase)) FamilyFilters.Add(new() { Label = group.Key, Count = group.Count(), IsActive = ActiveFamilyFilter == group.Key });
         if (!FamilyFilters.Any(x => x.Label.Equals(ActiveFamilyFilter, StringComparison.OrdinalIgnoreCase))) ActiveFamilyFilter = "Toutes";
-        ComponentTypeOptions.Clear(); ComponentTypeOptions.Add("Tous les types");
+        RebuildComponentTypeOptions();
+    }
+
+    private void RebuildComponentTypeOptions()
+    {
+        var scoped = ScopedComponentCards();
+        if (ActiveFamilyFilter != "Toutes") scoped = scoped.Where(item => NormalizeBucket(item.Family) == ActiveFamilyFilter);
+        ComponentTypeOptions.Clear();
+        ComponentTypeOptions.Add("Tous les types");
         foreach (var type in scoped.Select(item => item.Type).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ComponentTypeOptions.Add(type);
         if (!ComponentTypeOptions.Contains(SelectedComponentType)) SelectedComponentType = "Tous les types";
     }
@@ -431,6 +469,7 @@ public sealed class MainViewModel : ObservableObject
         if (option.IsSelected && existing is null) SelectedFurniture.Usages.Add(option.Label);
         else if (!option.IsSelected && existing is not null) SelectedFurniture.Usages.Remove(existing);
         SelectedFurniture.UsageSpecifique = string.Join(", ", SelectedFurniture.Usages);
+        InvalidatePublicationReview();
     }
 
     public async Task ReloadTaxonomyAsync()
@@ -439,6 +478,7 @@ public sealed class MainViewModel : ObservableObject
         RebuildFurnitureTagOptions();
         RebuildClientCards();
         OnPropertyChanged(nameof(InheritedTags));
+        InvalidatePublicationReview();
     }
 
     private void RebuildFurnitureTagOptions()
@@ -471,6 +511,7 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedFurniture is null) return;
         var existing = SelectedFurniture.Universes.FirstOrDefault(value => value.Equals(option.Label, StringComparison.OrdinalIgnoreCase));
         if (option.IsSelected && existing is null) SelectedFurniture.Universes.Add(option.Label); else if (!option.IsSelected && existing is not null) SelectedFurniture.Universes.Remove(existing);
+        InvalidatePublicationReview();
         RebuildClientCards();
     }
 
@@ -491,34 +532,93 @@ public sealed class MainViewModel : ObservableObject
 
     private void AddComponent()
     {
-        if (SelectedFurniture is null || SelectedCompositionCandidate is null || SelectedFurniture.ComponentIds.Contains(SelectedCompositionCandidate.Id)) return;
-        SelectedFurniture.ComponentIds.Add(SelectedCompositionCandidate.Id); RefreshLinkedComponents();
+        if (SelectedFurniture is null || SelectedCompositionCandidate is null) return;
+        AddOrIncrementComponent(SelectedCompositionCandidate.Id);
+        InvalidatePublicationReview();
+        RefreshLinkedComponents();
     }
 
     private void AddMarkedComponents()
     {
-        if (SelectedFurniture is null) return; var added = 0;
-        foreach (var card in ComponentCards.Where(item => item.IsMarked)) if (!SelectedFurniture.ComponentIds.Contains(card.Id)) { SelectedFurniture.ComponentIds.Add(card.Id); added++; }
-        RefreshLinkedComponents(); StatusText = $"{added} composant(s) ajouté(s) à la composition.";
+        if (SelectedFurniture is null) return;
+        var added = 0;
+        foreach (var card in ComponentCards.Where(item => item.IsMarked).ToArray())
+        {
+            AddOrIncrementComponent(card.Id);
+            card.IsMarked = false;
+            added++;
+        }
+        InvalidatePublicationReview();
+        RefreshLinkedComponents(); StatusText = $"{added} composant(s) ajouté(s) à la composition. Une référence déjà présente voit sa quantité augmenter.";
     }
 
-    private void RemoveComponent() { if (SelectedFurniture is null || SelectedLinkedComponent is null) return; SelectedFurniture.ComponentIds.Remove(SelectedLinkedComponent.Id); RefreshLinkedComponents(); }
+    private void RemoveComponent()
+    {
+        if (SelectedFurniture is null || SelectedLinkedComponent is null) return;
+        var line = SelectedFurniture.ComponentLines.FirstOrDefault(x => x.ComponentId == SelectedLinkedComponent.Id);
+        if (line is not null) SelectedFurniture.ComponentLines.Remove(line);
+        InvalidatePublicationReview();
+        RefreshLinkedComponents();
+    }
+
+    private void RemoveMarkedComposition()
+    {
+        if (SelectedFurniture is null) return;
+        var marked = CompositionLines.Where(x => x.IsMarked).ToArray();
+        if (marked.Length == 0 || !AtlasDialog.Confirm($"Retirer {marked.Length} ligne(s) de la composition ?", "Composition")) return;
+        foreach (var line in marked) SelectedFurniture.ComponentLines.Remove(line.Line);
+        InvalidatePublicationReview();
+        RefreshLinkedComponents();
+    }
 
     private void PublishFurniture()
     {
         if (SelectedFurniture is null) return;
-        var invalid = LinkedComponents.Where(item => item.Status is not (RecordStatus.Validee or RecordStatus.Retenue or RecordStatus.Publiee)).ToArray();
-        if ((LinkedComponents.Count == 0 || invalid.Length > 0) && string.IsNullOrWhiteSpace(SelectedFurniture.ForcedValidationReason)) { AtlasDialog.Warning("La composition est vide ou contient des composants non validés. Renseignez le motif de forçage pour conserver le dernier mot.", "Publication"); return; }
-        if (SelectedFurniture.Universes.Count == 0) { AtlasDialog.Warning("Sélectionnez au moins un univers avant de publier ce meuble.", "Publication"); CurrentFurnitureStep = "Classification"; return; }
+        if (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath)) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais il faut lui associer un fichier .TOP avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Identity"; return; }
+        if (SelectedFurniture.Universes.Count == 0 || string.IsNullOrWhiteSpace(SelectedFurniture.TypeMeuble)) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais un univers et un type sont obligatoires avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Classification"; return; }
+        if (SelectedFurniture.ComponentLines.Count == 0) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais sa composition ne peut pas être vide avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Composition"; return; }
+        if (!SelectedFurniture.IsPublicationReviewed) { AtlasDialog.Warning("Enregistrement possible, mais publication impossible : cochez la validation finale après avoir contrôlé le récapitulatif.", "Publication bloquée"); CurrentFurnitureStep = "Review"; return; }
         SelectedFurniture.Status = RecordStatus.Publiee; SelectedFurniture.ValidatedBy = CurrentUser.DisplayName; SelectedFurniture.ValidatedUtc = DateTimeOffset.UtcNow;
         RebuildClientCards(); NotifySummary(); StatusText = "Meuble publié dans le Catalogue Atlas. Pensez à enregistrer.";
     }
 
     private void RefreshLinkedComponents()
     {
-        LinkedComponents.Clear();
-        if (SelectedFurniture is not null) foreach (var id in SelectedFurniture.ComponentIds) if (Components.FirstOrDefault(item => item.Id == id) is { } component) LinkedComponents.Add(component);
-        RebuildFurnitureTagOptions(); OnPropertyChanged(nameof(InheritedTags)); OnPropertyChanged(nameof(InheritedTagsByCategory)); OnPropertyChanged(nameof(InheritedFamilies)); OnPropertyChanged(nameof(InheritedCompatibility));
+        LinkedComponents.Clear(); CompositionLines.Clear();
+        if (SelectedFurniture is not null)
+        {
+            SelectedFurniture.ComponentLines ??= [];
+            foreach (var line in SelectedFurniture.ComponentLines)
+            {
+                var component = Components.FirstOrDefault(item => item.Id == line.ComponentId);
+                var card = ComponentCards.FirstOrDefault(item => item.Id == line.ComponentId);
+                if (component is null || card is null) continue;
+                if (!LinkedComponents.Contains(component)) LinkedComponents.Add(component);
+                var row = new FurnitureCompositionLineViewModel(line, card);
+                row.PropertyChanged += CompositionLineOnPropertyChanged;
+                CompositionLines.Add(row);
+            }
+            SyncLegacyComponentIds(SelectedFurniture);
+        }
+        RebuildFurnitureTagOptions(); OnPropertyChanged(nameof(InheritedTags)); OnPropertyChanged(nameof(InheritedTagsByCategory)); OnPropertyChanged(nameof(InheritedFamilies)); OnPropertyChanged(nameof(InheritedCompatibility)); OnPropertyChanged(nameof(CompositionTotalQuantity)); OnPropertyChanged(nameof(CharacteristicWarnings));
+        RemoveMarkedCompositionCommand.RaiseCanExecuteChanged();
+    }
+
+    public string CharacteristicWarnings
+    {
+        get
+        {
+            var warnings = new List<string>();
+            foreach (var component in LinkedComponents)
+            {
+                var family = component.EffectiveFamilyName.ToLowerInvariant();
+                var tags = ComponentTaxonomyStore.Resolve(component, _taxonomy);
+                if ((family.Contains("couliss") || family.Contains("tiroir")) && !tags.Any(x => x.Category is "Marque" or "Gamme")) warnings.Add($"{component.DisplayName} : marque ou gamme de coulissant à compléter");
+                if ((family.Contains("charni") || family.Contains("façade") || family.Contains("facade")) && !tags.Any(x => x.Category is "Marque" or "Implantation")) warnings.Add($"{component.DisplayName} : quincaillerie ou implantation de façade à compléter");
+                if (family.Contains("pied") && !tags.Any(x => x.Category is "Marque" or "Gamme")) warnings.Add($"{component.DisplayName} : système de pied à compléter");
+            }
+            return warnings.Count == 0 ? "Aucun avertissement technique détecté." : "À compléter (sans bloquer le MVP) :\n" + string.Join("\n", warnings.Distinct(StringComparer.OrdinalIgnoreCase));
+        }
     }
 
     private void SelectedFurnitureOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -528,7 +628,46 @@ public sealed class MainViewModel : ObservableObject
             LoadFurniturePreview();
             OpenFurnitureFolderCommand.RaiseCanExecuteChanged();
         }
+        if (e.PropertyName != nameof(FurnitureRecord.IsPublicationReviewed)) InvalidatePublicationReview();
     }
+
+    private int FurnitureStepIndex => Math.Max(0, FurnitureSteps.ToList().FindIndex(x => x.Key.Equals(CurrentFurnitureStep, StringComparison.OrdinalIgnoreCase)));
+
+    private void MoveFurnitureStep(int direction)
+    {
+        var index = Math.Clamp(FurnitureStepIndex + direction, 0, FurnitureSteps.Count - 1);
+        CurrentFurnitureStep = FurnitureSteps[index].Key;
+    }
+
+    private void AddOrIncrementComponent(string componentId)
+    {
+        if (SelectedFurniture is null) return;
+        SelectedFurniture.ComponentLines ??= [];
+        var existing = SelectedFurniture.ComponentLines.FirstOrDefault(x => x.ComponentId.Equals(componentId, StringComparison.OrdinalIgnoreCase));
+        if (existing is null) SelectedFurniture.ComponentLines.Add(new FurnitureComponentLine { ComponentId = componentId, Quantity = 1 });
+        else existing.Quantity++;
+        SyncLegacyComponentIds(SelectedFurniture);
+    }
+
+    private void CompositionLineOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FurnitureCompositionLineViewModel.IsMarked)) RemoveMarkedCompositionCommand.RaiseCanExecuteChanged();
+        if (e.PropertyName == nameof(FurnitureCompositionLineViewModel.Quantity))
+        {
+            InvalidatePublicationReview();
+            OnPropertyChanged(nameof(CompositionTotalQuantity));
+        }
+    }
+
+    private void InvalidatePublicationReview()
+    {
+        if (SelectedFurniture is not null && SelectedFurniture.IsPublicationReviewed) SelectedFurniture.IsPublicationReviewed = false;
+    }
+
+    private static void SyncLegacyComponentIds(FurnitureRecord furniture) =>
+        furniture.ComponentIds = furniture.ComponentLines.Select(x => x.ComponentId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    private string NavBackground(string page) => CurrentPage.Equals(page, StringComparison.OrdinalIgnoreCase) ? "#214E86" : "Transparent";
 
     private string ResolveLibraryPath(string path)
     {
@@ -675,7 +814,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, PublishFurnitureCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand }) command.RaiseCanExecuteChanged();
     }
 
     private static void ShowError(Exception exception) => AtlasDialog.Error(exception.Message, "Biblidéo Atlas");
