@@ -8,6 +8,7 @@ namespace Atlas.App.Controls;
 public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
 {
     public static readonly DependencyProperty TargetItemWidthProperty = DependencyProperty.Register(nameof(TargetItemWidth), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(278d, FrameworkPropertyMetadataOptions.AffectsMeasure));
+    public static readonly DependencyProperty ItemWidthProperty = DependencyProperty.Register(nameof(ItemWidth), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(205d, FrameworkPropertyMetadataOptions.AffectsMeasure, OnItemWidthChanged));
     public static readonly DependencyProperty ItemHeightProperty = DependencyProperty.Register(nameof(ItemHeight), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(244d, FrameworkPropertyMetadataOptions.AffectsMeasure));
     public static readonly DependencyProperty SpacingProperty = DependencyProperty.Register(nameof(Spacing), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(12d, FrameworkPropertyMetadataOptions.AffectsMeasure));
     private Size _extent;
@@ -17,17 +18,26 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     private double _actualItemWidth = 278;
 
     public double TargetItemWidth { get => (double)GetValue(TargetItemWidthProperty); set => SetValue(TargetItemWidthProperty, value); }
-    // Alias WPF familier, utile aux vues compactes qui réutilisent ce panneau.
-    public double ItemWidth { get => TargetItemWidth; set => TargetItemWidth = value; }
+    public double ItemWidth { get => (double)GetValue(ItemWidthProperty); set => SetValue(ItemWidthProperty, value); }
     public double ItemHeight { get => (double)GetValue(ItemHeightProperty); set => SetValue(ItemHeightProperty, value); }
     public double Spacing { get => (double)GetValue(SpacingProperty); set => SetValue(SpacingProperty, value); }
+
+    private static void OnItemWidthChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (dependencyObject is VirtualizingWrapPanel panel && args.NewValue is double width) panel.TargetItemWidth = width;
+    }
 
     protected override Size MeasureOverride(Size availableSize)
     {
         var owner = ItemsControl.GetItemsOwner(this);
-        if (owner is null) return availableSize;
+        if (owner is null) return new Size(
+            double.IsFinite(availableSize.Width) ? Math.Max(0, availableSize.Width) : 0,
+            double.IsFinite(availableSize.Height) ? Math.Max(0, availableSize.Height) : 0);
         var width = double.IsInfinity(availableSize.Width) || availableSize.Width <= 0 ? Math.Max(1, owner.ActualWidth) : availableSize.Width;
-        var height = double.IsInfinity(availableSize.Height) || availableSize.Height <= 0 ? Math.Max(1, ScrollOwner?.ViewportHeight ?? owner.ActualHeight) : availableSize.Height;
+        var measuredViewport = ScrollOwner?.ViewportHeight ?? owner.ActualHeight;
+        var height = double.IsInfinity(availableSize.Height) || availableSize.Height <= 0
+            ? Math.Max(1, double.IsFinite(measuredViewport) && measuredViewport > 0 ? measuredViewport : 520)
+            : availableSize.Height;
         _columns = Math.Max(1, (int)Math.Floor((width + Spacing) / (Math.Max(180, TargetItemWidth) + Spacing)));
         _actualItemWidth = Math.Max(210, (width - ((_columns - 1) * Spacing)) / _columns);
         var rowHeight = ItemHeight + Spacing;
@@ -40,7 +50,8 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         Cleanup(firstIndex, lastIndex);
         if (lastIndex >= firstIndex) Generate(firstIndex, lastIndex);
         foreach (UIElement child in InternalChildren) child.Measure(new Size(_actualItemWidth, ItemHeight));
-        return availableSize;
+        // WPF interdit qu'un panneau renvoie une taille désirée infinie, notamment dans un ScrollViewer.
+        return new Size(Math.Max(0, width), Math.Max(0, height));
     }
 
     protected override Size ArrangeOverride(Size finalSize)
