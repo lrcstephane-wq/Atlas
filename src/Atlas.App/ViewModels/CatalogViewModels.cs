@@ -6,6 +6,32 @@ using Atlas.Core.Models;
 
 namespace Atlas.App.ViewModels;
 
+public sealed class FurnitureStepViewModel : INotifyPropertyChanged
+{
+    private bool _isActive;
+    public FurnitureStepViewModel(string key, string number, string label) { Key = key; Number = number; Label = label; }
+    public string Key { get; }
+    public string Number { get; }
+    public string Label { get; }
+    public bool IsActive
+    {
+        get => _isActive;
+        set
+        {
+            if (_isActive == value) return;
+            _isActive = value;
+            PropertyChanged?.Invoke(this, new(nameof(IsActive)));
+            PropertyChanged?.Invoke(this, new(nameof(Background)));
+            PropertyChanged?.Invoke(this, new(nameof(BorderBrush)));
+            PropertyChanged?.Invoke(this, new(nameof(Foreground)));
+        }
+    }
+    public string Background => IsActive ? "#397FF6" : "#1C2B42";
+    public string BorderBrush => IsActive ? "#2DD4BF" : "#283A55";
+    public string Foreground => IsActive ? "#FFFFFF" : "#B9C7DA";
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
 public sealed class ComponentCardViewModel : INotifyPropertyChanged
 {
     private bool _isMarked;

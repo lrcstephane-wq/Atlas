@@ -12,7 +12,7 @@ namespace Atlas.App.Services;
 public sealed class ApplicationUpdateService
 {
     private const string LatestReleaseApi = "https://api.github.com/repos/lrcstephane-wq/Atlas/releases/latest";
-    private const string AssetName = "Atlas-win-x64.zip";
+    private static readonly string[] PreferredAssetNames = ["Atlas-update.zip", "Atlas-win-x64.zip"];
     private readonly HttpClient _httpClient = new();
     private ReleaseAsset? _availableAsset;
 
@@ -37,8 +37,8 @@ public sealed class ApplicationUpdateService
         if (!Version.TryParse(release.TagName.Trim().TrimStart('v', 'V'), out var latest))
             throw new InvalidOperationException($"Version GitHub invalide : {release.TagName}");
         if (latest <= GetCurrentVersion()) return null;
-        _availableAsset = release.Assets.FirstOrDefault(asset => asset.Name.Equals(AssetName, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException($"La release {release.TagName} ne contient pas {AssetName}.");
+        _availableAsset = PreferredAssetNames.Select(name => release.Assets.FirstOrDefault(asset => asset.Name.Equals(name, StringComparison.OrdinalIgnoreCase))).FirstOrDefault(asset => asset is not null)
+            ?? throw new InvalidOperationException($"La release {release.TagName} ne contient aucun pack de mise à jour compatible.");
         AvailableVersion = latest.ToString(3);
         return AvailableVersion;
     }

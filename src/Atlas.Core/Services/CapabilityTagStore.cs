@@ -49,3 +49,4 @@ public static class CapabilityTagStore
         component.CapabilitiesCsv = string.Join(", ", Resolve(component, tags).Select(x => x.Label));
     }
 }
+
