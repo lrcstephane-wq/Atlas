@@ -144,6 +144,33 @@ public sealed class LibraryFilterViewModel : INotifyPropertyChanged
     public int TotalCount { get; init; }
     public int MarkedCount { get => _markedCount; set { if (_markedCount == value) return; _markedCount = value; PropertyChanged?.Invoke(this, new(nameof(MarkedCount))); PropertyChanged?.Invoke(this, new(nameof(CountLabel))); } }
     public string CountLabel => MarkedCount == 0 ? TotalCount.ToString("N0") : $"{MarkedCount}/{TotalCount}";
+    public override string ToString() => Name;
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class FurnitureCompositionLineViewModel : INotifyPropertyChanged
+{
+    private bool _isMarked;
+    private readonly ComponentCardViewModel _card;
+
+    public FurnitureCompositionLineViewModel(FurnitureComponentLine line, ComponentCardViewModel card)
+    {
+        Line = line;
+        _card = card;
+        Line.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(FurnitureComponentLine.Quantity)) PropertyChanged?.Invoke(this, new(nameof(Quantity)));
+        };
+    }
+
+    public FurnitureComponentLine Line { get; }
+    public string ComponentId => Line.ComponentId;
+    public string Name => _card.Name;
+    public string Family => _card.Family;
+    public string Location => _card.Location;
+    public BitmapImage? Thumbnail => _card.Thumbnail;
+    public int Quantity { get => Line.Quantity; set => Line.Quantity = value; }
+    public bool IsMarked { get => _isMarked; set { if (_isMarked == value) return; _isMarked = value; PropertyChanged?.Invoke(this, new(nameof(IsMarked))); } }
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
