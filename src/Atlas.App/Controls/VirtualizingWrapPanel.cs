@@ -8,6 +8,7 @@ namespace Atlas.App.Controls;
 public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
 {
     public static readonly DependencyProperty TargetItemWidthProperty = DependencyProperty.Register(nameof(TargetItemWidth), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(278d, FrameworkPropertyMetadataOptions.AffectsMeasure));
+    public static readonly DependencyProperty ItemWidthProperty = DependencyProperty.Register(nameof(ItemWidth), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(205d, FrameworkPropertyMetadataOptions.AffectsMeasure, OnItemWidthChanged));
     public static readonly DependencyProperty ItemHeightProperty = DependencyProperty.Register(nameof(ItemHeight), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(244d, FrameworkPropertyMetadataOptions.AffectsMeasure));
     public static readonly DependencyProperty SpacingProperty = DependencyProperty.Register(nameof(Spacing), typeof(double), typeof(VirtualizingWrapPanel), new FrameworkPropertyMetadata(12d, FrameworkPropertyMetadataOptions.AffectsMeasure));
     private Size _extent;
@@ -17,8 +18,14 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     private double _actualItemWidth = 278;
 
     public double TargetItemWidth { get => (double)GetValue(TargetItemWidthProperty); set => SetValue(TargetItemWidthProperty, value); }
+    public double ItemWidth { get => (double)GetValue(ItemWidthProperty); set => SetValue(ItemWidthProperty, value); }
     public double ItemHeight { get => (double)GetValue(ItemHeightProperty); set => SetValue(ItemHeightProperty, value); }
     public double Spacing { get => (double)GetValue(SpacingProperty); set => SetValue(SpacingProperty, value); }
+
+    private static void OnItemWidthChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (dependencyObject is VirtualizingWrapPanel panel && args.NewValue is double width) panel.TargetItemWidth = width;
+    }
 
     protected override Size MeasureOverride(Size availableSize)
     {
