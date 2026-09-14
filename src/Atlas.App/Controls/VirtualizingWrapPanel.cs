@@ -17,6 +17,8 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     private double _actualItemWidth = 278;
 
     public double TargetItemWidth { get => (double)GetValue(TargetItemWidthProperty); set => SetValue(TargetItemWidthProperty, value); }
+    // Alias WPF familier, utile aux vues compactes qui réutilisent ce panneau.
+    public double ItemWidth { get => TargetItemWidth; set => TargetItemWidth = value; }
     public double ItemHeight { get => (double)GetValue(ItemHeightProperty); set => SetValue(ItemHeightProperty, value); }
     public double Spacing { get => (double)GetValue(SpacingProperty); set => SetValue(SpacingProperty, value); }
 
