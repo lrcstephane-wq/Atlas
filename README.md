@@ -32,7 +32,7 @@ La V0.3 pose deux espaces :
 
 ## Installation Windows
 
-Télécharger `Atlas-win-x64.zip`, extraire entièrement le dossier puis lancer `Atlas.exe` depuis ce dossier. Le passage depuis une version antérieure à la V0.3 demande cette dernière extraction manuelle. Ensuite, le bouton de mise à jour télécharge le pack officiel, vérifie son intégrité et relance Atlas grâce au module statique `Atlas.Updater.exe`, sans script temporaire.
+Pour une première installation, télécharger `Atlas-full-win-x64.zip`, extraire entièrement le dossier puis lancer `Atlas.exe`. Ensuite, le bouton de mise à jour télécharge uniquement `Atlas-update.zip`, un petit pack différentiel signé par GitHub, remplace les fichiers applicatifs modifiés puis relance Atlas automatiquement. L’alias `Atlas-win-x64.zip` assure la compatibilité avec la V0.3.
 
 L’exécutable reste non signé pendant la phase de développement : Windows peut donc encore afficher un avertissement d’éditeur inconnu. Une détection antivirus de type cheval de Troie ne doit en revanche jamais être ignorée ni autorisée manuellement.
 

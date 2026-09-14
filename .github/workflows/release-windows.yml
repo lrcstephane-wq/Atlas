@@ -35,11 +35,17 @@ jobs:
       - name: Ajouter le module au pack
         shell: pwsh
         run: Copy-Item publish/updater/Atlas.Updater.exe publish/portable/Atlas.Updater.exe -Force
-      - name: Créer l’archive portable
+      - name: Créer le pack complet et la mise à jour différentielle
         shell: pwsh
-        run: Compress-Archive -Path publish/portable/* -DestinationPath publish/Atlas-win-x64.zip
+        run: |
+          Compress-Archive -Path publish/portable/* -DestinationPath publish/Atlas-full-win-x64.zip
+          New-Item -ItemType Directory -Path publish/update | Out-Null
+          $changed = @("Atlas.exe", "Atlas.dll", "Atlas.Core.dll", "Atlas.deps.json", "Atlas.runtimeconfig.json")
+          foreach ($file in $changed) { Copy-Item "publish/portable/$file" "publish/update/$file" -Force }
+          Compress-Archive -Path publish/update/* -DestinationPath publish/Atlas-update.zip
+          Copy-Item publish/Atlas-update.zip publish/Atlas-win-x64.zip
       - name: Créer la GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
-        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-win-x64.zip" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-update.zip" "publish/Atlas-win-x64.zip" "publish/Atlas-full-win-x64.zip" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes

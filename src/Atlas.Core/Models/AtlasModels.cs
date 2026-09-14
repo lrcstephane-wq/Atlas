@@ -133,11 +133,13 @@ public sealed class ComponentTagRecord : BindableModel
 {
     private string _label = string.Empty;
     private string _description = string.Empty;
+    private string _category = "Autre";
     private bool _isActive = true;
 
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
     public string Label { get => _label; set => Set(ref _label, value); }
     public string Description { get => _description; set => Set(ref _description, value); }
+    public string Category { get => _category; set => Set(ref _category, string.IsNullOrWhiteSpace(value) ? "Autre" : value.Trim()); }
     public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
 }
 
@@ -258,6 +260,7 @@ public sealed class FurnitureRecord : BindableModel
     private string _typeAssemblage = string.Empty;
     private string _sourceRelativePath = string.Empty;
     private string _imageRelativePath = string.Empty;
+    private DateTime? _conceptionDate = DateTime.Today;
     private bool _separationHorizontale;
     private bool _separationVerticale;
     private bool _porte;
@@ -299,6 +302,7 @@ public sealed class FurnitureRecord : BindableModel
     public string TypeAssemblage { get => _typeAssemblage; set => Set(ref _typeAssemblage, value); }
     public string SourceRelativePath { get => _sourceRelativePath; set => Set(ref _sourceRelativePath, value); }
     public string ImageRelativePath { get => _imageRelativePath; set => Set(ref _imageRelativePath, value); }
+    public DateTime? ConceptionDate { get => _conceptionDate; set => Set(ref _conceptionDate, value); }
     public bool SeparationHorizontale { get => _separationHorizontale; set => Set(ref _separationHorizontale, value); }
     public bool SeparationVerticale { get => _separationVerticale; set => Set(ref _separationVerticale, value); }
     public bool Porte { get => _porte; set => Set(ref _porte, value); }
@@ -321,6 +325,7 @@ public sealed class FurnitureRecord : BindableModel
     public int NombreRayons { get => _nombreRayons; set => Set(ref _nombreRayons, Math.Max(0, value)); }
     public int NombreNichesOuvertes { get => _nombreNichesOuvertes; set => Set(ref _nombreNichesOuvertes, Math.Max(0, value)); }
     public List<string> Universes { get; set; } = [];
+    public List<string> Usages { get; set; } = [];
     [JsonIgnore]
     public string UniversesCsv
     {

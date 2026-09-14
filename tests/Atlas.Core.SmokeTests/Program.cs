@@ -51,6 +51,11 @@ var furniture = new FurnitureRecord { ComponentIds = ["base"] };
 Assert(ComponentTaxonomyStore.Resolve(furniture, [baseComponent, userComponent], taxonomy).Single().Label == "Tiroir", "Le meuble doit recevoir les tags de ses composants.");
 furniture.RemovedInheritedTagIds.Add("tag-tiroir");
 Assert(ComponentTaxonomyStore.Resolve(furniture, [baseComponent, userComponent], taxonomy).Count == 0, "Le meuble doit pouvoir retirer un tag hérité.");
+furniture.Usages.AddRange(["Four", "Micro-ondes"]);
+Assert(furniture.Usages.Count == 2, "Les usages spécifiques d’un meuble doivent être cumulables.");
+Assert(furniture.ConceptionDate is not null, "Une nouvelle fiche meuble doit porter une date de conception.");
+taxonomy.Tags[0].Category = "Fonction";
+Assert(taxonomy.Tags[0].Category == "Fonction", "Les tags doivent pouvoir être classés par catégorie.");
 
 var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
