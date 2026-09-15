@@ -16,12 +16,15 @@ public static class ComponentTaxonomyStore
         var path = GetPath(sharedRoot);
         if (!File.Exists(path)) return await MigrateLegacyAsync(sharedRoot, cancellationToken);
         await using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        return await JsonSerializer.DeserializeAsync<ComponentTaxonomy>(stream, Options, cancellationToken) ?? new();
+        var taxonomy = await JsonSerializer.DeserializeAsync<ComponentTaxonomy>(stream, Options, cancellationToken) ?? new();
+        Normalize(taxonomy);
+        return taxonomy;
     }
 
     public static async Task SaveAsync(string sharedRoot, ComponentTaxonomy taxonomy, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sharedRoot)) throw new InvalidOperationException("Le dossier partagé Atlas n’est pas renseigné.");
+        Normalize(taxonomy);
         Directory.CreateDirectory(Path.Combine(sharedRoot, "Configuration"));
         var path = GetPath(sharedRoot);
         var temporary = path + $".{Environment.MachineName}.{Guid.NewGuid():N}.tmp";
@@ -33,7 +36,9 @@ public static class ComponentTaxonomyStore
 
     public static int SyncDetectedFamilies(ComponentTaxonomy taxonomy, IEnumerable<ComponentRecord> components)
     {
+        Normalize(taxonomy);
         foreach (var family in taxonomy.Families.Where(x => x.IsDetected)) family.IsMissing = true;
+        foreach (var type in taxonomy.Families.SelectMany(x => x.Types).Where(x => x.IsDetected)) type.IsMissing = true;
         var added = 0;
         foreach (var group in components.Where(x => !x.IsDemo && !string.IsNullOrWhiteSpace(x.LibraryName) && !string.IsNullOrWhiteSpace(x.FamilyName))
                      .GroupBy(x => FamilyKey(x.LibraryName, x.FamilyName), StringComparer.OrdinalIgnoreCase))
@@ -48,18 +53,32 @@ public static class ComponentTaxonomyStore
             }
             family.IsDetected = true;
             family.IsMissing = false;
+            foreach (var typeName in group.Select(x => x.TypeCode).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var type = family.Types.FirstOrDefault(x => x.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
+                if (type is null)
+                {
+                    type = new ComponentTypeRecord { Name = typeName, IsDetected = true };
+                    family.Types.Add(type);
+                }
+                type.IsDetected = true;
+                type.IsMissing = false;
+            }
         }
         return added;
     }
 
     public static IReadOnlyList<ComponentTagRecord> Resolve(ComponentRecord component, ComponentTaxonomy taxonomy)
     {
+        Normalize(taxonomy);
         component.NormalizeTags();
         var family = taxonomy.Families.FirstOrDefault(x => FamilyKey(x.LibraryName, x.Name).Equals(FamilyKey(component.LibraryName, component.EffectiveFamilyName), StringComparison.OrdinalIgnoreCase));
-        var inherited = family?.TagIds ?? [];
+        var inherited = new HashSet<string>(family?.TagIds ?? [], StringComparer.OrdinalIgnoreCase);
+        var type = family?.Types.FirstOrDefault(x => x.Name.Equals(component.TypeCode, StringComparison.OrdinalIgnoreCase));
+        if (type is not null) inherited.UnionWith(type.TagIds);
         var removed = component.RemovedInheritedTagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var added = component.AddedTagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return taxonomy.Tags.Where(tag => tag.IsActive && ((inherited.Contains(tag.Id, StringComparer.OrdinalIgnoreCase) && !removed.Contains(tag.Id)) || added.Contains(tag.Id)))
+        return taxonomy.Tags.Where(tag => tag.IsActive && ((inherited.Contains(tag.Id) && !removed.Contains(tag.Id)) || added.Contains(tag.Id)))
             .DistinctBy(tag => tag.Id, StringComparer.OrdinalIgnoreCase).OrderBy(tag => tag.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
@@ -75,6 +94,31 @@ public static class ComponentTaxonomyStore
     }
 
     public static string FamilyKey(string libraryName, string familyName) => $"{libraryName.Trim()}|{familyName.Trim()}";
+
+    public static IReadOnlyDictionary<string, string> InheritedTagOrigins(ComponentRecord component, ComponentTaxonomy taxonomy)
+    {
+        Normalize(taxonomy);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var family = taxonomy.Families.FirstOrDefault(x => FamilyKey(x.LibraryName, x.Name).Equals(FamilyKey(component.LibraryName, component.EffectiveFamilyName), StringComparison.OrdinalIgnoreCase));
+        if (family is null) return result;
+        foreach (var id in family.TagIds) result[id] = $"Famille · {family.Name}";
+        var type = family.Types.FirstOrDefault(x => x.Name.Equals(component.TypeCode, StringComparison.OrdinalIgnoreCase));
+        if (type is not null) foreach (var id in type.TagIds) result[id] = result.TryGetValue(id, out var origin) ? $"{origin} + Type · {type.Name}" : $"Type · {type.Name}";
+        return result;
+    }
+
+    private static void Normalize(ComponentTaxonomy taxonomy)
+    {
+        taxonomy.Families ??= [];
+        taxonomy.Tags ??= [];
+        foreach (var family in taxonomy.Families)
+        {
+            family.TagIds ??= [];
+            family.Types ??= [];
+            foreach (var type in family.Types) type.TagIds ??= [];
+        }
+        taxonomy.SchemaVersion = Math.Max(taxonomy.SchemaVersion, 2);
+    }
 
     private static async Task<ComponentTaxonomy> MigrateLegacyAsync(string sharedRoot, CancellationToken cancellationToken)
     {

@@ -214,21 +214,38 @@ public sealed class ToggleOptionViewModel : INotifyPropertyChanged
 public sealed class TagChoiceViewModel : INotifyPropertyChanged
 {
     private bool _isSelected;
+    private string _exclusionReason;
     private readonly Action<TagChoiceViewModel> _changed;
+    private readonly Action<TagChoiceViewModel>? _reasonChanged;
 
-    public TagChoiceViewModel(ComponentTagRecord tag, bool inherited, bool selected, Action<TagChoiceViewModel> changed)
+    public TagChoiceViewModel(ComponentTagRecord tag, string originLabel, bool inherited, bool selected, string exclusionReason, Action<TagChoiceViewModel> changed, Action<TagChoiceViewModel>? reasonChanged = null)
     {
         Tag = tag;
+        OriginLabel = originLabel;
         IsInherited = inherited;
         _isSelected = selected;
+        _exclusionReason = exclusionReason;
         _changed = changed;
+        _reasonChanged = reasonChanged;
     }
 
     public ComponentTagRecord Tag { get; }
     public string Id => Tag.Id;
     public string Label => Tag.Label;
     public bool IsInherited { get; }
-    public string OriginLabel => IsInherited ? "Héritée de la famille" : "Spécifique";
+    public string OriginLabel { get; }
+    public bool IsExcluded => IsInherited && !IsSelected;
+    public string ExclusionReason
+    {
+        get => _exclusionReason;
+        set
+        {
+            if (_exclusionReason == value) return;
+            _exclusionReason = value;
+            PropertyChanged?.Invoke(this, new(nameof(ExclusionReason)));
+            _reasonChanged?.Invoke(this);
+        }
+    }
     public bool IsSelected
     {
         get => _isSelected;
@@ -237,6 +254,7 @@ public sealed class TagChoiceViewModel : INotifyPropertyChanged
             if (_isSelected == value) return;
             _isSelected = value;
             PropertyChanged?.Invoke(this, new(nameof(IsSelected)));
+            PropertyChanged?.Invoke(this, new(nameof(IsExcluded)));
             _changed(this);
         }
     }

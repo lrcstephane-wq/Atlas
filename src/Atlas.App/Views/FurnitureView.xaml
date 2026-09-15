@@ -188,6 +188,8 @@
 </Border>
 </StackPanel>
 </Grid>
+<TextBlock Text="Tags du meuble — hérités des composants et ajustables ici" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
+<Border Style="{StaticResource RaisedCard}" Padding="12"><ItemsControl ItemsSource="{Binding FurnitureTagOptions}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Border>
 </StackPanel>
      <Grid Visibility="{Binding CurrentFurnitureStep, Converter={StaticResource PageVisibility}, ConverterParameter=Composition}">
 <Grid.ColumnDefinitions>

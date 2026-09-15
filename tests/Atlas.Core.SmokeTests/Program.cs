@@ -57,6 +57,18 @@ Assert(furniture.ConceptionDate is not null, "Une nouvelle fiche meuble doit por
 taxonomy.Tags[0].Category = "Fonction";
 Assert(taxonomy.Tags[0].Category == "Fonction", "Les tags doivent pouvoir être classés par catégorie.");
 
+var brandTag = new ComponentTagRecord { Id = "tag-blum", Label = "Blum", Category = "Marque" };
+taxonomy.Tags.Add(brandTag);
+taxonomy.Families[0].Types.Add(new ComponentTypeRecord { Name = "Coulissant", TagIds = [brandTag.Id] });
+baseComponent.TypeCode = "Coulissant";
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == brandTag.Id), "Un composant doit hériter des tags de son type dans sa famille et sa bibliothèque.");
+baseComponent.RemovedInheritedTagIds.Add(brandTag.Id);
+baseComponent.RemovedInheritedTagReasons[brandTag.Id] = "Ce composant utilise une autre marque.";
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).All(x => x.Id != brandTag.Id), "Un tag de type doit pouvoir être exclu localement avec un motif.");
+baseComponent.AddedTagIds.Add("tag-specifique");
+taxonomy.Tags.Add(new ComponentTagRecord { Id = "tag-specifique", Label = "Legrabox", Category = "Gamme" });
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == "tag-specifique"), "Un tag propre doit pouvoir être ajouté à une fiche composant.");
+
 var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
 Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 0, "Le secret ne doit jamais être stocké en clair.");
