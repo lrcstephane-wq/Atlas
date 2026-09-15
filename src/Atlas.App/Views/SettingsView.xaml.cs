@@ -158,10 +158,9 @@ public partial class SettingsView : UserControl
                 _familyTagChoices.Add(new ToggleOptionViewModel(tag.Label, family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                 {
                     SetMembership(family.TagIds, tag.Id, choice.IsSelected);
-                    MarkFamilyDirty(family);
                     TaxonomyStatus.Text = "Affectation modifiée. Enregistrez pour la propager.";
                     RefreshTagFamilyChoices();
-                }));
+                }, FamilyScopeKey(family), true));
         _refreshing = false;
     }
 
@@ -183,10 +182,9 @@ public partial class SettingsView : UserControl
             _typeTagChoices.Add(new ToggleOptionViewModel(tag.Label, type.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
             {
                 SetMembership(type.TagIds, tag.Id, choice.IsSelected);
-                if (FamilyList.SelectedItem is ComponentFamilyRecord selectedFamily) MarkTypeDirty(selectedFamily, type);
                 TaxonomyStatus.Text = "Affectation au type modifiée. Enregistrez pour la propager.";
                 RefreshTagFamilyChoices();
-            }));
+            }, FamilyList.SelectedItem is ComponentFamilyRecord selectedFamily ? TypeScopeKeyWithPrefix(selectedFamily, type) : null, true));
     }
 
     private void RefreshTagFamilyChoices()
@@ -201,19 +199,17 @@ public partial class SettingsView : UserControl
                 var familyChoice = new ToggleOptionViewModel("Toute la famille", family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                 {
                     SetMembership(family.TagIds, tag.Id, choice.IsSelected);
-                    MarkFamilyDirty(family);
                     TaxonomyStatus.Text = "Affectation à la famille modifiée. Enregistrez pour la propager.";
                     RefreshFamilyTagChoices();
-                });
+                }, FamilyScopeKey(family), true);
                 var scope = new TagFamilyScopeViewModel(family.QualifiedName, familyChoice);
                 foreach (var type in family.Types.Where(x => !x.IsMissing).OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase))
                     scope.Types.Add(new ToggleOptionViewModel(type.Name, type.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                     {
                         SetMembership(type.TagIds, tag.Id, choice.IsSelected);
-                        MarkTypeDirty(family, type);
                         TaxonomyStatus.Text = "Affectation au type modifiée. Enregistrez pour la propager.";
                         RefreshTypeTagChoices();
-                    }));
+                    }, TypeScopeKeyWithPrefix(family, type), true));
                 _tagFamilyChoices.Add(scope);
             }
         }
@@ -339,9 +335,20 @@ public partial class SettingsView : UserControl
 
     private static string TypeScopeKey(string familyKey, string typeName) => $"{familyKey}|{typeName.Trim()}";
 
-    private void MarkFamilyDirty(ComponentFamilyRecord family) => _dirtyAssignmentScopes.Add($"F:{ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name)}");
+    private static string FamilyScopeKey(ComponentFamilyRecord family) => $"F:{ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name)}";
 
-    private void MarkTypeDirty(ComponentFamilyRecord family, ComponentTypeRecord type) => _dirtyAssignmentScopes.Add($"T:{TypeScopeKey(ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name), type.Name)}");
+    private static string TypeScopeKeyWithPrefix(ComponentFamilyRecord family, ComponentTypeRecord type) => $"T:{TypeScopeKey(ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name), type.Name)}";
+
+    private void AssignmentCheckBox_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox { DataContext: ToggleOptionViewModel choice }) return;
+        choice.NotifyUserAction();
+        if (!string.IsNullOrWhiteSpace(choice.AssignmentScopeKey)) _dirtyAssignmentScopes.Add(choice.AssignmentScopeKey);
+    }
+
+    private void MarkFamilyDirty(ComponentFamilyRecord family) => _dirtyAssignmentScopes.Add(FamilyScopeKey(family));
+
+    private void MarkTypeDirty(ComponentFamilyRecord family, ComponentTypeRecord type) => _dirtyAssignmentScopes.Add(TypeScopeKeyWithPrefix(family, type));
 
     private static string DescribeScope(string scope)
     {
