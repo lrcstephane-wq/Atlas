@@ -179,7 +179,7 @@
               <TextBlock Text="{Binding Category}" Style="{StaticResource Caption}" Margin="0,3,0,0"/>
              </StackPanel>
              <Border x:Name="StatusBadge" Grid.Column="1" Background="#123C38" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
-              <TextBlock x:Name="StatusText" Text="Actif" Foreground="{StaticResource TealBrush}" FontSize="11"/>
+              <TextBlock x:Name="StatusText" Text="Actif" Foreground="{StaticResource CyanBrush}" FontSize="11"/>
              </Border>
             </Grid>
            </Border>

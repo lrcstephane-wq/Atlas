@@ -78,9 +78,9 @@ public partial class SettingsView : UserControl
         if (item is not ComponentTagRecord tag) return false;
         var query = TagSearch?.Text.Trim() ?? string.Empty;
         return string.IsNullOrWhiteSpace(query)
-            || tag.Label.Contains(query, StringComparison.OrdinalIgnoreCase)
-            || tag.Category.Contains(query, StringComparison.OrdinalIgnoreCase)
-            || tag.Description.Contains(query, StringComparison.OrdinalIgnoreCase);
+            || (tag.Label ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (tag.Category ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (tag.Description ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
     private void AddTag_OnClick(object sender, RoutedEventArgs e)
