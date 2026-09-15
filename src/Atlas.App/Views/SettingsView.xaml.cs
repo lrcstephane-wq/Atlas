@@ -19,7 +19,7 @@ public partial class SettingsView : UserControl
     private readonly ObservableCollection<string> _universes = [];
     private readonly ObservableCollection<string> _familyLibraries = ["Toutes les bibliothèques"];
     private ComponentTaxonomy _taxonomy = new();
-    private Dictionary<string, HashSet<string>> _savedAssignments = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _dirtyAssignmentScopes = new(StringComparer.OrdinalIgnoreCase);
     private bool _refreshing;
     private Button? _activeSettingsButton;
 
@@ -54,7 +54,7 @@ public partial class SettingsView : UserControl
         _taxonomy = await ComponentTaxonomyStore.LoadAsync(vm.SharedRoot);
         var added = ComponentTaxonomyStore.SyncDetectedFamilies(_taxonomy, vm.Components);
         RefreshCollections();
-        _savedAssignments = BuildAssignmentSnapshot();
+        _dirtyAssignmentScopes.Clear();
         TaxonomyStatus.Text = added == 0 ? $"{_families.Count} famille(s) · {_tags.Count} tag(s)." : $"{added} nouvelle(s) famille(s) détectée(s). Enregistrez pour les partager.";
     }
 
@@ -158,6 +158,7 @@ public partial class SettingsView : UserControl
                 _familyTagChoices.Add(new ToggleOptionViewModel(tag.Label, family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                 {
                     SetMembership(family.TagIds, tag.Id, choice.IsSelected);
+                    MarkFamilyDirty(family);
                     TaxonomyStatus.Text = "Affectation modifiée. Enregistrez pour la propager.";
                     RefreshTagFamilyChoices();
                 }));
@@ -182,6 +183,7 @@ public partial class SettingsView : UserControl
             _typeTagChoices.Add(new ToggleOptionViewModel(tag.Label, type.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
             {
                 SetMembership(type.TagIds, tag.Id, choice.IsSelected);
+                if (FamilyList.SelectedItem is ComponentFamilyRecord selectedFamily) MarkTypeDirty(selectedFamily, type);
                 TaxonomyStatus.Text = "Affectation au type modifiée. Enregistrez pour la propager.";
                 RefreshTagFamilyChoices();
             }));
@@ -199,6 +201,7 @@ public partial class SettingsView : UserControl
                 var familyChoice = new ToggleOptionViewModel("Toute la famille", family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                 {
                     SetMembership(family.TagIds, tag.Id, choice.IsSelected);
+                    MarkFamilyDirty(family);
                     TaxonomyStatus.Text = "Affectation à la famille modifiée. Enregistrez pour la propager.";
                     RefreshFamilyTagChoices();
                 });
@@ -207,6 +210,7 @@ public partial class SettingsView : UserControl
                     scope.Types.Add(new ToggleOptionViewModel(type.Name, type.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                     {
                         SetMembership(type.TagIds, tag.Id, choice.IsSelected);
+                        MarkTypeDirty(family, type);
                         TaxonomyStatus.Text = "Affectation au type modifiée. Enregistrez pour la propager.";
                         RefreshTypeTagChoices();
                     }));
@@ -245,7 +249,16 @@ public partial class SettingsView : UserControl
         var affected = _families.Count(x => x.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase));
         if (!AtlasDialog.Confirm($"Supprimer le tag « {tag.Label} » ?", "Suppression du tag", $"{affected} famille(s) le référencent actuellement.")) return;
         _taxonomy.Tags.Remove(tag);
-        foreach (var family in _taxonomy.Families) RemoveIgnoreCase(family.TagIds, tag.Id);
+        foreach (var family in _taxonomy.Families)
+        {
+            if (family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase)) MarkFamilyDirty(family);
+            RemoveIgnoreCase(family.TagIds, tag.Id);
+            foreach (var type in family.Types)
+            {
+                if (type.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase)) MarkTypeDirty(family, type);
+                RemoveIgnoreCase(type.TagIds, tag.Id);
+            }
+        }
         RefreshCollections();
         TaxonomyStatus.Text = "Tag supprimé. Enregistrez pour confirmer.";
     }
@@ -265,10 +278,7 @@ public partial class SettingsView : UserControl
         if (duplicateTags is not null) { TaxonomyStatus.Text = $"Tag en double : {duplicateTags.Key}"; return; }
         if (_tags.Any(x => string.IsNullOrWhiteSpace(x.Label)) || _families.Any(x => string.IsNullOrWhiteSpace(x.Name))) { TaxonomyStatus.Text = "Chaque famille et chaque tag doit avoir un nom."; return; }
 
-        var currentAssignments = BuildAssignmentSnapshot();
-        var changedScopes = currentAssignments.Keys.Union(_savedAssignments.Keys, StringComparer.OrdinalIgnoreCase)
-            .Where(key => !_savedAssignments.TryGetValue(key, out var saved) || !currentAssignments.TryGetValue(key, out var current) || !saved.SetEquals(current))
-            .ToArray();
+        var changedScopes = _dirtyAssignmentScopes.ToArray();
         var changedFamilyKeys = changedScopes.Where(x => x.StartsWith("F:", StringComparison.OrdinalIgnoreCase)).Select(x => x[2..]).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var changedTypeKeys = changedScopes.Where(x => x.StartsWith("T:", StringComparison.OrdinalIgnoreCase)).Select(x => x[2..]).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var impacted = vm.Components.Count(component =>
@@ -278,7 +288,9 @@ public partial class SettingsView : UserControl
         });
         if (changedScopes.Length > 0)
         {
+            var scopeLabels = changedScopes.Select(DescribeScope).Where(x => !string.IsNullOrWhiteSpace(x)).Take(5).ToArray();
             var details = $"{changedFamilyKeys.Count} famille(s) entière(s) · {changedTypeKeys.Count} type(s) précis · {impacted} composant(s) verront leurs tags hérités évoluer.";
+            if (scopeLabels.Length > 0) details += $" Portée : {string.Join(" ; ", scopeLabels)}.";
             if (!AtlasDialog.Confirm("Appliquer ces changements de tags ?", "Propagation aux composants", details + " Les exceptions manuelles seront conservées.")) return;
         }
 
@@ -286,7 +298,7 @@ public partial class SettingsView : UserControl
         foreach (var family in _families) { family.Name = family.Name.Trim(); family.Description = family.Description.Trim(); }
         await ComponentTaxonomyStore.SaveAsync(vm.SharedRoot, _taxonomy);
         await vm.ReloadTaxonomyAsync();
-        _savedAssignments = BuildAssignmentSnapshot();
+        _dirtyAssignmentScopes.Clear();
         TaxonomyStatus.Text = $"Référentiel enregistré · {_families.Count} famille(s) · {_tags.Count} tag(s).";
         vm.StatusText = "Familles et tags partagés enregistrés.";
     }
@@ -325,20 +337,20 @@ public partial class SettingsView : UserControl
         if (!selected) RemoveIgnoreCase(values, id);
     }
 
-    private Dictionary<string, HashSet<string>> BuildAssignmentSnapshot()
-    {
-        var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var family in _taxonomy.Families)
-        {
-            var familyKey = ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name);
-            result[$"F:{familyKey}"] = family.TagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var type in family.Types)
-                result[$"T:{TypeScopeKey(familyKey, type.Name)}"] = type.TagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        }
-        return result;
-    }
-
     private static string TypeScopeKey(string familyKey, string typeName) => $"{familyKey}|{typeName.Trim()}";
+
+    private void MarkFamilyDirty(ComponentFamilyRecord family) => _dirtyAssignmentScopes.Add($"F:{ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name)}");
+
+    private void MarkTypeDirty(ComponentFamilyRecord family, ComponentTypeRecord type) => _dirtyAssignmentScopes.Add($"T:{TypeScopeKey(ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name), type.Name)}");
+
+    private static string DescribeScope(string scope)
+    {
+        var value = scope.Length > 2 ? scope[2..] : scope;
+        var parts = value.Split('|');
+        if (scope.StartsWith("T:", StringComparison.OrdinalIgnoreCase) && parts.Length >= 3) return $"{parts[0]} › {parts[1]} › {parts[2]}";
+        if (parts.Length >= 2) return $"{parts[0]} › {parts[1]}";
+        return value;
+    }
 
     private static void RemoveIgnoreCase(List<string> values, string id)
     {
