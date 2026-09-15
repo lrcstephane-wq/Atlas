@@ -72,13 +72,8 @@ public static class ComponentTaxonomyStore
     {
         Normalize(taxonomy);
         component.NormalizeTags();
-        var family = taxonomy.Families.FirstOrDefault(x => FamilyKey(x.LibraryName, x.Name).Equals(FamilyKey(component.LibraryName, component.EffectiveFamilyName), StringComparison.OrdinalIgnoreCase));
-        var inherited = new HashSet<string>(family?.TagIds ?? [], StringComparer.OrdinalIgnoreCase);
-        var type = family?.Types.FirstOrDefault(x => x.Name.Equals(component.TypeCode, StringComparison.OrdinalIgnoreCase));
-        if (type is not null) inherited.UnionWith(type.TagIds);
-        var removed = component.RemovedInheritedTagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var added = component.AddedTagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return taxonomy.Tags.Where(tag => tag.IsActive && ((inherited.Contains(tag.Id) && !removed.Contains(tag.Id)) || added.Contains(tag.Id)))
+        return taxonomy.Tags.Where(tag => tag.IsActive && added.Contains(tag.Id))
             .DistinctBy(tag => tag.Id, StringComparer.OrdinalIgnoreCase).OrderBy(tag => tag.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
@@ -94,18 +89,6 @@ public static class ComponentTaxonomyStore
     }
 
     public static string FamilyKey(string libraryName, string familyName) => $"{libraryName.Trim()}|{familyName.Trim()}";
-
-    public static IReadOnlyDictionary<string, string> InheritedTagOrigins(ComponentRecord component, ComponentTaxonomy taxonomy)
-    {
-        Normalize(taxonomy);
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var family = taxonomy.Families.FirstOrDefault(x => FamilyKey(x.LibraryName, x.Name).Equals(FamilyKey(component.LibraryName, component.EffectiveFamilyName), StringComparison.OrdinalIgnoreCase));
-        if (family is null) return result;
-        foreach (var id in family.TagIds) result[id] = $"Famille · {family.Name}";
-        var type = family.Types.FirstOrDefault(x => x.Name.Equals(component.TypeCode, StringComparison.OrdinalIgnoreCase));
-        if (type is not null) foreach (var id in type.TagIds) result[id] = result.TryGetValue(id, out var origin) ? $"{origin} + Type · {type.Name}" : $"Type · {type.Name}";
-        return result;
-    }
 
     private static void Normalize(ComponentTaxonomy taxonomy)
     {

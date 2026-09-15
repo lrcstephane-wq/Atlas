@@ -10,7 +10,6 @@ namespace Atlas.App.Views;
 
 public partial class ComponentsView : UserControl
 {
-    private readonly ObservableCollection<TagChoiceViewModel> _inheritedTagChoices = [];
     private readonly ObservableCollection<TagChoiceViewModel> _specificTagChoices = [];
     private readonly ObservableCollection<TagChoiceViewModel> _availableTagChoices = [];
     private ComponentTaxonomy _taxonomy = new();
@@ -19,7 +18,6 @@ public partial class ComponentsView : UserControl
     public ComponentsView()
     {
         InitializeComponent();
-        InheritedTagList.ItemsSource = _inheritedTagChoices;
         SpecificTagList.ItemsSource = _specificTagChoices;
         AvailableTagList.ItemsSource = _availableTagChoices;
     }
@@ -77,18 +75,12 @@ public partial class ComponentsView : UserControl
             AtlasFamilyCombo.Text = component.EffectiveFamilyName;
             FamilyOverrideHint.Visibility = component.IsFamilyOverridden ? Visibility.Visible : Visibility.Collapsed;
 
-            _inheritedTagChoices.Clear(); _specificTagChoices.Clear(); _availableTagChoices.Clear();
-            var inheritedOrigins = ComponentTaxonomyStore.InheritedTagOrigins(component, _taxonomy);
+            _specificTagChoices.Clear(); _availableTagChoices.Clear();
             foreach (var tag in _taxonomy.Tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase))
             {
-                var inherited = inheritedOrigins.TryGetValue(tag.Id, out var origin);
-                var removed = component.RemovedInheritedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
                 var added = component.AddedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
-                var selected = (inherited && !removed) || added;
-                var reason = component.RemovedInheritedTagReasons.GetValueOrDefault(tag.Id, string.Empty);
-                var choice = new TagChoiceViewModel(tag, inherited ? origin! : added ? "Ajouté sur ce composant" : tag.Category, inherited, selected, reason, TagChoice_OnChanged, TagReason_OnChanged);
-                if (inherited) _inheritedTagChoices.Add(choice);
-                else if (added) _specificTagChoices.Add(choice);
+                var choice = new TagChoiceViewModel(tag, added ? "Ajouté sur ce composant" : tag.Category, false, added, string.Empty, TagChoice_OnChanged);
+                if (added) _specificTagChoices.Add(choice);
                 else _availableTagChoices.Add(choice);
             }
             NoTagsText.Visibility = _taxonomy.Tags.Any(x => x.IsActive) ? Visibility.Collapsed : Visibility.Visible;
@@ -103,30 +95,11 @@ public partial class ComponentsView : UserControl
 
         RemoveIgnoreCase(component.AddedTagIds, choice.Id);
         RemoveIgnoreCase(component.RemovedInheritedTagIds, choice.Id);
-
-        if (choice.IsInherited)
-        {
-            if (!choice.IsSelected)
-            {
-                component.RemovedInheritedTagIds.Add(choice.Id);
-                component.RemovedInheritedTagReasons[choice.Id] = string.IsNullOrWhiteSpace(choice.ExclusionReason) ? "À préciser" : choice.ExclusionReason.Trim();
-            }
-            else component.RemovedInheritedTagReasons.Remove(choice.Id);
-        }
-        else if (choice.IsSelected)
-        {
-            component.AddedTagIds.Add(choice.Id);
-        }
+        component.RemovedInheritedTagReasons.Remove(choice.Id);
+        if (choice.IsSelected) component.AddedTagIds.Add(choice.Id);
 
         vm.StatusText = "Tags du composant modifiés. Pensez à enregistrer.";
         Dispatcher.BeginInvoke(new Action(RefreshEditor));
-    }
-
-    private void TagReason_OnChanged(TagChoiceViewModel choice)
-    {
-        if (_isRefreshing || DataContext is not MainViewModel vm || vm.SelectedComponent is not { } component || !choice.IsExcluded) return;
-        component.RemovedInheritedTagReasons[choice.Id] = choice.ExclusionReason.Trim();
-        vm.StatusText = "Motif d’exclusion modifié. Pensez à enregistrer.";
     }
 
     private void AtlasFamilyCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)

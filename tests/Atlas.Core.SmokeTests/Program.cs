@@ -42,11 +42,10 @@ var taxonomy = new ComponentTaxonomy
 };
 var baseComponent = new ComponentRecord { Id = "base", LibraryName = "_Ideo_Base", FamilyName = "Coulissants" };
 var userComponent = new ComponentRecord { Id = "user", LibraryName = "_Ideo_Utilisateur", FamilyName = "Coulissants" };
-Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Single().Label == "Tiroir", "Le tag de famille doit être hérité par le composant.");
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Count == 0, "Les tags de famille ne doivent plus être propagés automatiquement aux composants.");
 Assert(ComponentTaxonomyStore.Resolve(userComponent, taxonomy).Count == 0, "Deux familles homonymes de bibliothèques différentes doivent rester distinctes.");
-baseComponent.RemovedInheritedTagIds.Add("tag-tiroir");
-Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Count == 0, "Un tag hérité doit pouvoir être exclu sur un composant.");
-baseComponent.RemovedInheritedTagIds.Clear();
+baseComponent.AddedTagIds.Add("tag-tiroir");
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Single().Label == "Tiroir", "Un tag doit pouvoir être ajouté directement au composant.");
 var furniture = new FurnitureRecord { ComponentIds = ["base"] };
 Assert(ComponentTaxonomyStore.Resolve(furniture, [baseComponent, userComponent], taxonomy).Single().Label == "Tiroir", "Le meuble doit recevoir les tags de ses composants.");
 furniture.RemovedInheritedTagIds.Add("tag-tiroir");
@@ -61,10 +60,9 @@ var brandTag = new ComponentTagRecord { Id = "tag-blum", Label = "Blum", Categor
 taxonomy.Tags.Add(brandTag);
 taxonomy.Families[0].Types.Add(new ComponentTypeRecord { Name = "Coulissant", TagIds = [brandTag.Id] });
 baseComponent.TypeCode = "Coulissant";
-Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == brandTag.Id), "Un composant doit hériter des tags de son type dans sa famille et sa bibliothèque.");
-baseComponent.RemovedInheritedTagIds.Add(brandTag.Id);
-baseComponent.RemovedInheritedTagReasons[brandTag.Id] = "Ce composant utilise une autre marque.";
-Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).All(x => x.Id != brandTag.Id), "Un tag de type doit pouvoir être exclu localement avec un motif.");
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).All(x => x.Id != brandTag.Id), "Les tags de type ne doivent plus être propagés automatiquement aux composants.");
+baseComponent.AddedTagIds.Add(brandTag.Id);
+Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == brandTag.Id), "Un tag de marque doit pouvoir être ajouté directement au composant.");
 baseComponent.AddedTagIds.Add("tag-specifique");
 taxonomy.Tags.Add(new ComponentTagRecord { Id = "tag-specifique", Label = "Legrabox", Category = "Gamme" });
 Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == "tag-specifique"), "Un tag propre doit pouvoir être ajouté à une fiche composant.");
