@@ -2,11 +2,23 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  Loaded="SettingsView_OnLoaded">
  <Grid>
-  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-  <StackPanel Margin="0,0,0,18"><TextBlock Text="Paramètres" Style="{StaticResource PageTitle}"/><TextBlock Text="Chaque espace d’Atlas dispose de son propre réglage. Les capacités restent réservées pour une version ultérieure." Style="{StaticResource Caption}" FontSize="13" Margin="0,6,0,0"/></StackPanel>
-  <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
+  <Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="*"/>
+</Grid.RowDefinitions>
+  <StackPanel Margin="0,0,0,18">
+<TextBlock Text="Paramètres" Style="{StaticResource PageTitle}"/>
+<TextBlock Text="Chaque espace d’Atlas dispose de son propre réglage. Les capacités restent réservées pour une version ultérieure." Style="{StaticResource Caption}" FontSize="13" Margin="0,6,0,0"/>
+</StackPanel>
+  <Grid Grid.Row="1">
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="260"/>
+<ColumnDefinition Width="14"/>
+<ColumnDefinition/>
+</Grid.ColumnDefinitions>
    <Border Style="{StaticResource Card}" Padding="10">
-    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel>
      <TextBlock Text="GÉNÉRAL" Style="{StaticResource NavSection}"/>
      <Button Content="Espace de travail" Tag="GeneralPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Utilisateurs et droits" Tag="UsersPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
@@ -23,57 +35,330 @@
      <Button Content="Ouverture TopSolid" Tag="TopSolidPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}"/>
      <Button Content="Sauvegardes et diagnostics" Tag="SystemPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
-    </StackPanel></ScrollViewer>
+    </StackPanel>
+</ScrollViewer>
    </Border>
 
    <Grid Grid.Column="2">
-    <ScrollViewer x:Name="GeneralPanel" VerticalScrollBarVisibility="Auto"><StackPanel>
-     <TextBlock Text="Espace de travail" Style="{StaticResource SectionTitle}"/><TextBlock Text="Emplacements partagés et comportement général de l’application." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
-     <Border Style="{StaticResource Card}"><StackPanel>
-      <TextBlock Text="Environnement du catalogue" Style="{StaticResource FieldLabel}"/><ComboBox ItemsSource="{Binding Environments}" SelectedItem="{Binding Settings.Environment}" Margin="0,0,0,14" IsEnabled="{Binding IsAdministrator}"/>
+    <ScrollViewer x:Name="GeneralPanel" VerticalScrollBarVisibility="Auto">
+<StackPanel>
+     <TextBlock Text="Espace de travail" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Emplacements partagés et comportement général de l’application." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+     <Border Style="{StaticResource Card}">
+<StackPanel>
+      <TextBlock Text="Environnement du catalogue" Style="{StaticResource FieldLabel}"/>
+<ComboBox ItemsSource="{Binding Environments}" SelectedItem="{Binding Settings.Environment}" Margin="0,0,0,14" IsEnabled="{Binding IsAdministrator}"/>
       <CheckBox Content="Rechercher automatiquement les mises à jour au lancement" IsChecked="{Binding Settings.AutoUpdate}" Margin="0,0,0,18"/>
-      <TextBlock Text="Dossier partagé Atlas" Style="{StaticResource FieldLabel}"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox Text="{Binding SharedRoot, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsAdministrator}"/><Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseSharedRootCommand}" Margin="8,0,0,0"/></Grid>
-      <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><Button Content="Appliquer au prochain lancement" Command="{Binding SaveBootstrapCommand}"/><Button Content="Ouvrir le dossier" Style="{StaticResource SecondaryButton}" Command="{Binding OpenSharedRootCommand}" Margin="8,0,0,0"/></StackPanel>
-     </StackPanel></Border>
-    </StackPanel></ScrollViewer>
+      <TextBlock Text="Dossier partagé Atlas" Style="{StaticResource FieldLabel}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition/>
+<ColumnDefinition Width="Auto"/>
+</Grid.ColumnDefinitions>
+<TextBox Text="{Binding SharedRoot, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsAdministrator}"/>
+<Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseSharedRootCommand}" Margin="8,0,0,0"/>
+</Grid>
+      <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+<Button Content="Appliquer au prochain lancement" Command="{Binding SaveBootstrapCommand}"/>
+<Button Content="Ouvrir le dossier" Style="{StaticResource SecondaryButton}" Command="{Binding OpenSharedRootCommand}" Margin="8,0,0,0"/>
+</StackPanel>
+     </StackPanel>
+</Border>
+    </StackPanel>
+</ScrollViewer>
 
-    <ScrollViewer x:Name="UsersPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
-     <TextBlock Text="Utilisateurs et droits" Style="{StaticResource SectionTitle}"/><TextBlock Text="Comptes partagés, rôles et traçabilité." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
-     <Border Style="{StaticResource Card}"><StackPanel>
-      <DataGrid ItemsSource="{Binding Users}" AutoGenerateColumns="False" IsReadOnly="True" Height="230"><DataGrid.Columns><DataGridTextColumn Header="Nom" Binding="{Binding DisplayName}" Width="*"/><DataGridTextColumn Header="Identifiant" Binding="{Binding Login}" Width="*"/><DataGridTextColumn Header="Droits" Binding="{Binding Permissions}" Width="1.3*"/></DataGrid.Columns></DataGrid>
+    <ScrollViewer x:Name="UsersPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+<StackPanel>
+     <TextBlock Text="Utilisateurs et droits" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Comptes partagés, rôles et traçabilité." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+     <Border Style="{StaticResource Card}">
+<StackPanel>
+      <DataGrid ItemsSource="{Binding Users}" AutoGenerateColumns="False" IsReadOnly="True" Height="230">
+<DataGrid.Columns>
+<DataGridTextColumn Header="Nom" Binding="{Binding DisplayName}" Width="*"/>
+<DataGridTextColumn Header="Identifiant" Binding="{Binding Login}" Width="*"/>
+<DataGridTextColumn Header="Droits" Binding="{Binding Permissions}" Width="1.3*"/>
+</DataGrid.Columns>
+</DataGrid>
       <StackPanel Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}">
        <TextBlock Text="Ajouter un utilisateur" FontWeight="SemiBold" Margin="0,18,0,10"/>
-       <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Nom affiché" Style="{StaticResource FieldLabel}"/><TextBox x:Name="NewDisplayName"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Identifiant" Style="{StaticResource FieldLabel}"/><TextBox x:Name="NewLogin"/></StackPanel></Grid>
-       <Grid Margin="0,9,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Mot de passe temporaire" Style="{StaticResource FieldLabel}"/><PasswordBox x:Name="NewPassword"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Profil" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="NewRole" ItemsSource="{Binding RoleProfiles}" SelectedIndex="2"/></StackPanel></Grid>
-       <TextBlock x:Name="UserError" Foreground="{StaticResource RoseBrush}" Margin="0,8,0,0"/><Button Content="Créer le compte" HorizontalAlignment="Left" Margin="0,10,0,0" Click="CreateUser_OnClick"/>
+       <Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition/>
+<ColumnDefinition Width="10"/>
+<ColumnDefinition/>
+</Grid.ColumnDefinitions>
+<StackPanel>
+<TextBlock Text="Nom affiché" Style="{StaticResource FieldLabel}"/>
+<TextBox x:Name="NewDisplayName"/>
+</StackPanel>
+<StackPanel Grid.Column="2">
+<TextBlock Text="Identifiant" Style="{StaticResource FieldLabel}"/>
+<TextBox x:Name="NewLogin"/>
+</StackPanel>
+</Grid>
+       <Grid Margin="0,9,0,0">
+<Grid.ColumnDefinitions>
+<ColumnDefinition/>
+<ColumnDefinition Width="10"/>
+<ColumnDefinition/>
+</Grid.ColumnDefinitions>
+<StackPanel>
+<TextBlock Text="Mot de passe temporaire" Style="{StaticResource FieldLabel}"/>
+<PasswordBox x:Name="NewPassword"/>
+</StackPanel>
+<StackPanel Grid.Column="2">
+<TextBlock Text="Profil" Style="{StaticResource FieldLabel}"/>
+<ComboBox x:Name="NewRole" ItemsSource="{Binding RoleProfiles}" SelectedIndex="2"/>
+</StackPanel>
+</Grid>
+       <TextBlock x:Name="UserError" Foreground="{StaticResource RoseBrush}" Margin="0,8,0,0"/>
+<Button Content="Créer le compte" HorizontalAlignment="Left" Margin="0,10,0,0" Click="CreateUser_OnClick"/>
       </StackPanel>
-     </StackPanel></Border>
-    </StackPanel></ScrollViewer>
+     </StackPanel>
+</Border>
+    </StackPanel>
+</ScrollViewer>
 
-    <ScrollViewer x:Name="LibrariesPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
-     <TextBlock Text="Bibliothèques et indexation" Style="{StaticResource SectionTitle}"/><TextBlock Text="Atlas lit uniquement les chemins, noms et aperçus. Le contenu des .TOP reste opaque." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
-     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Racine de la bibliothèque TopSolid" Style="{StaticResource FieldLabel}"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox Text="{Binding Settings.LibraryRoot, UpdateSourceTrigger=PropertyChanged}"/><Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseLibraryCommand}" Margin="8,0,0,0"/></Grid><StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="Indexer maintenant" Command="{Binding ScanCommand}"/><Button Content="Synchroniser les familles" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="SyncFamilies_OnClick"/></StackPanel></StackPanel></Border>
-    </StackPanel></ScrollViewer>
+    <ScrollViewer x:Name="LibrariesPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+<StackPanel>
+     <TextBlock Text="Bibliothèques et indexation" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Atlas lit uniquement les chemins, noms et aperçus. Le contenu des .TOP reste opaque." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+     <Border Style="{StaticResource Card}">
+<StackPanel>
+<TextBlock Text="Racine de la bibliothèque TopSolid" Style="{StaticResource FieldLabel}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition/>
+<ColumnDefinition Width="Auto"/>
+</Grid.ColumnDefinitions>
+<TextBox Text="{Binding Settings.LibraryRoot, UpdateSourceTrigger=PropertyChanged}"/>
+<Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseLibraryCommand}" Margin="8,0,0,0"/>
+</Grid>
+<StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+<Button Content="Indexer maintenant" Command="{Binding ScanCommand}"/>
+<Button Content="Synchroniser les familles" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="SyncFamilies_OnClick"/>
+</StackPanel>
+</StackPanel>
+</Border>
+    </StackPanel>
+</ScrollViewer>
 
     <Grid x:Name="TaxonomyPanel" Visibility="Collapsed">
-     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <StackPanel><TextBlock Text="Familles et tags" Style="{StaticResource SectionTitle}"/><TextBlock Text="Les familles sont distinctes par bibliothèque. Leurs tags sont hérités par les composants, puis proposés aux meubles." Style="{StaticResource Caption}" Margin="0,5,0,16"/></StackPanel>
-     <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="1.2*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="1.05*"/></Grid.ColumnDefinitions>
-      <Border Style="{StaticResource Card}" Padding="12"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel><TextBlock Text="FAMILLES" Style="{StaticResource Eyebrow}"/><TextBlock Text="Détectées et manuelles" Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel><ListBox x:Name="FamilyList" Grid.Row="1" SelectionChanged="FamilySelection_OnChanged"><ListBox.ItemTemplate><DataTemplate><Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="8" Padding="10" Margin="0,0,0,6"><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding LibraryName}" Style="{StaticResource Caption}" Margin="0,3,0,0"/></StackPanel></Border></DataTemplate></ListBox.ItemTemplate></ListBox><StackPanel Grid.Row="2"><ComboBox x:Name="NewFamilyLibrary" Margin="0,8,0,6"/><TextBox x:Name="NewFamilyName" ToolTip="Nom de la nouvelle famille"/><Button Content="+ Ajouter une famille" Margin="0,7,0,0" Click="AddFamily_OnClick"/></StackPanel></Grid></Border>
-      <Border Grid.Column="2" Style="{StaticResource Card}" Padding="14"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="FICHE FAMILLE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Nom" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/><TextBox Text="{Binding SelectedItem.Name, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding SelectedItem.IsDetected, ElementName=FamilyList}"/><TextBlock Text="Bibliothèque" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/><TextBox Text="{Binding SelectedItem.LibraryName, ElementName=FamilyList}" IsReadOnly="True"/><TextBlock Text="Description interne" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/><TextBox Text="{Binding SelectedItem.Description, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="72"/><CheckBox Content="Famille active" IsChecked="{Binding SelectedItem.IsActive, ElementName=FamilyList}" Margin="0,14,0,0"/><TextBlock Text="Tags affectés à cette famille" Style="{StaticResource FieldLabel}" Margin="0,18,0,8"/><ItemsControl x:Name="FamilyTagChoices"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><TextBlock Text="Toute modification sera propagée aux composants de cette famille après confirmation." Style="{StaticResource Caption}" Margin="0,8,0,0"/></StackPanel></ScrollViewer></Border>
-      <Border Grid.Column="4" Style="{StaticResource Card}" Padding="12"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="170"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel><TextBlock Text="TAGS" Style="{StaticResource Eyebrow}"/><TextBlock Text="Référentiel du MVP" Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel><ListBox x:Name="TagList" Grid.Row="1" SelectionChanged="TagSelection_OnChanged" DisplayMemberPath="Label"/><ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,10,0,0"><TextBlock Text="Libellé" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding SelectedItem.Label, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/><TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="55"/><CheckBox Content="Tag actif" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,12,0,0"/><TextBlock Text="Affecter à plusieurs familles" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/><ItemsControl x:Name="TagFamilyChoices"><ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,0,0,7"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></ScrollViewer><StackPanel Grid.Row="3"><Button Content="+ Créer un tag" Margin="0,8,0,0" Click="AddTag_OnClick"/><Button Content="Supprimer le tag" Style="{StaticResource GhostButton}" Margin="0,7,0,0" Click="DeleteTag_OnClick"/></StackPanel></Grid></Border>
+     <Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="*"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+     <StackPanel>
+<TextBlock Text="Familles et tags" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Les familles sont distinctes par bibliothèque. Leurs tags sont hérités par les composants, puis proposés aux meubles." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+</StackPanel>
+     <Grid Grid.Row="1">
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="1.05*"/>
+<ColumnDefinition Width="12"/>
+<ColumnDefinition Width="1.2*"/>
+<ColumnDefinition Width="12"/>
+<ColumnDefinition Width="1.05*"/>
+</Grid.ColumnDefinitions>
+      <Border Style="{StaticResource Card}" Padding="12">
+<Grid>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="*"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<StackPanel>
+<TextBlock Text="FAMILLES" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="Détectées et manuelles" Style="{StaticResource Caption}" Margin="0,4,0,10"/>
+<ComboBox x:Name="FamilyLibraryFilter" SelectionChanged="FamilyFilter_OnChanged" Margin="0,0,0,7"/>
+<TextBox x:Name="FamilySearch" TextChanged="FamilyFilter_OnChanged" ToolTip="Rechercher une famille" Margin="0,0,0,9"/>
+</StackPanel>
+<ListBox x:Name="FamilyList" Grid.Row="1" SelectionChanged="FamilySelection_OnChanged">
+<ListBox.ItemTemplate>
+<DataTemplate>
+<Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="8" Padding="10" Margin="0,0,0,6">
+<StackPanel>
+<TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+<TextBlock Text="{Binding LibraryName}" Style="{StaticResource Caption}" Margin="0,3,0,0"/>
+</StackPanel>
+</Border>
+</DataTemplate>
+</ListBox.ItemTemplate>
+</ListBox>
+<StackPanel Grid.Row="2">
+<ComboBox x:Name="NewFamilyLibrary" Margin="0,8,0,6"/>
+<TextBox x:Name="NewFamilyName" ToolTip="Nom de la nouvelle famille"/>
+<Button Content="+ Ajouter une famille" Margin="0,7,0,0" Click="AddFamily_OnClick"/>
+</StackPanel>
+</Grid>
+</Border>
+      <Border Grid.Column="2" Style="{StaticResource Card}" Padding="14">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel>
+<TextBlock Text="FICHE FAMILLE" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="Nom" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+<TextBox Text="{Binding SelectedItem.Name, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding SelectedItem.IsDetected, ElementName=FamilyList}"/>
+<TextBlock Text="Bibliothèque" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+<TextBox Text="{Binding SelectedItem.LibraryName, ElementName=FamilyList}" IsReadOnly="True"/>
+<TextBlock Text="Description interne" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+<TextBox Text="{Binding SelectedItem.Description, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="72"/>
+<CheckBox Content="Famille active" IsChecked="{Binding SelectedItem.IsActive, ElementName=FamilyList}" Margin="0,14,0,0"/>
+<TextBlock Text="Tags affectés à cette famille — cliquez pour ajouter ou retirer" Style="{StaticResource FieldLabel}" Margin="0,18,0,8"/>
+<ItemsControl x:Name="FamilyTagChoices">
+<ItemsControl.ItemsPanel>
+<ItemsPanelTemplate>
+<WrapPanel/>
+</ItemsPanelTemplate>
+</ItemsControl.ItemsPanel>
+<ItemsControl.ItemTemplate>
+<DataTemplate>
+<CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}"/>
+</DataTemplate>
+</ItemsControl.ItemTemplate>
+</ItemsControl>
+<TextBlock Text="Toute modification sera propagée aux composants de cette famille après confirmation." Style="{StaticResource Caption}" Margin="0,8,0,0"/>
+</StackPanel>
+</ScrollViewer>
+</Border>
+      <Border Grid.Column="4" Style="{StaticResource Card}" Padding="12">
+<Grid>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="170"/>
+<RowDefinition Height="*"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<StackPanel>
+<TextBlock Text="TAGS" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="Référentiel du MVP" Style="{StaticResource Caption}" Margin="0,4,0,10"/>
+</StackPanel>
+<ListBox x:Name="TagList" Grid.Row="1" SelectionChanged="TagSelection_OnChanged" DisplayMemberPath="Label"/>
+<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="0,10,0,0">
+<TextBlock Text="Libellé" Style="{StaticResource FieldLabel}"/>
+<TextBox Text="{Binding SelectedItem.Label, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}"/>
+<TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/>
+<TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="55"/>
+<CheckBox Content="Tag actif" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,12,0,0"/>
+<TextBlock Text="Affecter ce tag à plusieurs familles" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
+<ItemsControl x:Name="TagFamilyChoices">
+<ItemsControl.ItemTemplate>
+<DataTemplate>
+<CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,0,0,7"/>
+</DataTemplate>
+</ItemsControl.ItemTemplate>
+</ItemsControl>
+</StackPanel>
+</ScrollViewer>
+<StackPanel Grid.Row="3">
+<Button Content="+ Créer un tag" Margin="0,8,0,0" Click="AddTag_OnClick"/>
+<Button Content="Supprimer le tag" Style="{StaticResource GhostButton}" Margin="0,7,0,0" Click="DeleteTag_OnClick"/>
+</StackPanel>
+</Grid>
+</Border>
      </Grid>
-     <Grid Grid.Row="2" Margin="0,12,0,0"><TextBlock x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Synchroniser les familles détectées" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="SyncFamilies_OnClick"/><Button Content="Enregistrer familles et tags" Click="SaveTaxonomy_OnClick"/></StackPanel></Grid>
+     <Grid Grid.Row="2" Margin="0,12,0,0">
+<TextBlock x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
+<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+<Button Content="Synchroniser les familles détectées" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="SyncFamilies_OnClick"/>
+<Button Content="Enregistrer familles et tags" Click="SaveTaxonomy_OnClick"/>
+</StackPanel>
+</Grid>
     </Grid>
 
-    <ScrollViewer x:Name="CompatibilityPanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Compatibilités" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><TextBlock Text="Espace réservé aux règles de compatibilité et d’incompatibilité. Il sera activé après le MVP de présentation." Style="{StaticResource Caption}"/></Border></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="FurniturePanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Meubles et variantes" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><TextBlock Text="Espace réservé aux référentiels de meubles, familles et variantes TOP." Style="{StaticResource Caption}"/></Border></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="ValidationPanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Validation et publication" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><TextBlock Text="Espace réservé aux workflows, contrôles de publication et dérogations." Style="{StaticResource Caption}"/></Border></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="CapabilitiesPanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Capacités paramétriques" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><StackPanel><Border Background="#322A18" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" CornerRadius="9" Padding="12"><TextBlock Text="Hors périmètre du MVP — conservé pour une prochaine version." Foreground="{StaticResource AmberBrush}"/></Border><TextBlock Text="Cet espace accueillera les capacités, leurs paramètres TopSolid, valeurs, unités, conditions et règles d’affichage client." Style="{StaticResource Caption}" Margin="0,14,0,0"/></StackPanel></Border></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="ClientPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="Apparence, navigation et univers" Style="{StaticResource SectionTitle}"/><TextBlock Text="Les univers structurent l’entrée principale du Catalogue Atlas." Style="{StaticResource Caption}" Margin="0,5,0,16"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.2*"/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="UNIVERS DU CATALOGUE" Style="{StaticResource Eyebrow}"/><ListBox x:Name="UniverseList" Height="330" Margin="0,12,0,0"/></StackPanel></Border><Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel><TextBlock Text="Gérer les univers" Style="{StaticResource SectionTitle}"/><TextBlock Text="Ajoutez les espaces de destination utilisés pour classer les meubles. Plusieurs univers peuvent être cochés sur une même fiche." Style="{StaticResource Caption}" Margin="0,6,0,16"/><TextBlock Text="Nouvel univers" Style="{StaticResource FieldLabel}"/><TextBox x:Name="NewUniverseSetting"/><Button Content="+ Ajouter" HorizontalAlignment="Left" Margin="0,9,0,0" Click="AddUniverseSetting_OnClick"/><Button Content="Supprimer l’univers sélectionné" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,18,0,0" Click="DeleteUniverseSetting_OnClick"/><TextBlock Text="Les modifications seront partagées lors du prochain Enregistrer général." Style="{StaticResource Caption}" Margin="0,12,0,0"/></StackPanel></Border></Grid></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="ClientSearchPanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Recherche et filtres client" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><TextBlock Text="Espace prévu pour l’ordre des filtres, les tags visibles et les tris du catalogue client." Style="{StaticResource Caption}"/></Border></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="TopSolidPanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Ouverture TopSolid" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><TextBlock Text="Espace prévu pour l’ouverture et le glisser-déposer des fichiers .TOP, toujours considérés comme opaques." Style="{StaticResource Caption}"/></Border></StackPanel></ScrollViewer>
-    <ScrollViewer x:Name="SystemPanel" Visibility="Collapsed"><StackPanel><TextBlock Text="Sauvegardes et diagnostics" Style="{StaticResource SectionTitle}"/><Border Style="{StaticResource Card}" Margin="0,16,0,0"><TextBlock Text="Espace prévu pour sauvegardes, import/export, journaux, santé du catalogue et restauration." Style="{StaticResource Caption}"/></Border></StackPanel></ScrollViewer>
+    <ScrollViewer x:Name="CompatibilityPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Compatibilités" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace réservé aux règles de compatibilité et d’incompatibilité. Il sera activé après le MVP de présentation." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="FurniturePanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Meubles et variantes" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace réservé aux référentiels de meubles, familles et variantes TOP." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="ValidationPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Validation et publication" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace réservé aux workflows, contrôles de publication et dérogations." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="CapabilitiesPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Capacités paramétriques" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<StackPanel>
+<Border Background="#322A18" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" CornerRadius="9" Padding="12">
+<TextBlock Text="Hors périmètre du MVP — conservé pour une prochaine version." Foreground="{StaticResource AmberBrush}"/>
+</Border>
+<TextBlock Text="Cet espace accueillera les capacités, leurs paramètres TopSolid, valeurs, unités, conditions et règles d’affichage client." Style="{StaticResource Caption}" Margin="0,14,0,0"/>
+</StackPanel>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="ClientPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+<StackPanel>
+<TextBlock Text="Apparence, navigation et univers" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Les univers structurent l’entrée principale du Catalogue Atlas." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="1.2*"/>
+<ColumnDefinition Width="12"/>
+<ColumnDefinition/>
+</Grid.ColumnDefinitions>
+<Border Style="{StaticResource Card}">
+<StackPanel>
+<TextBlock Text="UNIVERS DU CATALOGUE" Style="{StaticResource Eyebrow}"/>
+<ListBox x:Name="UniverseList" Height="330" Margin="0,12,0,0"/>
+</StackPanel>
+</Border>
+<Border Grid.Column="2" Style="{StaticResource Card}">
+<StackPanel>
+<TextBlock Text="Gérer les univers" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Ajoutez les espaces de destination utilisés pour classer les meubles. Plusieurs univers peuvent être cochés sur une même fiche." Style="{StaticResource Caption}" Margin="0,6,0,16"/>
+<TextBlock Text="Nouvel univers" Style="{StaticResource FieldLabel}"/>
+<TextBox x:Name="NewUniverseSetting"/>
+<Button Content="+ Ajouter" HorizontalAlignment="Left" Margin="0,9,0,0" Click="AddUniverseSetting_OnClick"/>
+<Button Content="Supprimer l’univers sélectionné" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,18,0,0" Click="DeleteUniverseSetting_OnClick"/>
+<TextBlock Text="Les modifications seront partagées lors du prochain Enregistrer général." Style="{StaticResource Caption}" Margin="0,12,0,0"/>
+</StackPanel>
+</Border>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="ClientSearchPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Recherche et filtres client" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace prévu pour l’ordre des filtres, les tags visibles et les tris du catalogue client." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="TopSolidPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Ouverture TopSolid" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace prévu pour l’ouverture et le glisser-déposer des fichiers .TOP, toujours considérés comme opaques." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="SystemPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Sauvegardes et diagnostics" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace prévu pour sauvegardes, import/export, journaux, santé du catalogue et restauration." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
    </Grid>
   </Grid>
  </Grid>

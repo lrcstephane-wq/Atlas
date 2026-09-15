@@ -284,6 +284,7 @@ public sealed class FurnitureRecord : BindableModel
     private int _nombreNichesOuvertes;
     private RecordStatus _status;
     private string _forcedValidationReason = string.Empty;
+    private bool _isPublicationReviewed;
 
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public bool IsDemo { get; set; }
@@ -339,10 +340,20 @@ public sealed class FurnitureRecord : BindableModel
     public RecordStatus Status { get => _status; set => Set(ref _status, value); }
     public string ForcedValidationReason { get => _forcedValidationReason; set => Set(ref _forcedValidationReason, value); }
     public List<string> ComponentIds { get; set; } = [];
+    public List<FurnitureComponentLine> ComponentLines { get; set; } = [];
+    public bool IsPublicationReviewed { get => _isPublicationReviewed; set => Set(ref _isPublicationReviewed, value); }
     public List<string> AddedTagIds { get; set; } = [];
     public List<string> RemovedInheritedTagIds { get; set; } = [];
     public string ValidatedBy { get; set; } = string.Empty;
     public DateTimeOffset? ValidatedUtc { get; set; }
+}
+
+public sealed class FurnitureComponentLine : BindableModel
+{
+    private int _quantity = 1;
+
+    public string ComponentId { get; set; } = string.Empty;
+    public int Quantity { get => _quantity; set => Set(ref _quantity, Math.Max(1, value)); }
 }
 
 public sealed class FurnitureFamilyRecord : BindableModel

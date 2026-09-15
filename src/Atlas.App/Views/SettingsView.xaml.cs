@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Media;
 using Atlas.App.ViewModels;
 using Atlas.Core.Models;
 using Atlas.Core.Services;
@@ -14,9 +16,11 @@ public partial class SettingsView : UserControl
     private readonly ObservableCollection<ToggleOptionViewModel> _familyTagChoices = [];
     private readonly ObservableCollection<ToggleOptionViewModel> _tagFamilyChoices = [];
     private readonly ObservableCollection<string> _universes = [];
+    private readonly ObservableCollection<string> _familyLibraries = ["Toutes les bibliothèques"];
     private ComponentTaxonomy _taxonomy = new();
     private Dictionary<string, HashSet<string>> _savedAssignments = new(StringComparer.OrdinalIgnoreCase);
     private bool _refreshing;
+    private Button? _activeSettingsButton;
 
     public SettingsView()
     {
@@ -26,6 +30,9 @@ public partial class SettingsView : UserControl
         FamilyTagChoices.ItemsSource = _familyTagChoices;
         TagFamilyChoices.ItemsSource = _tagFamilyChoices;
         UniverseList.ItemsSource = _universes;
+        FamilyLibraryFilter.ItemsSource = _familyLibraries;
+        FamilyLibraryFilter.SelectedIndex = 0;
+        CollectionViewSource.GetDefaultView(_families).Filter = FilterFamily;
     }
 
     private async void SettingsView_OnLoaded(object sender, RoutedEventArgs e)
@@ -62,6 +69,11 @@ public partial class SettingsView : UserControl
             if (libraries.Count == 0) libraries.Add("Atlas");
             NewFamilyLibrary.ItemsSource = libraries;
             NewFamilyLibrary.SelectedIndex = 0;
+            var selectedLibrary = FamilyLibraryFilter.SelectedItem?.ToString();
+            _familyLibraries.Clear();
+            _familyLibraries.Add("Toutes les bibliothèques");
+            foreach (var library in libraries) _familyLibraries.Add(library);
+            FamilyLibraryFilter.SelectedItem = _familyLibraries.FirstOrDefault(x => x.Equals(selectedLibrary, StringComparison.OrdinalIgnoreCase)) ?? _familyLibraries[0];
         }
         _refreshing = false;
         RefreshFamilyTagChoices();
@@ -70,13 +82,36 @@ public partial class SettingsView : UserControl
 
     private void SettingsNavigation_OnClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: string target }) return;
+        if (sender is not Button { Tag: string target } button) return;
+        if (_activeSettingsButton is not null)
+        {
+            _activeSettingsButton.ClearValue(BackgroundProperty);
+            _activeSettingsButton.ClearValue(BorderBrushProperty);
+        }
+        _activeSettingsButton = button;
+        button.Background = new SolidColorBrush(Color.FromRgb(33, 78, 134));
+        button.BorderBrush = new SolidColorBrush(Color.FromRgb(45, 212, 191));
         foreach (var panel in new FrameworkElement[] { GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
             panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void FamilySelection_OnChanged(object sender, SelectionChangedEventArgs e) { if (!_refreshing) RefreshFamilyTagChoices(); }
     private void TagSelection_OnChanged(object sender, SelectionChangedEventArgs e) { if (!_refreshing) RefreshTagFamilyChoices(); }
+
+    private void FamilyFilter_OnChanged(object sender, EventArgs e)
+    {
+        if (!IsLoaded) return;
+        CollectionViewSource.GetDefaultView(_families).Refresh();
+    }
+
+    private bool FilterFamily(object item)
+    {
+        if (item is not ComponentFamilyRecord family) return false;
+        var library = FamilyLibraryFilter.SelectedItem?.ToString() ?? "Toutes les bibliothèques";
+        if (library != "Toutes les bibliothèques" && !family.LibraryName.Equals(library, StringComparison.OrdinalIgnoreCase)) return false;
+        var query = FamilySearch.Text.Trim();
+        return string.IsNullOrWhiteSpace(query) || family.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || family.LibraryName.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
 
     private void RefreshFamilyTagChoices()
     {
