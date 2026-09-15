@@ -32,6 +32,8 @@ public partial class SettingsView : UserControl
         UniverseList.ItemsSource = _universes;
         FamilyLibraryFilter.ItemsSource = _familyLibraries;
         FamilyLibraryFilter.SelectedIndex = 0;
+        TagFamilyLibraryFilter.ItemsSource = _familyLibraries;
+        TagFamilyLibraryFilter.SelectedIndex = 0;
         CollectionViewSource.GetDefaultView(_families).Filter = FilterFamily;
     }
 
@@ -40,6 +42,8 @@ public partial class SettingsView : UserControl
         if (_families.Count > 0 || _tags.Count > 0) return;
         await ReloadTaxonomyAsync();
         if (DataContext is MainViewModel vm) foreach (var universe in vm.CatalogUniverses.Order(StringComparer.CurrentCultureIgnoreCase)) _universes.Add(universe);
+        ActivateSettingsButton(GeneralSettingsButton);
+        SetTaxonomyMode("Family");
     }
 
     private async Task ReloadTaxonomyAsync()
@@ -74,6 +78,7 @@ public partial class SettingsView : UserControl
             _familyLibraries.Add("Toutes les bibliothèques");
             foreach (var library in libraries) _familyLibraries.Add(library);
             FamilyLibraryFilter.SelectedItem = _familyLibraries.FirstOrDefault(x => x.Equals(selectedLibrary, StringComparison.OrdinalIgnoreCase)) ?? _familyLibraries[0];
+            TagFamilyLibraryFilter.SelectedItem ??= _familyLibraries[0];
         }
         _refreshing = false;
         RefreshFamilyTagChoices();
@@ -83,6 +88,13 @@ public partial class SettingsView : UserControl
     private void SettingsNavigation_OnClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string target } button) return;
+        ActivateSettingsButton(button);
+        foreach (var panel in new FrameworkElement[] { GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
+            panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ActivateSettingsButton(Button button)
+    {
         if (_activeSettingsButton is not null)
         {
             _activeSettingsButton.ClearValue(BackgroundProperty);
@@ -91,8 +103,23 @@ public partial class SettingsView : UserControl
         _activeSettingsButton = button;
         button.Background = new SolidColorBrush(Color.FromRgb(33, 78, 134));
         button.BorderBrush = new SolidColorBrush(Color.FromRgb(45, 212, 191));
-        foreach (var panel in new FrameworkElement[] { GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
-            panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void TaxonomyMode_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string mode }) SetTaxonomyMode(mode);
+    }
+
+    private void SetTaxonomyMode(string mode)
+    {
+        var familyMode = mode == "Family";
+        FamilyListColumn.Width = familyMode ? new GridLength(370) : new GridLength(0);
+        FamilyGapColumn.Width = familyMode ? new GridLength(12) : new GridLength(0);
+        FamilyDetailColumn.Width = familyMode ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        TagGapColumn.Width = new GridLength(0);
+        TagColumn.Width = familyMode ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        FamilyModeButton.Background = new SolidColorBrush(familyMode ? Color.FromRgb(45, 126, 247) : Color.FromRgb(24, 40, 62));
+        TagModeButton.Background = new SolidColorBrush(familyMode ? Color.FromRgb(24, 40, 62) : Color.FromRgb(45, 126, 247));
     }
 
     private void FamilySelection_OnChanged(object sender, SelectionChangedEventArgs e) { if (!_refreshing) RefreshFamilyTagChoices(); }
@@ -102,6 +129,11 @@ public partial class SettingsView : UserControl
     {
         if (!IsLoaded) return;
         CollectionViewSource.GetDefaultView(_families).Refresh();
+    }
+
+    private void TagFamilyFilter_OnChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded && !_refreshing) RefreshTagFamilyChoices();
     }
 
     private bool FilterFamily(object item)
@@ -133,13 +165,16 @@ public partial class SettingsView : UserControl
         _refreshing = true;
         _tagFamilyChoices.Clear();
         if (TagList.SelectedItem is ComponentTagRecord tag)
-            foreach (var family in _families.Where(x => x.IsActive))
+        {
+            var library = TagFamilyLibraryFilter.SelectedItem?.ToString() ?? "Toutes les bibliothèques";
+            foreach (var family in _families.Where(x => x.IsActive && (library == "Toutes les bibliothèques" || x.LibraryName.Equals(library, StringComparison.OrdinalIgnoreCase))))
                 _tagFamilyChoices.Add(new ToggleOptionViewModel(family.QualifiedName, family.TagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase), choice =>
                 {
                     SetMembership(family.TagIds, tag.Id, choice.IsSelected);
                     TaxonomyStatus.Text = "Affectation modifiée. Enregistrez pour la propager.";
                     RefreshFamilyTagChoices();
                 }));
+        }
         _refreshing = false;
     }
 
@@ -158,9 +193,12 @@ public partial class SettingsView : UserControl
     private void AddTag_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel { CanEdit: true }) return;
-        var tag = new ComponentTagRecord { Label = "Nouveau tag" };
-        _taxonomy.Tags.Add(tag); RefreshCollections(); TagList.SelectedItem = tag;
-        TaxonomyStatus.Text = "Tag créé. Renommez-le et choisissez une ou plusieurs familles.";
+        var label = NewTagName.Text.Trim();
+        if (string.IsNullOrWhiteSpace(label)) { TaxonomyStatus.Text = "Saisissez le libellé du nouveau tag."; return; }
+        if (_tags.Any(x => x.Label.Equals(label, StringComparison.OrdinalIgnoreCase))) { TaxonomyStatus.Text = "Ce tag existe déjà."; return; }
+        var tag = new ComponentTagRecord { Label = label, Category = "Autre" };
+        _taxonomy.Tags.Add(tag); NewTagName.Clear(); RefreshCollections(); TagList.SelectedItem = tag;
+        TaxonomyStatus.Text = "Tag créé. Choisissez sa catégorie et les familles auxquelles l’affecter.";
     }
 
     private void DeleteTag_OnClick(object sender, RoutedEventArgs e)
