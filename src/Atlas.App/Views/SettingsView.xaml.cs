@@ -266,9 +266,21 @@ public partial class SettingsView : UserControl
         if (_tags.Any(x => string.IsNullOrWhiteSpace(x.Label)) || _families.Any(x => string.IsNullOrWhiteSpace(x.Name))) { TaxonomyStatus.Text = "Chaque famille et chaque tag doit avoir un nom."; return; }
 
         var currentAssignments = BuildAssignmentSnapshot();
-        var changedFamilies = _families.Where(f => !_savedAssignments.TryGetValue(f.Id, out var saved) || !currentAssignments.TryGetValue(f.Id, out var current) || !saved.SetEquals(current)).ToArray();
-        var impacted = vm.Components.Count(component => changedFamilies.Any(f => ComponentTaxonomyStore.FamilyKey(f.LibraryName, f.Name).Equals(ComponentTaxonomyStore.FamilyKey(component.LibraryName, component.EffectiveFamilyName), StringComparison.OrdinalIgnoreCase)));
-        if (impacted > 0 && !AtlasDialog.Confirm("Appliquer ces changements de tags ?", "Propagation aux composants", $"{changedFamilies.Length} famille(s) modifiée(s) · {impacted} composant(s) verront leurs tags hérités évoluer. Les exceptions manuelles seront conservées.")) return;
+        var changedScopes = currentAssignments.Keys.Union(_savedAssignments.Keys, StringComparer.OrdinalIgnoreCase)
+            .Where(key => !_savedAssignments.TryGetValue(key, out var saved) || !currentAssignments.TryGetValue(key, out var current) || !saved.SetEquals(current))
+            .ToArray();
+        var changedFamilyKeys = changedScopes.Where(x => x.StartsWith("F:", StringComparison.OrdinalIgnoreCase)).Select(x => x[2..]).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var changedTypeKeys = changedScopes.Where(x => x.StartsWith("T:", StringComparison.OrdinalIgnoreCase)).Select(x => x[2..]).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var impacted = vm.Components.Count(component =>
+        {
+            var familyKey = ComponentTaxonomyStore.FamilyKey(component.LibraryName, component.EffectiveFamilyName);
+            return changedFamilyKeys.Contains(familyKey) || changedTypeKeys.Contains(TypeScopeKey(familyKey, component.TypeCode));
+        });
+        if (changedScopes.Length > 0)
+        {
+            var details = $"{changedFamilyKeys.Count} famille(s) entière(s) · {changedTypeKeys.Count} type(s) précis · {impacted} composant(s) verront leurs tags hérités évoluer.";
+            if (!AtlasDialog.Confirm("Appliquer ces changements de tags ?", "Propagation aux composants", details + " Les exceptions manuelles seront conservées.")) return;
+        }
 
         foreach (var tag in _tags) { tag.Label = tag.Label.Trim(); tag.Description = tag.Description.Trim(); }
         foreach (var family in _families) { family.Name = family.Name.Trim(); family.Description = family.Description.Trim(); }
@@ -313,10 +325,20 @@ public partial class SettingsView : UserControl
         if (!selected) RemoveIgnoreCase(values, id);
     }
 
-    private Dictionary<string, HashSet<string>> BuildAssignmentSnapshot() => _taxonomy.Families.ToDictionary(
-        family => family.Id,
-        family => family.TagIds.Select(id => $"F:{id}").Concat(family.Types.SelectMany(type => type.TagIds.Select(id => $"T:{type.Name}:{id}"))).ToHashSet(StringComparer.OrdinalIgnoreCase),
-        StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, HashSet<string>> BuildAssignmentSnapshot()
+    {
+        var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var family in _taxonomy.Families)
+        {
+            var familyKey = ComponentTaxonomyStore.FamilyKey(family.LibraryName, family.Name);
+            result[$"F:{familyKey}"] = family.TagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var type in family.Types)
+                result[$"T:{TypeScopeKey(familyKey, type.Name)}"] = type.TagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        return result;
+    }
+
+    private static string TypeScopeKey(string familyKey, string typeName) => $"{familyKey}|{typeName.Trim()}";
 
     private static void RemoveIgnoreCase(List<string> values, string id)
     {
