@@ -20,7 +20,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
 <StackPanel>
      <TextBlock Text="GÉNÉRAL" Style="{StaticResource NavSection}"/>
-     <Button Content="Espace de travail" Tag="GeneralPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     <Button x:Name="GeneralSettingsButton" Content="Espace de travail" Tag="GeneralPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Utilisateurs et droits" Tag="UsersPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <TextBlock Text="FORGE" Style="{StaticResource NavSection}"/>
      <Button Content="Bibliothèques et indexation" Tag="LibrariesPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
@@ -150,17 +150,23 @@
 <RowDefinition Height="*"/>
 <RowDefinition Height="Auto"/>
 </Grid.RowDefinitions>
-     <StackPanel>
+     <Grid>
+      <StackPanel>
 <TextBlock Text="Familles et tags" Style="{StaticResource SectionTitle}"/>
-<TextBlock Text="Les familles sont distinctes par bibliothèque. Leurs tags sont hérités par les composants, puis proposés aux meubles." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
-</StackPanel>
+<TextBlock Text="Choisissez une tâche : enrichir une famille ou diffuser un tag dans plusieurs familles." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+       <Button x:Name="FamilyModeButton" Content="Gérer par famille" Click="TaxonomyMode_OnClick" Tag="Family"/>
+       <Button x:Name="TagModeButton" Content="Gérer par tag" Style="{StaticResource GhostButton}" Click="TaxonomyMode_OnClick" Tag="Tag" Margin="8,0,0,0"/>
+      </StackPanel>
+     </Grid>
      <Grid Grid.Row="1">
 <Grid.ColumnDefinitions>
-<ColumnDefinition Width="1.05*"/>
-<ColumnDefinition Width="12"/>
-<ColumnDefinition Width="1.2*"/>
-<ColumnDefinition Width="12"/>
-<ColumnDefinition Width="1.05*"/>
+<ColumnDefinition x:Name="FamilyListColumn" Width="370"/>
+<ColumnDefinition x:Name="FamilyGapColumn" Width="12"/>
+<ColumnDefinition x:Name="FamilyDetailColumn" Width="*"/>
+<ColumnDefinition x:Name="TagGapColumn" Width="0"/>
+<ColumnDefinition x:Name="TagColumn" Width="0"/>
 </Grid.ColumnDefinitions>
       <Border Style="{StaticResource Card}" Padding="12">
 <Grid>
@@ -170,8 +176,8 @@
 <RowDefinition Height="Auto"/>
 </Grid.RowDefinitions>
 <StackPanel>
-<TextBlock Text="FAMILLES" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="Détectées et manuelles" Style="{StaticResource Caption}" Margin="0,4,0,10"/>
+<TextBlock Text="1 · CHOISIR LA BIBLIOTHÈQUE" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="Les familles détectées restent séparées par bibliothèque." Style="{StaticResource Caption}" Margin="0,4,0,10" TextWrapping="Wrap"/>
 <ComboBox x:Name="FamilyLibraryFilter" SelectionChanged="FamilyFilter_OnChanged" Margin="0,0,0,7"/>
 <TextBox x:Name="FamilySearch" TextChanged="FamilyFilter_OnChanged" ToolTip="Rechercher une famille" Margin="0,0,0,9"/>
 </StackPanel>
@@ -188,6 +194,7 @@
 </ListBox.ItemTemplate>
 </ListBox>
 <StackPanel Grid.Row="2">
+<TextBlock Text="Ajouter une famille manuelle" Style="{StaticResource FieldLabel}" Margin="0,8,0,5"/>
 <ComboBox x:Name="NewFamilyLibrary" Margin="0,8,0,6"/>
 <TextBox x:Name="NewFamilyName" ToolTip="Nom de la nouvelle famille"/>
 <Button Content="+ Ajouter une famille" Margin="0,7,0,0" Click="AddFamily_OnClick"/>
@@ -197,7 +204,7 @@
       <Border Grid.Column="2" Style="{StaticResource Card}" Padding="14">
 <ScrollViewer VerticalScrollBarVisibility="Auto">
 <StackPanel>
-<TextBlock Text="FICHE FAMILLE" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="2 · ENRICHIR LA FAMILLE" Style="{StaticResource Eyebrow}"/>
 <TextBlock Text="Nom" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
 <TextBox Text="{Binding SelectedItem.Name, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding SelectedItem.IsDetected, ElementName=FamilyList}"/>
 <TextBlock Text="Bibliothèque" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
@@ -205,7 +212,8 @@
 <TextBlock Text="Description interne" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
 <TextBox Text="{Binding SelectedItem.Description, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="72"/>
 <CheckBox Content="Famille active" IsChecked="{Binding SelectedItem.IsActive, ElementName=FamilyList}" Margin="0,14,0,0"/>
-<TextBlock Text="Tags affectés à cette famille — cliquez pour ajouter ou retirer" Style="{StaticResource FieldLabel}" Margin="0,18,0,8"/>
+<TextBlock Text="3 · TAGS HÉRITÉS PAR SES COMPOSANTS" Style="{StaticResource Eyebrow}" Margin="0,22,0,4"/>
+<TextBlock Text="Cliquez sur un tag pour l’ajouter ou le retirer. La couleur bleue indique une affectation active." Style="{StaticResource Caption}" Margin="0,0,0,10"/>
 <ItemsControl x:Name="FamilyTagChoices">
 <ItemsControl.ItemsPanel>
 <ItemsPanelTemplate>
@@ -231,29 +239,35 @@
 <RowDefinition Height="Auto"/>
 </Grid.RowDefinitions>
 <StackPanel>
-<TextBlock Text="TAGS" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="Référentiel du MVP" Style="{StaticResource Caption}" Margin="0,4,0,10"/>
+<TextBlock Text="1 · CHOISIR OU CRÉER UN TAG" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="Le tag sera ensuite diffusé dans les familles choisies." Style="{StaticResource Caption}" Margin="0,4,0,10"/>
 </StackPanel>
 <ListBox x:Name="TagList" Grid.Row="1" SelectionChanged="TagSelection_OnChanged" DisplayMemberPath="Label"/>
 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
 <StackPanel Margin="0,10,0,0">
 <TextBlock Text="Libellé" Style="{StaticResource FieldLabel}"/>
 <TextBox Text="{Binding SelectedItem.Label, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}"/>
+<TextBlock Text="Catégorie" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/>
+<ComboBox ItemsSource="{Binding DataContext.TagCategories, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding SelectedItem.Category, ElementName=TagList}"/>
 <TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/>
 <TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="55"/>
 <CheckBox Content="Tag actif" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,12,0,0"/>
-<TextBlock Text="Affecter ce tag à plusieurs familles" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
+<TextBlock Text="2 · CHOISIR LA BIBLIOTHÈQUE CIBLE" Style="{StaticResource Eyebrow}" Margin="0,18,0,7"/>
+<ComboBox x:Name="TagFamilyLibraryFilter" SelectionChanged="TagFamilyFilter_OnChanged" Margin="0,0,0,12"/>
+<TextBlock Text="3 · AFFECTER AUX FAMILLES" Style="{StaticResource Eyebrow}" Margin="0,0,0,8"/>
 <ItemsControl x:Name="TagFamilyChoices">
+<ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
 <ItemsControl.ItemTemplate>
 <DataTemplate>
-<CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,0,0,7"/>
+<CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}"/>
 </DataTemplate>
 </ItemsControl.ItemTemplate>
 </ItemsControl>
 </StackPanel>
 </ScrollViewer>
 <StackPanel Grid.Row="3">
-<Button Content="+ Créer un tag" Margin="0,8,0,0" Click="AddTag_OnClick"/>
+<TextBlock Text="Créer un nouveau tag" Style="{StaticResource FieldLabel}" Margin="0,10,0,5"/>
+<Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="NewTagName" ToolTip="Ex. Hettich, Coulissant, Sous-évier"/><Button Grid.Column="1" Content="Créer et ouvrir" Margin="8,0,0,0" Click="AddTag_OnClick"/></Grid>
 <Button Content="Supprimer le tag" Style="{StaticResource GhostButton}" Margin="0,7,0,0" Click="DeleteTag_OnClick"/>
 </StackPanel>
 </Grid>
