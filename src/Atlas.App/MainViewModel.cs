@@ -438,8 +438,6 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedComponent is null) return;
         if (!SelectedComponent.IsNameCompliant && string.IsNullOrWhiteSpace(SelectedComponent.ForcedValidationReason)) { AtlasDialog.Warning("Ce nom n’est pas conforme. Renseignez le motif de validation forcée avant de valider.", "Validation"); return; }
         SelectedComponent.NormalizeTags();
-        var missingTagReason = SelectedComponent.RemovedInheritedTagIds.FirstOrDefault(id => !SelectedComponent.RemovedInheritedTagReasons.TryGetValue(id, out var reason) || string.IsNullOrWhiteSpace(reason) || reason.Equals("À préciser", StringComparison.OrdinalIgnoreCase));
-        if (missingTagReason is not null) { AtlasDialog.Warning("Un tag hérité a été exclu sans motif. Complétez le motif affiché sous ce tag avant de valider la fiche.", "Validation"); return; }
         SelectedComponent.Status = RecordStatus.Validee; SelectedComponent.ValidatedBy = CurrentUser.DisplayName; SelectedComponent.ValidatedUtc = DateTimeOffset.UtcNow;
         StatusText = $"Fiche validée par {CurrentUser.DisplayName}. Pensez à enregistrer."; RefreshComponentView();
     }
