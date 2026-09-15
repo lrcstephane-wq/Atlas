@@ -59,20 +59,14 @@
       <TextBlock x:Name="FamilyOverrideHint" Text="Dérogation active : la famille Atlas diffère de l’architecture Biblidéo." Foreground="{StaticResource AmberBrush}" FontSize="10" Margin="0,6,0,0" Visibility="Collapsed"/>
 
       <TextBlock Text="TAGS DU COMPOSANT" Style="{StaticResource Eyebrow}" Margin="0,18,0,5"/>
-      <TextBlock Text="La fiche montre toujours l’origine réelle de chaque tag." Style="{StaticResource Caption}" Margin="0,0,0,11"/>
+      <TextBlock Text="Sélectionnez directement les informations utiles pour qualifier ce composant." Style="{StaticResource Caption}" Margin="0,0,0,11" TextWrapping="Wrap"/>
 
-      <Border Background="#102D2D" BorderBrush="#24645C" BorderThickness="1" CornerRadius="9" Padding="10">
-       <StackPanel><TextBlock Text="HÉRITÉS AUTOMATIQUEMENT" Style="{StaticResource Eyebrow}"/><TextBlock Text="Famille et type" Style="{StaticResource Caption}" Margin="0,3,0,8"/>
-        <ItemsControl x:Name="InheritedTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,0,7,7"><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="{Binding OriginLabel}" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox><StackPanel Visibility="{Binding IsExcluded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="Exclu sur ce composant — motif obligatoire" Foreground="{StaticResource AmberBrush}" FontSize="9"/><TextBox Text="{Binding ExclusionReason, UpdateSourceTrigger=PropertyChanged}" MinWidth="210" Margin="0,3,0,0"/></StackPanel></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-       </StackPanel>
-      </Border>
-
-      <TextBlock Text="AJOUTÉS SUR CETTE FICHE" Style="{StaticResource Eyebrow}" Margin="0,14,0,7"/>
+      <TextBlock Text="TAGS SÉLECTIONNÉS" Style="{StaticResource Eyebrow}" Margin="0,4,0,7"/>
       <ItemsControl x:Name="SpecificTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="Spécifique au composant" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
 
       <TextBlock Text="AJOUTER UN TAG" Style="{StaticResource Eyebrow}" Margin="0,14,0,7"/>
       <ItemsControl x:Name="AvailableTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="{Binding OriginLabel}" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-      <TextBlock x:Name="NoTagsText" Text="Aucun tag actif. Créez vos tags dans Paramètres › Forge › Familles et tags." Style="{StaticResource Caption}" Margin="0,4,0,0"/>
+      <TextBlock x:Name="NoTagsText" Text="Aucun tag actif. Créez vos tags dans Paramètres › Forge › Tags." Style="{StaticResource Caption}" Margin="0,4,0,0"/>
 
       <TextBlock Text="Description" Style="{StaticResource FieldLabel}" Margin="0,17,0,5"/><TextBox Text="{Binding SelectedComponent.Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="62"/>
       <TextBlock Text="Conseils d’utilisation" Style="{StaticResource FieldLabel}" Margin="0,11,0,5"/><TextBox Text="{Binding SelectedComponent.UsageNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="52"/>

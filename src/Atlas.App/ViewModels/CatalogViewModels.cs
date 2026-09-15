@@ -188,19 +188,15 @@ public sealed class ToggleOptionViewModel : INotifyPropertyChanged
 {
     private bool _isSelected;
     private readonly Action<ToggleOptionViewModel>? _changed;
-    private readonly bool _deferChangedToUserAction;
 
-    public ToggleOptionViewModel(string label, bool isSelected, Action<ToggleOptionViewModel>? changed = null, string? assignmentScopeKey = null, bool deferChangedToUserAction = false)
+    public ToggleOptionViewModel(string label, bool isSelected, Action<ToggleOptionViewModel>? changed = null)
     {
         Label = label;
         _isSelected = isSelected;
         _changed = changed;
-        AssignmentScopeKey = assignmentScopeKey;
-        _deferChangedToUserAction = deferChangedToUserAction;
     }
 
     public string Label { get; }
-    public string? AssignmentScopeKey { get; }
     public bool IsSelected
     {
         get => _isSelected;
@@ -209,12 +205,8 @@ public sealed class ToggleOptionViewModel : INotifyPropertyChanged
             if (_isSelected == value) return;
             _isSelected = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
-            if (!_deferChangedToUserAction) _changed?.Invoke(this);
+            _changed?.Invoke(this);
         }
-    }
-    public void NotifyUserAction()
-    {
-        if (_deferChangedToUserAction) _changed?.Invoke(this);
     }
     public event PropertyChangedEventHandler? PropertyChanged;
 }

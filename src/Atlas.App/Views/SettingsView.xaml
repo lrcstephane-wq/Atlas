@@ -24,7 +24,7 @@
      <Button Content="Utilisateurs et droits" Tag="UsersPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <TextBlock Text="FORGE" Style="{StaticResource NavSection}"/>
      <Button Content="Bibliothèques et indexation" Tag="LibrariesPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
-     <Button Content="Familles et tags" Tag="TaxonomyPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     <Button Content="Tags" Tag="TaxonomyPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Compatibilités" Tag="CompatibilityPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Meubles et variantes" Tag="FurniturePanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Validation et publication" Tag="ValidationPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
@@ -135,10 +135,7 @@
 <TextBox Text="{Binding Settings.LibraryRoot, UpdateSourceTrigger=PropertyChanged}"/>
 <Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseLibraryCommand}" Margin="8,0,0,0"/>
 </Grid>
-<StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-<Button Content="Indexer maintenant" Command="{Binding ScanCommand}"/>
-<Button Content="Synchroniser les familles" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="SyncFamilies_OnClick"/>
-</StackPanel>
+<Button Content="Indexer maintenant" Command="{Binding ScanCommand}" HorizontalAlignment="Left" Margin="0,14,0,0"/>
 </StackPanel>
 </Border>
     </StackPanel>
@@ -146,151 +143,98 @@
 
     <Grid x:Name="TaxonomyPanel" Visibility="Collapsed">
      <Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="*"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-     <Grid>
-      <StackPanel>
-<TextBlock Text="Familles et tags" Style="{StaticResource SectionTitle}"/>
-<TextBlock Text="Choisissez une tâche : enrichir une famille ou diffuser un tag dans plusieurs familles." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
-      </StackPanel>
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-       <Button x:Name="FamilyModeButton" Content="Gérer par famille" Click="TaxonomyMode_OnClick" Tag="Family"/>
-       <Button x:Name="TagModeButton" Content="Gérer par tag" Style="{StaticResource GhostButton}" Click="TaxonomyMode_OnClick" Tag="Tag" Margin="8,0,0,0"/>
-      </StackPanel>
-     </Grid>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+     </Grid.RowDefinitions>
+     <StackPanel>
+      <TextBlock Text="Tags" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="Créez le vocabulaire utilisé pour qualifier les composants et retrouver les meubles dans le catalogue." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+     </StackPanel>
      <Grid Grid.Row="1">
-<Grid.ColumnDefinitions>
-<ColumnDefinition x:Name="FamilyListColumn" Width="370"/>
-<ColumnDefinition x:Name="FamilyGapColumn" Width="12"/>
-<ColumnDefinition x:Name="FamilyDetailColumn" Width="*"/>
-<ColumnDefinition x:Name="TagGapColumn" Width="0"/>
-<ColumnDefinition x:Name="TagColumn" Width="0"/>
-</Grid.ColumnDefinitions>
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="370"/>
+       <ColumnDefinition Width="14"/>
+       <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
       <Border Style="{StaticResource Card}" Padding="12">
-<Grid>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="*"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<StackPanel>
-<TextBlock Text="1 · CHOISIR LA BIBLIOTHÈQUE" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="Les familles détectées restent séparées par bibliothèque." Style="{StaticResource Caption}" Margin="0,4,0,10" TextWrapping="Wrap"/>
-<ComboBox x:Name="FamilyLibraryFilter" SelectionChanged="FamilyFilter_OnChanged" Margin="0,0,0,7"/>
-<TextBox x:Name="FamilySearch" TextChanged="FamilyFilter_OnChanged" ToolTip="Rechercher une famille" Margin="0,0,0,9"/>
-</StackPanel>
-<ListBox x:Name="FamilyList" Grid.Row="1" SelectionChanged="FamilySelection_OnChanged">
-<ListBox.ItemTemplate>
-<DataTemplate>
-<Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="8" Padding="10" Margin="0,0,0,6">
-<StackPanel>
-<TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-<TextBlock Text="{Binding LibraryName}" Style="{StaticResource Caption}" Margin="0,3,0,0"/>
-</StackPanel>
-</Border>
-</DataTemplate>
-</ListBox.ItemTemplate>
-</ListBox>
-<StackPanel Grid.Row="2">
-<TextBlock Text="Ajouter une famille manuelle" Style="{StaticResource FieldLabel}" Margin="0,8,0,5"/>
-<ComboBox x:Name="NewFamilyLibrary" Margin="0,8,0,6"/>
-<TextBox x:Name="NewFamilyName" ToolTip="Nom de la nouvelle famille"/>
-<Button Content="+ Ajouter une famille" Margin="0,7,0,0" Click="AddFamily_OnClick"/>
-</StackPanel>
-</Grid>
-</Border>
-      <Border Grid.Column="2" Style="{StaticResource Card}" Padding="14">
-<ScrollViewer VerticalScrollBarVisibility="Auto">
-<StackPanel>
-<TextBlock Text="2 · ENRICHIR LA FAMILLE" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="Nom" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
-<TextBox Text="{Binding SelectedItem.Name, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding SelectedItem.IsDetected, ElementName=FamilyList}"/>
-<TextBlock Text="Bibliothèque" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
-<TextBox Text="{Binding SelectedItem.LibraryName, ElementName=FamilyList}" IsReadOnly="True"/>
-<TextBlock Text="Description interne" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
-<TextBox Text="{Binding SelectedItem.Description, ElementName=FamilyList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="72"/>
-<CheckBox Content="Famille active" IsChecked="{Binding SelectedItem.IsActive, ElementName=FamilyList}" Margin="0,14,0,0"/>
-<TextBlock Text="3 · TAGS HÉRITÉS PAR SES COMPOSANTS" Style="{StaticResource Eyebrow}" Margin="0,22,0,4"/>
-<TextBlock Text="Cliquez sur un tag pour l’ajouter ou le retirer. La couleur bleue indique une affectation active." Style="{StaticResource Caption}" Margin="0,0,0,10"/>
-<ItemsControl x:Name="FamilyTagChoices">
-<ItemsControl.ItemsPanel>
-<ItemsPanelTemplate>
-<WrapPanel/>
-</ItemsPanelTemplate>
-</ItemsControl.ItemsPanel>
-<ItemsControl.ItemTemplate>
-<DataTemplate>
-<CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}" Click="AssignmentCheckBox_OnClick"/>
-</DataTemplate>
-</ItemsControl.ItemTemplate>
-</ItemsControl>
-<Border Height="1" Background="{StaticResource LineBrush}" Margin="0,16"/>
-<TextBlock Text="4 · AFFINER PAR TYPE" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="Sélectionnez un type réel de cette famille, puis ses tags propres." Style="{StaticResource Caption}" Margin="0,4,0,8"/>
-<ComboBox x:Name="FamilyTypeList" DisplayMemberPath="Name" SelectionChanged="FamilyTypeSelection_OnChanged"/>
-<ItemsControl x:Name="TypeTagChoices" Margin="0,10,0,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}" Click="AssignmentCheckBox_OnClick"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-<TextBlock Text="Toute modification sera propagée aux composants de cette famille ou de ce type après confirmation." Style="{StaticResource Caption}" Margin="0,8,0,0"/>
-</StackPanel>
-</ScrollViewer>
-</Border>
-      <Border Grid.Column="4" Style="{StaticResource Card}" Padding="12">
-<Grid>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="170"/>
-<RowDefinition Height="*"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<StackPanel>
-<TextBlock Text="1 · CHOISIR OU CRÉER UN TAG" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="Le tag sera ensuite diffusé dans les familles choisies." Style="{StaticResource Caption}" Margin="0,4,0,10"/>
-</StackPanel>
-<ListBox x:Name="TagList" Grid.Row="1" SelectionChanged="TagSelection_OnChanged" DisplayMemberPath="Label"/>
-<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-<StackPanel Margin="0,10,0,0">
-<TextBlock Text="Libellé" Style="{StaticResource FieldLabel}"/>
-<TextBox Text="{Binding SelectedItem.Label, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}"/>
-<TextBlock Text="Catégorie" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/>
-<ComboBox ItemsSource="{Binding DataContext.TagCategories, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding SelectedItem.Category, ElementName=TagList}"/>
-<TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/>
-<TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="55"/>
-<CheckBox Content="Tag actif" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,12,0,0"/>
-<TextBlock Text="2 · CHOISIR LA BIBLIOTHÈQUE CIBLE" Style="{StaticResource Eyebrow}" Margin="0,18,0,7"/>
-<ComboBox x:Name="TagFamilyLibraryFilter" SelectionChanged="TagFamilyFilter_OnChanged" Margin="0,0,0,12"/>
-<TextBlock Text="3 · AFFECTER AUX FAMILLES" Style="{StaticResource Eyebrow}" Margin="0,0,0,8"/>
-<ItemsControl x:Name="TagFamilyChoices">
-<ItemsControl.ItemTemplate>
-<DataTemplate>
-<Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,9">
- <StackPanel>
-  <TextBlock Text="{Binding Label}" FontWeight="SemiBold"/>
-  <CheckBox Content="{Binding WholeFamily.Label}" IsChecked="{Binding WholeFamily.IsSelected}" Style="{StaticResource ChipCheck}" Margin="0,8,0,3" Click="AssignmentCheckBox_OnClick"/>
-  <TextBlock Text="Ou limiter à certains types :" Style="{StaticResource Caption}" Margin="0,2,0,6"/>
-  <ItemsControl ItemsSource="{Binding Types}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Style="{StaticResource ChipCheck}" Click="AssignmentCheckBox_OnClick"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
- </StackPanel>
-</Border>
-</DataTemplate>
-</ItemsControl.ItemTemplate>
-</ItemsControl>
-</StackPanel>
-</ScrollViewer>
-<StackPanel Grid.Row="3">
-<TextBlock Text="Créer un nouveau tag" Style="{StaticResource FieldLabel}" Margin="0,10,0,5"/>
-<Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="NewTagName" ToolTip="Ex. Hettich, Coulissant, Sous-évier"/><Button Grid.Column="1" Content="Créer et ouvrir" Margin="8,0,0,0" Click="AddTag_OnClick"/></Grid>
-<Button Content="Supprimer le tag" Style="{StaticResource GhostButton}" Margin="0,7,0,0" Click="DeleteTag_OnClick"/>
-</StackPanel>
-</Grid>
-</Border>
+       <Grid>
+        <Grid.RowDefinitions>
+         <RowDefinition Height="Auto"/>
+         <RowDefinition Height="*"/>
+         <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+         <TextBlock Text="RÉFÉRENTIEL DES TAGS" Style="{StaticResource Eyebrow}"/>
+         <TextBox x:Name="TagSearch" TextChanged="TagSearch_OnChanged" ToolTip="Rechercher un tag" Margin="0,10,0,10"/>
+        </StackPanel>
+        <ListBox x:Name="TagList" Grid.Row="1">
+         <ListBox.ItemTemplate>
+          <DataTemplate>
+           <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="9" Padding="11" Margin="0,0,0,7">
+            <Grid>
+             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+             <StackPanel>
+              <TextBlock Text="{Binding Label}" FontWeight="SemiBold"/>
+              <TextBlock Text="{Binding Category}" Style="{StaticResource Caption}" Margin="0,3,0,0"/>
+             </StackPanel>
+             <Border x:Name="StatusBadge" Grid.Column="1" Background="#123C38" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
+              <TextBlock x:Name="StatusText" Text="Actif" Foreground="{StaticResource TealBrush}" FontSize="11"/>
+             </Border>
+            </Grid>
+           </Border>
+           <DataTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsActive}" Value="False">
+             <Setter TargetName="StatusBadge" Property="Background" Value="#263348"/>
+             <Setter TargetName="StatusText" Property="Text" Value="Inactif"/>
+             <Setter TargetName="StatusText" Property="Foreground" Value="#94A3B8"/>
+            </DataTrigger>
+           </DataTemplate.Triggers>
+          </DataTemplate>
+         </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Grid.Row="2" Margin="0,10,0,0">
+         <TextBlock Text="Nouveau tag" Style="{StaticResource FieldLabel}"/>
+         <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <TextBox x:Name="NewTagName" ToolTip="Ex. Hettich, Legrabox, Sous-évier"/>
+          <Button Grid.Column="1" Content="Créer" Margin="8,0,0,0" Click="AddTag_OnClick"/>
+         </Grid>
+        </StackPanel>
+       </Grid>
+      </Border>
+      <Border Grid.Column="2" Style="{StaticResource Card}" Padding="18">
+       <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel>
+         <TextBlock Text="FICHE DU TAG" Style="{StaticResource Eyebrow}"/>
+         <TextBlock Text="Informations visibles dans Forge et utilisées dans les filtres du catalogue." Style="{StaticResource Caption}" Margin="0,5,0,18"/>
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+         <StackPanel>
+          <TextBlock Text="Libellé" Style="{StaticResource FieldLabel}"/>
+          <TextBox Text="{Binding SelectedItem.Label, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}"/>
+          <TextBlock Text="Catégorie" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/>
+          <ComboBox ItemsSource="{Binding DataContext.TagCategories, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding SelectedItem.Category, ElementName=TagList}"/>
+          <TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/>
+          <TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="90" TextWrapping="Wrap"/>
+          <CheckBox Content="Tag disponible dans les fiches composants" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,16,0,0"/>
+          <Border Background="#102B31" BorderBrush="#23515A" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,22,0,0">
+           <StackPanel>
+            <TextBlock Text="AFFECTATION" Style="{StaticResource Eyebrow}"/>
+            <TextBlock Text="Les tags sont ajoutés directement dans chaque fiche composant. La fiche meuble récupère ensuite automatiquement les tags de tous ses composants." TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
+           </StackPanel>
+          </Border>
+         </StackPanel>
+        </ScrollViewer>
+        <Button Grid.Row="2" Content="Supprimer ce tag" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,16,0,0" Click="DeleteTag_OnClick"/>
+       </Grid>
+      </Border>
      </Grid>
      <Grid Grid.Row="2" Margin="0,12,0,0">
-<TextBlock x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
-<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-<Button Content="Synchroniser les familles détectées" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="SyncFamilies_OnClick"/>
-<Button Content="Enregistrer familles et tags" Click="SaveTaxonomy_OnClick"/>
-</StackPanel>
-</Grid>
+      <TextBlock x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
+      <Button Content="Enregistrer les tags" HorizontalAlignment="Right" Click="SaveTaxonomy_OnClick"/>
+     </Grid>
     </Grid>
 
     <ScrollViewer x:Name="CompatibilityPanel" Visibility="Collapsed">
