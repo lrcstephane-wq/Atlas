@@ -126,7 +126,19 @@ public sealed class ComponentFamilyRecord : BindableModel
     public bool IsDetected { get => _isDetected; set => Set(ref _isDetected, value); }
     public bool IsMissing { get => _isMissing; set => Set(ref _isMissing, value); }
     public List<string> TagIds { get; set; } = [];
+    public List<ComponentTypeRecord> Types { get; set; } = [];
     [JsonIgnore] public string QualifiedName => $"{LibraryName}  ›  {Name}";
+}
+
+public sealed class ComponentTypeRecord : BindableModel
+{
+    private string _name = string.Empty;
+    private bool _isMissing;
+
+    public string Name { get => _name; set => Set(ref _name, value); }
+    public bool IsDetected { get; set; } = true;
+    public bool IsMissing { get => _isMissing; set => Set(ref _isMissing, value); }
+    public List<string> TagIds { get; set; } = [];
 }
 
 public sealed class ComponentTagRecord : BindableModel
@@ -220,6 +232,7 @@ public sealed class ComponentRecord : BindableModel
     public List<string> RemovedInheritedCapabilityIds { get; set; } = [];
     public List<string> AddedTagIds { get; set; } = [];
     public List<string> RemovedInheritedTagIds { get; set; } = [];
+    public Dictionary<string, string> RemovedInheritedTagReasons { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public RecordStatus Status { get => _status; set => Set(ref _status, value); }
     public string ForcedValidationReason { get => _forcedValidationReason; set => Set(ref _forcedValidationReason, value); }
@@ -240,6 +253,7 @@ public sealed class ComponentRecord : BindableModel
     {
         AddedTagIds ??= [];
         RemovedInheritedTagIds ??= [];
+        RemovedInheritedTagReasons ??= new(StringComparer.OrdinalIgnoreCase);
     }
 }
 

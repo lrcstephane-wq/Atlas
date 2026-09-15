@@ -10,14 +10,18 @@ namespace Atlas.App.Views;
 
 public partial class ComponentsView : UserControl
 {
-    private readonly ObservableCollection<TagChoiceViewModel> _tagChoices = [];
+    private readonly ObservableCollection<TagChoiceViewModel> _inheritedTagChoices = [];
+    private readonly ObservableCollection<TagChoiceViewModel> _specificTagChoices = [];
+    private readonly ObservableCollection<TagChoiceViewModel> _availableTagChoices = [];
     private ComponentTaxonomy _taxonomy = new();
     private bool _isRefreshing;
 
     public ComponentsView()
     {
         InitializeComponent();
-        TagList.ItemsSource = _tagChoices;
+        InheritedTagList.ItemsSource = _inheritedTagChoices;
+        SpecificTagList.ItemsSource = _specificTagChoices;
+        AvailableTagList.ItemsSource = _availableTagChoices;
     }
 
     private async void ComponentsView_OnLoaded(object sender, RoutedEventArgs e)
@@ -73,18 +77,21 @@ public partial class ComponentsView : UserControl
             AtlasFamilyCombo.Text = component.EffectiveFamilyName;
             FamilyOverrideHint.Visibility = component.IsFamilyOverridden ? Visibility.Visible : Visibility.Collapsed;
 
-            _tagChoices.Clear();
-            var familyKey = ComponentTaxonomyStore.FamilyKey(component.LibraryName, component.EffectiveFamilyName);
-            var inheritedIds = _taxonomy.Families.FirstOrDefault(x => ComponentTaxonomyStore.FamilyKey(x.LibraryName, x.Name).Equals(familyKey, StringComparison.OrdinalIgnoreCase))?.TagIds ?? [];
+            _inheritedTagChoices.Clear(); _specificTagChoices.Clear(); _availableTagChoices.Clear();
+            var inheritedOrigins = ComponentTaxonomyStore.InheritedTagOrigins(component, _taxonomy);
             foreach (var tag in _taxonomy.Tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase))
             {
-                var inherited = inheritedIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
+                var inherited = inheritedOrigins.TryGetValue(tag.Id, out var origin);
                 var removed = component.RemovedInheritedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
                 var added = component.AddedTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
                 var selected = (inherited && !removed) || added;
-                _tagChoices.Add(new TagChoiceViewModel(tag, inherited, selected, TagChoice_OnChanged));
+                var reason = component.RemovedInheritedTagReasons.GetValueOrDefault(tag.Id, string.Empty);
+                var choice = new TagChoiceViewModel(tag, inherited ? origin! : added ? "Ajouté sur ce composant" : tag.Category, inherited, selected, reason, TagChoice_OnChanged, TagReason_OnChanged);
+                if (inherited) _inheritedTagChoices.Add(choice);
+                else if (added) _specificTagChoices.Add(choice);
+                else _availableTagChoices.Add(choice);
             }
-            NoTagsText.Visibility = _tagChoices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            NoTagsText.Visibility = _taxonomy.Tags.Any(x => x.IsActive) ? Visibility.Collapsed : Visibility.Visible;
         }
         finally { _isRefreshing = false; }
     }
@@ -99,7 +106,12 @@ public partial class ComponentsView : UserControl
 
         if (choice.IsInherited)
         {
-            if (!choice.IsSelected) component.RemovedInheritedTagIds.Add(choice.Id);
+            if (!choice.IsSelected)
+            {
+                component.RemovedInheritedTagIds.Add(choice.Id);
+                component.RemovedInheritedTagReasons[choice.Id] = string.IsNullOrWhiteSpace(choice.ExclusionReason) ? "À préciser" : choice.ExclusionReason.Trim();
+            }
+            else component.RemovedInheritedTagReasons.Remove(choice.Id);
         }
         else if (choice.IsSelected)
         {
@@ -107,6 +119,14 @@ public partial class ComponentsView : UserControl
         }
 
         vm.StatusText = "Tags du composant modifiés. Pensez à enregistrer.";
+        Dispatcher.BeginInvoke(new Action(RefreshEditor));
+    }
+
+    private void TagReason_OnChanged(TagChoiceViewModel choice)
+    {
+        if (_isRefreshing || DataContext is not MainViewModel vm || vm.SelectedComponent is not { } component || !choice.IsExcluded) return;
+        component.RemovedInheritedTagReasons[choice.Id] = choice.ExclusionReason.Trim();
+        vm.StatusText = "Motif d’exclusion modifié. Pensez à enregistrer.";
     }
 
     private void AtlasFamilyCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
