@@ -227,14 +227,14 @@
           </Border>
          </StackPanel>
         </ScrollViewer>
-        <Button Grid.Row="2" Content="Supprimer ce tag" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,16,0,0" Click="DeleteTag_OnClick"/>
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+         <Button Content="Supprimer ce tag" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="DeleteTag_OnClick"/>
+         <Button Content="Enregistrer les modifications" HorizontalAlignment="Right" Click="SaveTaxonomy_OnClick"/>
+        </Grid>
        </Grid>
       </Border>
      </Grid>
-     <Grid Grid.Row="2" Margin="0,12,0,0">
-      <TextBlock x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
-      <Button Content="Enregistrer les tags" HorizontalAlignment="Right" Click="SaveTaxonomy_OnClick"/>
-     </Grid>
+     <TextBlock Grid.Row="2" x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="0,12,0,0"/>
     </Grid>
 
     <ScrollViewer x:Name="CompatibilityPanel" Visibility="Collapsed">
