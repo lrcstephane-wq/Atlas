@@ -307,10 +307,23 @@
 </ScrollViewer>
     <ScrollViewer x:Name="ClientSearchPanel" Visibility="Collapsed">
 <StackPanel>
-<TextBlock Text="Recherche et filtres client" Style="{StaticResource SectionTitle}"/>
-<Border Style="{StaticResource Card}" Margin="0,16,0,0">
-<TextBlock Text="Espace prévu pour l’ordre des filtres, les tags visibles et les tris du catalogue client." Style="{StaticResource Caption}"/>
-</Border>
+<TextBlock Text="Intelligence de recherche" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Horizon corrige déjà les petites fautes. Ce dictionnaire lui apprend en plus le vocabulaire de votre métier." Style="{StaticResource Caption}" Margin="0,6,0,16"/>
+<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.45*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+ <Border Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid><StackPanel><TextBlock Text="DICTIONNAIRE MÉTIER" Style="{StaticResource Eyebrow}"/><TextBlock Text="Un concept principal et les mots équivalents que vos clients emploient." Style="{StaticResource Caption}" Margin="0,4,0,12"/></StackPanel><Button Content="+ Ajouter une ligne" HorizontalAlignment="Right" VerticalAlignment="Center" Click="AddSearchSynonym_OnClick"/></Grid>
+  <DataGrid x:Name="SearchSynonymGrid" Grid.Row="1" ItemsSource="{Binding Settings.SearchSynonyms}" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single" MinHeight="360" IsReadOnly="{Binding CanEdit, Converter={StaticResource InverseBool}}">
+   <DataGrid.Columns><DataGridTextColumn Header="Concept recherché" Binding="{Binding Canonical, UpdateSourceTrigger=PropertyChanged}" Width="0.75*"/><DataGridTextColumn Header="Synonymes séparés par des virgules" Binding="{Binding AliasesCsv, UpdateSourceTrigger=PropertyChanged}" Width="1.25*"/></DataGrid.Columns>
+  </DataGrid>
+  <Button Grid.Row="2" Content="Supprimer la ligne sélectionnée" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Click="DeleteSearchSynonym_OnClick"/>
+ </Grid></Border>
+ <Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel>
+  <TextBlock Text="COMMENT ÇA MARCHE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Atlas combine quatre niveaux, entièrement en local :" FontWeight="SemiBold" Margin="0,8,0,12"/>
+  <TextBlock Text="1  Accents et ponctuation ignorés" Margin="0,0,0,9"/><TextBlock Text="2  Lettres inversées et petites fautes tolérées" Margin="0,0,0,9"/><TextBlock Text="3  Synonymes métier appliqués" Margin="0,0,0,9"/><TextBlock Text="4  Résultats classés par pertinence" Margin="0,0,0,18"/>
+  <Border Background="#103A38" BorderBrush="#2DD4BF" BorderThickness="1" CornerRadius="10" Padding="12"><TextBlock Text="Exemple : « meubel evrier » peut retrouver « meuble sous-évier ». Ajoutez ici « lavabo » comme synonyme de « sous évier » pour couvrir aussi le vocabulaire client." TextWrapping="Wrap" Foreground="#C8EDE7"/></Border>
+ </StackPanel></Border>
+</Grid>
+<Grid Margin="0,14,0,0"><TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Enregistrer le dictionnaire" HorizontalAlignment="Right" Click="SaveSearchDictionary_OnClick"/></Grid>
 </StackPanel>
 </ScrollViewer>
     <ScrollViewer x:Name="TopSolidPanel" Visibility="Collapsed">
