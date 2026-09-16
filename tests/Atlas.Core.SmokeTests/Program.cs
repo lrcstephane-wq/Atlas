@@ -11,6 +11,8 @@ Assert(parsed.Type == "TIROIR" && parsed.Variant == "AVANTECH" && parsed.Index =
 Assert(parsed.Range == "YOU" && parsed.Construction == "STD", "Les marqueurs optionnels doivent être extraits.");
 Assert(!ComponentNameParser.TryParse("nom_incomplet", out _), "Un nom incomplet doit rester non classé.");
 Assert(ComponentNameParser.SuggestDisplayName("Accessoires#V=Poignee_Bouton#I=00#R=NR") == "Poignee Bouton", "Le nom affiché proposé doit reprendre V et remplacer les underscores.");
+Assert(ComponentNameParser.SuggestDetailedDisplayName("Blum Porte Simple", "Facade#V=Blum_Porte_Simple#I=00#C=Recouvrement_Total") == "Blum Porte Simple · Recouvrement Total", "La composition doit distinguer les composants grâce à la valeur C.");
+Assert(ComponentNameParser.SuggestDetailedDisplayName("Blum Porte Simple · Recouvrement Total", "Facade#V=Blum_Porte_Simple#I=00#C=Recouvrement_Total") == "Blum Porte Simple · Recouvrement Total", "La valeur C ne doit pas être ajoutée deux fois.");
 
 var demo = DemoCatalogFactory.Create();
 Assert(demo.Components.Count >= 2 && demo.Furniture.Count >= 1, "Le catalogue de démonstration doit permettre l’aperçu de la V0.1.");

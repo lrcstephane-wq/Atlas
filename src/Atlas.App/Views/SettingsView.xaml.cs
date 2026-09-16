@@ -12,6 +12,7 @@ namespace Atlas.App.Views;
 public partial class SettingsView : UserControl
 {
     private readonly ObservableCollection<ComponentTagRecord> _tags = [];
+    private readonly ObservableCollection<string> _tagCategoryFilters = ["Toutes les catégories"];
     private readonly ObservableCollection<string> _universes = [];
     private ComponentTaxonomy _taxonomy = new();
     private Button? _activeSettingsButton;
@@ -20,6 +21,8 @@ public partial class SettingsView : UserControl
     {
         InitializeComponent();
         TagList.ItemsSource = _tags;
+        TagCategoryFilter.ItemsSource = _tagCategoryFilters;
+        TagCategoryFilter.SelectedIndex = 0;
         UniverseList.ItemsSource = _universes;
         CollectionViewSource.GetDefaultView(_tags).Filter = FilterTag;
     }
@@ -28,7 +31,11 @@ public partial class SettingsView : UserControl
     {
         if (_tags.Count > 0) return;
         await ReloadTaxonomyAsync();
-        if (DataContext is MainViewModel vm) foreach (var universe in vm.CatalogUniverses.Order(StringComparer.CurrentCultureIgnoreCase)) _universes.Add(universe);
+        if (DataContext is MainViewModel vm)
+        {
+            foreach (var universe in vm.CatalogUniverses.Order(StringComparer.CurrentCultureIgnoreCase)) _universes.Add(universe);
+            foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
+        }
         ActivateSettingsButton(GeneralSettingsButton);
     }
 
@@ -44,7 +51,7 @@ public partial class SettingsView : UserControl
     {
         var selectedTagId = (TagList.SelectedItem as ComponentTagRecord)?.Id;
         _tags.Clear();
-        foreach (var tag in _taxonomy.Tags.OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)) _tags.Add(tag);
+        foreach (var tag in _taxonomy.Tags.OrderBy(x => x.Category, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)) _tags.Add(tag);
         TagList.SelectedItem = _tags.FirstOrDefault(x => x.Id == selectedTagId) ?? _tags.FirstOrDefault();
     }
 
@@ -73,9 +80,16 @@ public partial class SettingsView : UserControl
         if (IsLoaded) CollectionViewSource.GetDefaultView(_tags).Refresh();
     }
 
+    private void TagCategoryFilter_OnChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) CollectionViewSource.GetDefaultView(_tags).Refresh();
+    }
+
     private bool FilterTag(object item)
     {
         if (item is not ComponentTagRecord tag) return false;
+        var category = TagCategoryFilter?.SelectedItem?.ToString() ?? "Toutes les catégories";
+        if (category != "Toutes les catégories" && !tag.Category.Equals(category, StringComparison.OrdinalIgnoreCase)) return false;
         var query = TagSearch?.Text.Trim() ?? string.Empty;
         return string.IsNullOrWhiteSpace(query)
             || (tag.Label ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase)
@@ -130,6 +144,7 @@ public partial class SettingsView : UserControl
             foreach (var tag in _tags) { tag.Label = tag.Label.Trim(); tag.Description = (tag.Description ?? string.Empty).Trim(); }
             await ComponentTaxonomyStore.SaveAsync(vm.SharedRoot, _taxonomy);
             await vm.ReloadTaxonomyAsync();
+            RefreshCollections();
             TaxonomyStatus.Text = successMessage;
             vm.StatusText = successMessage;
             return true;

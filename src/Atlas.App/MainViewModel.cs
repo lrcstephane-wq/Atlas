@@ -99,8 +99,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<FurnitureStepViewModel> FurnitureSteps { get; } =
     [
         new("Identity", "01", "Identité"),
-        new("Classification", "02", "Classement"),
-        new("Composition", "03", "Composition"),
+        new("Composition", "02", "Composition"),
+        new("Classification", "03", "Classement"),
         new("Structure", "04", "Structure"),
         new("Review", "05", "Contrôle")
     ];

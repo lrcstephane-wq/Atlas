@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 using Atlas.Core.Models;
+using Atlas.Core.Services;
 
 namespace Atlas.App.ViewModels;
 
@@ -45,7 +46,7 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
         _libraryRoot = libraryRoot;
         Record.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(ComponentRecord.DisplayName)) OnPropertyChanged(nameof(Name));
+            if (args.PropertyName == nameof(ComponentRecord.DisplayName)) { OnPropertyChanged(nameof(Name)); OnPropertyChanged(nameof(DetailedName)); }
             if (args.PropertyName is nameof(ComponentRecord.FamilyName) or nameof(ComponentRecord.AtlasFamilyNameOverride))
             {
                 OnPropertyChanged(nameof(Family));
@@ -58,6 +59,7 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
     public ComponentRecord Record { get; }
     public string Id => Record.Id;
     public string Name => Record.DisplayName;
+    public string DetailedName => ComponentNameParser.SuggestDetailedDisplayName(Name, Record.TechnicalName);
     public string TechnicalName => Record.TechnicalName;
     public string Library => Record.LibraryName;
     public string Family => Record.EffectiveFamilyName;
@@ -165,7 +167,7 @@ public sealed class FurnitureCompositionLineViewModel : INotifyPropertyChanged
 
     public FurnitureComponentLine Line { get; }
     public string ComponentId => Line.ComponentId;
-    public string Name => _card.Name;
+    public string Name => _card.DetailedName;
     public string Family => _card.Family;
     public string Location => _card.Location;
     public BitmapImage? Thumbnail => _card.Thumbnail;
