@@ -11,9 +11,22 @@ public partial class MainWindow : Window
         InitializeComponent(); DataContext = _viewModel = viewModel;
         Loaded += async (_, _) => await _viewModel.CheckAutoUpdateAsync();
     }
-    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (e.ClickCount == 2) ToggleMaximize(); else if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
-    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
-    private void Close_Click(object sender, RoutedEventArgs e) => Close();
-    private void ToggleMaximize() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+    private void ToggleMaximize()
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+        else SystemCommands.MaximizeWindow(this);
+    }
+
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        if (MaximizeButton is null || WindowFrame is null) return;
+        var maximized = WindowState == WindowState.Maximized;
+        MaximizeButton.Content = maximized ? "❐" : "□";
+        MaximizeButton.ToolTip = maximized ? "Restaurer" : "Agrandir";
+        WindowFrame.CornerRadius = maximized ? new CornerRadius(0) : new CornerRadius(12);
+        WindowFrame.BorderThickness = maximized ? new Thickness(0) : new Thickness(1);
+    }
 }

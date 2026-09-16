@@ -114,4 +114,14 @@ var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
 Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 0, "Le secret ne doit jamais être stocké en clair.");
 
+var appRoot = Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.App");
+var mainWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWindow.xaml"));
+var catalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CatalogView.xaml"));
+var themeXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Themes", "AtlasTheme.xaml"));
+Assert(mainWindowXaml.Contains("WindowChrome") && !mainWindowXaml.Contains("AllowsTransparency=\"True\""), "La fenêtre principale doit conserver un chrome redimensionnable qui respecte la barre des tâches.");
+Assert(mainWindowXaml.Contains("StateChanged=\"Window_StateChanged\""), "La fenêtre principale doit adapter son cadre au mode agrandi.");
+Assert(catalogXaml.Contains("FavoriteButton") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit intégrer les favoris et conserver des filtres défilants.");
+Assert(catalogXaml.Contains("MinWidth=\"330\"") && catalogXaml.Contains("MaxWidth=\"410\""), "Horizon doit protéger les dimensions minimales de ses panneaux.");
+Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");
+
 Console.WriteLine("Atlas.Core : contrôles métier réussis.");
