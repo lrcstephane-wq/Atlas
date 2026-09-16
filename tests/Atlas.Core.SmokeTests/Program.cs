@@ -58,6 +58,21 @@ Assert(furniture.ConceptionDate is not null, "Une nouvelle fiche meuble doit por
 taxonomy.Tags[0].Category = "Fonction";
 Assert(taxonomy.Tags[0].Category == "Fonction", "Les tags doivent pouvoir être classés par catégorie.");
 
+var searchDictionary = new[]
+{
+    new SearchSynonymRecord { Canonical = "sous evier", AliasesCsv = "evier, lavabo" },
+    new SearchSynonymRecord { Canonical = "tiroir", AliasesCsv = "coulissant, rangement" }
+};
+var typoScore = CatalogSearchEngine.Score("meubel evrier",
+[
+    new CatalogSearchField("Meuble bas sous-évier", 1d),
+    new CatalogSearchField("Cuisine", 0.6d)
+], searchDictionary);
+Assert(typoScore > 0.7d, "La recherche doit tolérer une inversion et une lettre parasite.");
+Assert(CatalogSearchEngine.Score("lavabo", [new CatalogSearchField("Meuble sous évier")], searchDictionary) > 0.7d, "Un synonyme métier doit retrouver le concept canonique.");
+Assert(CatalogSearchEngine.Score("charniere", [new CatalogSearchField("Meuble sous évier")], searchDictionary) == 0d, "Un terme sans rapport ne doit pas produire de faux résultat.");
+Assert(CatalogSearchEngine.CorrectQuery("meubel evrier", ["meuble", "evier", "cuisine"], searchDictionary) == "meuble evier", "Atlas doit pouvoir expliquer la correction appliquée.");
+
 var brandTag = new ComponentTagRecord { Id = "tag-blum", Label = "Blum", Category = "Marque" };
 taxonomy.Tags.Add(brandTag);
 taxonomy.Families[0].Types.Add(new ComponentTypeRecord { Name = "Coulissant", TagIds = [brandTag.Id] });

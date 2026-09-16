@@ -103,6 +103,7 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
     private readonly string _libraryRoot;
     private bool _thumbnailLoaded;
     private bool _isChosen;
+    private double _searchScore;
     private BitmapImage? _thumbnail;
 
     public FurnitureCardViewModel(FurnitureRecord record, string libraryRoot)
@@ -126,6 +127,16 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
             if (_isChosen == value) return;
             _isChosen = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChosen)));
+        }
+    }
+    public double SearchScore
+    {
+        get => _searchScore;
+        set
+        {
+            if (Math.Abs(_searchScore - value) < 0.0001d) return;
+            _searchScore = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SearchScore)));
         }
     }
 
@@ -202,15 +213,18 @@ public sealed class FilterOptionViewModel : INotifyPropertyChanged
 public sealed class CatalogFacetViewModel : INotifyPropertyChanged
 {
     private bool _isSelected;
+    private bool _isFavorite;
     private readonly Action<CatalogFacetViewModel> _changed;
 
-    public CatalogFacetViewModel(string label, int count, Action<CatalogFacetViewModel> changed)
+    public CatalogFacetViewModel(string group, string label, int count, Action<CatalogFacetViewModel> changed)
     {
+        Group = group;
         Label = label;
         Count = count;
         _changed = changed;
     }
 
+    public string Group { get; }
     public string Label { get; }
     public int Count { get; }
     public string CountLabel => Count.ToString("N0");
@@ -225,6 +239,19 @@ public sealed class CatalogFacetViewModel : INotifyPropertyChanged
             _changed(this);
         }
     }
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set
+        {
+            if (_isFavorite == value) return;
+            _isFavorite = value;
+            PropertyChanged?.Invoke(this, new(nameof(IsFavorite)));
+            PropertyChanged?.Invoke(this, new(nameof(FavoriteGlyph)));
+        }
+    }
+    public string FavoriteGlyph => IsFavorite ? "★" : "☆";
+    public string FavoriteKey => $"{Group}|{CatalogSearchEngine.Normalize(Label)}";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 }
