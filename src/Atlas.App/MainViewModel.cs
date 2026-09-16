@@ -16,6 +16,8 @@ namespace Atlas.App;
 
 public sealed class MainViewModel : ObservableObject
 {
+    public event EventHandler? TaxonomyChanged;
+
     private static readonly string[] DefaultUniverses = ["Cuisine", "Dressing", "Salle de bain", "Bibliothèque", "Séjour", "Bureau / Tertiaire", "Buanderie", "Agencement commercial", "Chambre", "Hôtellerie / Hébergement", "Restaurant / Bar"];
     private readonly SharedCatalogStore _store;
     private readonly UserAccountStore _userStore;
@@ -492,7 +494,10 @@ public sealed class MainViewModel : ObservableObject
         RebuildClientCards();
         OnPropertyChanged(nameof(InheritedTags));
         InvalidatePublicationReview();
+        TaxonomyChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    public Task<bool> SaveCatalogAsync() => SaveAsync();
 
     private void RebuildFurnitureTagOptions()
     {
