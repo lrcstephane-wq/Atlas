@@ -18,6 +18,13 @@ public partial class CatalogView : UserControl
         vm.SelectedClientFurnitureCard = card;
     }
 
+    private void ClientFacetFavorite_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: CatalogFacetViewModel facet } || DataContext is not MainViewModel vm) return;
+        vm.ToggleClientFavorite(facet);
+        e.Handled = true;
+    }
+
     private void TopSolidDragCapsule_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart = e.GetPosition(this);
