@@ -73,14 +73,14 @@
 </Grid>
 </Button>
        <TextBlock Text="EXPÉRIENCE" Style="{StaticResource NavSection}" Margin="22,24,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-<Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Aperçu du Catalogue Atlas">
+<Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Horizon — expérience client Atlas">
 <Grid>
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="36"/>
 <ColumnDefinition Width="*"/>
 </Grid.ColumnDefinitions>
 <TextBlock Text="◈" Style="{StaticResource NavIcon}" Foreground="#9AB9FF"/>
-<TextBlock Grid.Column="1" Text="Catalogue client" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
+<TextBlock Grid.Column="1" Text="Horizon" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
 </Grid>
 </Button>
        <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="22,24,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>

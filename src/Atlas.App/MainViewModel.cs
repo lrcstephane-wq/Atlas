@@ -35,7 +35,7 @@ public sealed class MainViewModel : ObservableObject
     private FurnitureCardViewModel? _selectedClientFurnitureCard;
     private FurnitureFamilyRecord? _selectedFurnitureFamily;
     private LibraryFilterViewModel? _selectedLibraryFilter;
-    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy;
+    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _showAdvancedClientFilters, _suppressClientFacetRefresh;
     private BitmapImage? _furniturePreview;
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
 
@@ -61,6 +61,8 @@ public sealed class MainViewModel : ObservableObject
         ClearComponentFiltersCommand = new(_ => ClearComponentFilters());
         SelectVisibleComponentsCommand = new(_ => MarkVisibleComponents(true), _ => CanEdit);
         ClearMarkedComponentsCommand = new(_ => MarkVisibleComponents(false), _ => CanEdit);
+        ClearClientFiltersCommand = new(_ => ClearClientFilters());
+        ToggleClientFiltersCommand = new(_ => ShowAdvancedClientFilters = !ShowAdvancedClientFilters);
         CreateFurnitureCommand = new(_ => CreateFurniture(), _ => CanEdit);
         CreateFamilyCommand = new(_ => CreateFamily(), _ => CanEdit);
         SetCreationModeCommand = new(value => CreationMode = value?.ToString() ?? "Quick");
@@ -96,6 +98,15 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ToggleOptionViewModel> UniverseOptions { get; } = [];
     public ObservableCollection<ToggleOptionViewModel> UsageOptions { get; } = [];
     public ObservableCollection<ToggleOptionViewModel> FurnitureTagOptions { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientUniverseFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientTypeFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientUsageFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientFamilyFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientTagFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientFormFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientConstructionFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientAssemblyFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientBackFacets { get; } = [];
     public ObservableCollection<FurnitureStepViewModel> FurnitureSteps { get; } =
     [
         new("Identity", "01", "Identité"),
@@ -151,11 +162,16 @@ public sealed class MainViewModel : ObservableObject
     public bool IsNavigationExpanded { get => _isNavigationExpanded; set { if (SetProperty(ref _isNavigationExpanded, value)) OnPropertyChanged(nameof(NavigationWidth)); } }
     public double NavigationWidth => IsNavigationExpanded ? 268 : 82;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
+    public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set => SetProperty(ref _showAdvancedClientFilters, value); }
     public bool IsFamilyMode => CreationMode == "Family";
     public string EnvironmentLabel => Settings.Environment == CatalogEnvironment.NonConfigure ? "ENV. À CONFIGURER" : $"ENV. {Settings.Environment}";
     public int ComponentCount => Components.Count(item => !item.IsDemo);
     public int FurnitureCount => Furniture.Count(item => !item.IsDemo);
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
+    public int ClientResultCount => ClientFurnitureView.Cast<object>().Count();
+    public int ActiveClientFilterCount => ClientFacetGroups().Sum(group => group.Count(option => option.IsSelected));
+    public string ClientResultLabel => ClientResultCount <= 1 ? $"{ClientResultCount} meuble trouvé" : $"{ClientResultCount} meubles trouvés";
+    public string ClientFilterButtonLabel => ActiveClientFilterCount == 0 ? "Filtres techniques" : $"Filtres techniques · {ActiveClientFilterCount}";
     public int HealthIssueCount => Components.Count(item => !item.IsNameCompliant || item.IsMissing) + Furniture.Count(item => item.ComponentIds.Count == 0);
     public int MarkedComponentCount => ComponentCards.Count(item => item.IsMarked);
     public string VisibleComponentLabel => $"{ComponentView.Cast<object>().Count():N0} affichés sur {ScopedComponentCards().Count():N0}";
@@ -164,7 +180,7 @@ public sealed class MainViewModel : ObservableObject
     public string ComponentSearch { get => _componentSearch; set { if (SetProperty(ref _componentSearch, value)) RefreshComponentView(); } }
     public string FurnitureSearch { get => _furnitureSearch; set { if (SetProperty(ref _furnitureSearch, value)) RefreshFurnitureView(); } }
     public string SelectedFurnitureStatus { get => _selectedFurnitureStatus; set { if (SetProperty(ref _selectedFurnitureStatus, value ?? "Tous les statuts")) RefreshFurnitureView(); } }
-    public string ClientSearch { get => _clientSearch; set { if (SetProperty(ref _clientSearch, value)) ClientFurnitureView.Refresh(); } }
+    public string ClientSearch { get => _clientSearch; set { if (SetProperty(ref _clientSearch, value)) RefreshClientFurnitureView(); } }
     public string ActiveFamilyFilter { get => _activeFamilyFilter; set { if (SetProperty(ref _activeFamilyFilter, value)) { UpdateFamilyFilterStates(); RebuildComponentTypeOptions(); RefreshComponentView(); } } }
     public string SelectedComponentType { get => _selectedComponentType; set { if (SetProperty(ref _selectedComponentType, value)) RefreshComponentView(); } }
     public string SelectedClientUniverse { get => _selectedClientUniverse; set { if (SetProperty(ref _selectedClientUniverse, string.IsNullOrWhiteSpace(value) ? "Tous les univers" : value)) RefreshClientFurnitureView(); } }
@@ -219,8 +235,22 @@ public sealed class MainViewModel : ObservableObject
     }
     public ComponentRecord? SelectedCompositionCandidate { get => _selectedCompositionCandidate; set { if (SetProperty(ref _selectedCompositionCandidate, value)) RaiseCommandStates(); } }
     public ComponentRecord? SelectedLinkedComponent { get => _selectedLinkedComponent; set { if (SetProperty(ref _selectedLinkedComponent, value)) RaiseCommandStates(); } }
-    public FurnitureCardViewModel? SelectedClientFurnitureCard { get => _selectedClientFurnitureCard; set { if (SetProperty(ref _selectedClientFurnitureCard, value)) OnPropertyChanged(nameof(SelectedClientFurniture)); } }
+    public FurnitureCardViewModel? SelectedClientFurnitureCard
+    {
+        get => _selectedClientFurnitureCard;
+        set
+        {
+            if (!SetProperty(ref _selectedClientFurnitureCard, value)) return;
+            OnPropertyChanged(nameof(SelectedClientFurniture));
+            OnPropertyChanged(nameof(SelectedClientTags));
+            OnPropertyChanged(nameof(SelectedClientUses));
+            OnPropertyChanged(nameof(SelectedClientStructure));
+        }
+    }
     public FurnitureRecord? SelectedClientFurniture => SelectedClientFurnitureCard?.Record;
+    public string SelectedClientTags => SelectedClientFurniture is null ? "Aucun tag" : string.Join(" · ", ComponentTaxonomyStore.Resolve(SelectedClientFurniture, Components, _taxonomy).Select(tag => tag.Label));
+    public string SelectedClientUses => SelectedClientFurniture is null ? string.Empty : string.Join(" · ", FurnitureUsagesFor(SelectedClientFurniture));
+    public string SelectedClientStructure => SelectedClientFurniture is null ? string.Empty : string.Join(" · ", new[] { SelectedClientFurniture.PrincipleConstruction, SelectedClientFurniture.TypeAssemblage, SelectedClientFurniture.PositionDos }.Where(value => !string.IsNullOrWhiteSpace(value) && !value.Equals("Non applicable", StringComparison.OrdinalIgnoreCase)));
     public string InheritedTags => SelectedFurniture is null ? string.Empty : string.Join(" · ", ComponentTaxonomyStore.Resolve(SelectedFurniture, Components, _taxonomy).Select(x => x.Label));
     public string InheritedTagsByCategory => SelectedFurniture is null ? string.Empty : string.Join(Environment.NewLine, ComponentTaxonomyStore.Resolve(SelectedFurniture, Components, _taxonomy).GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "Autre" : x.Category).OrderBy(x => x.Key).Select(group => $"{group.Key} : {string.Join(", ", group.Select(x => x.Label).Distinct(StringComparer.OrdinalIgnoreCase))}"));
     public string InheritedFamilies => string.Join(" · ", LinkedComponents.Select(x => x.EffectiveFamilyName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase));
@@ -241,6 +271,8 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ClearComponentFiltersCommand { get; }
     public RelayCommand SelectVisibleComponentsCommand { get; }
     public RelayCommand ClearMarkedComponentsCommand { get; }
+    public RelayCommand ClearClientFiltersCommand { get; }
+    public RelayCommand ToggleClientFiltersCommand { get; }
     public RelayCommand CreateFurnitureCommand { get; }
     public RelayCommand CreateFamilyCommand { get; }
     public RelayCommand SetCreationModeCommand { get; }
@@ -408,17 +440,76 @@ public sealed class MainViewModel : ObservableObject
     private void RebuildClientCards()
     {
         ClientFurnitureCards.Clear(); foreach (var item in Furniture) ClientFurnitureCards.Add(new(item, Settings.LibraryRoot));
-        ClientUniverseOptions.Clear(); ClientUniverseOptions.Add("Tous les univers"); foreach (var item in _catalog.Universes.Order(StringComparer.CurrentCultureIgnoreCase)) ClientUniverseOptions.Add(item);
-        ClientTypeOptions.Clear(); ClientTypeOptions.Add("Tous les types"); foreach (var item in Furniture.Select(x => x.TypeMeuble).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ClientTypeOptions.Add(item);
-        ClientFamilyOptions.Clear(); ClientFamilyOptions.Add("Toutes les familles"); foreach (var item in Furniture.Select(x => x.Family).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)) ClientFamilyOptions.Add(item);
-        ClientTagOptions.Clear(); ClientTagOptions.Add("Tous les tags"); foreach (var tag in _taxonomy.Tags.Where(x => x.IsActive).OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)) ClientTagOptions.Add(tag.Label);
-        if (!ClientUniverseOptions.Contains(SelectedClientUniverse)) SelectedClientUniverse = "Tous les univers";
-        if (!ClientTypeOptions.Contains(SelectedClientType)) SelectedClientType = "Tous les types";
-        if (!ClientFamilyOptions.Contains(SelectedClientFamily)) SelectedClientFamily = "Toutes les familles";
-        if (!ClientTagOptions.Contains(SelectedClientTag)) SelectedClientTag = "Tous les tags";
+        RebuildClientFacets();
         RefreshClientFurnitureView();
         if (SelectedClientFurnitureCard is null || !ClientFurnitureView.Cast<FurnitureCardViewModel>().Contains(SelectedClientFurnitureCard))
             SelectedClientFurnitureCard = ClientFurnitureView.Cast<FurnitureCardViewModel>().FirstOrDefault();
+    }
+
+    private void RebuildClientFacets()
+    {
+        var published = Furniture.Where(item => item.Status == RecordStatus.Publiee).ToArray();
+        BuildClientFacet(ClientUniverseFacets, _catalog.Universes.Select(universe => (universe, published.Count(item => item.Universes.Contains(universe, StringComparer.OrdinalIgnoreCase)))));
+        BuildClientFacet(ClientTypeFacets, CountValues(published.Select(item => item.TypeMeuble)));
+        BuildClientFacet(ClientUsageFacets, CountValues(published.SelectMany(FurnitureUsagesFor)));
+        BuildClientFacet(ClientFamilyFacets, CountValues(published.Select(item => item.Family)));
+        BuildClientFacet(ClientFormFacets, CountValues(published.Select(item => item.Forme)));
+        BuildClientFacet(ClientConstructionFacets, CountValues(published.Select(item => item.PrincipleConstruction)));
+        BuildClientFacet(ClientAssemblyFacets, CountValues(published.Select(item => item.TypeAssemblage)));
+        BuildClientFacet(ClientBackFacets, CountValues(published.Select(item => item.PositionDos)));
+        BuildClientFacet(ClientTagFacets, CountValues(published.SelectMany(item => ComponentTaxonomyStore.Resolve(item, Components, _taxonomy).Select(tag => tag.Label).Distinct(StringComparer.OrdinalIgnoreCase))));
+    }
+
+    private void BuildClientFacet(ObservableCollection<CatalogFacetViewModel> target, IEnumerable<(string Label, int Count)> values)
+    {
+        var selected = target.Where(option => option.IsSelected).Select(option => option.Label).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        target.Clear();
+        foreach (var (label, count) in values.Where(item => !string.IsNullOrWhiteSpace(item.Label) && item.Count > 0).OrderByDescending(item => item.Count).ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var option = new CatalogFacetViewModel(label, count, _ => ClientFacetChanged());
+            target.Add(option);
+            if (selected.Contains(label)) option.IsSelected = true;
+        }
+    }
+
+    private static IEnumerable<(string Label, int Count)> CountValues(IEnumerable<string> values) =>
+        values.Where(value => !string.IsNullOrWhiteSpace(value))
+            .GroupBy(value => value.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => (group.Key, group.Count()));
+
+    private static IEnumerable<string> FurnitureUsagesFor(FurnitureRecord item) =>
+        (item.Usages ?? []).Concat(string.IsNullOrWhiteSpace(item.UsageSpecifique) ? [] : [item.UsageSpecifique])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private IEnumerable<ObservableCollection<CatalogFacetViewModel>> ClientFacetGroups()
+    {
+        yield return ClientUniverseFacets;
+        yield return ClientTypeFacets;
+        yield return ClientUsageFacets;
+        yield return ClientFamilyFacets;
+        yield return ClientTagFacets;
+        yield return ClientFormFacets;
+        yield return ClientConstructionFacets;
+        yield return ClientAssemblyFacets;
+        yield return ClientBackFacets;
+    }
+
+    private void ClientFacetChanged()
+    {
+        if (!_suppressClientFacetRefresh) RefreshClientFurnitureView();
+    }
+
+    private void ClearClientFilters()
+    {
+        _suppressClientFacetRefresh = true;
+        try
+        {
+            foreach (var option in ClientFacetGroups().SelectMany(group => group)) option.IsSelected = false;
+            ClientSearch = string.Empty;
+        }
+        finally { _suppressClientFacetRefresh = false; }
+        RefreshClientFurnitureView();
     }
 
     private void ComponentCardOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -430,7 +521,17 @@ public sealed class MainViewModel : ObservableObject
 
     private void RefreshComponentView() { ComponentView.Refresh(); OnPropertyChanged(nameof(VisibleComponentLabel)); }
     private void RefreshFurnitureView() { FurnitureView.Refresh(); OnPropertyChanged(nameof(VisibleFurnitureCount)); }
-    private void RefreshClientFurnitureView() { ClientFurnitureView.Refresh(); OnPropertyChanged(nameof(PublishedCount)); }
+    private void RefreshClientFurnitureView()
+    {
+        ClientFurnitureView.Refresh();
+        OnPropertyChanged(nameof(PublishedCount));
+        OnPropertyChanged(nameof(ClientResultCount));
+        OnPropertyChanged(nameof(ClientResultLabel));
+        OnPropertyChanged(nameof(ActiveClientFilterCount));
+        OnPropertyChanged(nameof(ClientFilterButtonLabel));
+        if (SelectedClientFurnitureCard is null || !ClientFurnitureView.Cast<FurnitureCardViewModel>().Contains(SelectedClientFurnitureCard))
+            SelectedClientFurnitureCard = ClientFurnitureView.Cast<FurnitureCardViewModel>().FirstOrDefault();
+    }
     private void ClearComponentFilters() { ComponentSearch = ""; ActiveFamilyFilter = "Toutes"; SelectedComponentType = "Tous les types"; SelectedLibraryFilter = LibraryFilters.FirstOrDefault(); }
     private void MarkVisibleComponents(bool marked) { foreach (var card in ComponentView.Cast<ComponentCardViewModel>().ToArray()) card.IsMarked = marked; }
     private void UpdateFamilyFilterStates() { foreach (var filter in FamilyFilters) filter.IsActive = filter.Label == ActiveFamilyFilter; OnPropertyChanged(nameof(FamilyFilters)); }
@@ -803,13 +904,26 @@ public sealed class MainViewModel : ObservableObject
     private bool FilterClientFurniture(object item)
     {
         if (item is not FurnitureCardViewModel card || card.Record.Status != RecordStatus.Publiee) return false;
-        if (!string.IsNullOrWhiteSpace(SelectedClientUniverse) && SelectedClientUniverse != "Tous les univers" && !card.Record.Universes.Contains(SelectedClientUniverse, StringComparer.OrdinalIgnoreCase)) return false;
-        if (!string.IsNullOrWhiteSpace(SelectedClientType) && SelectedClientType != "Tous les types" && !card.Record.TypeMeuble.Equals(SelectedClientType, StringComparison.OrdinalIgnoreCase)) return false;
-        if (!string.IsNullOrWhiteSpace(SelectedClientFamily) && SelectedClientFamily != "Toutes les familles" && !card.Record.Family.Equals(SelectedClientFamily, StringComparison.OrdinalIgnoreCase)) return false;
         var resolvedTags = ComponentTaxonomyStore.Resolve(card.Record, Components, _taxonomy);
-        if (!string.IsNullOrWhiteSpace(SelectedClientTag) && SelectedClientTag != "Tous les tags" && !resolvedTags.Any(tag => tag.Label.Equals(SelectedClientTag, StringComparison.OrdinalIgnoreCase))) return false;
+        if (!MatchesClientFacet(ClientUniverseFacets, card.Record.Universes)) return false;
+        if (!MatchesClientFacet(ClientTypeFacets, [card.Record.TypeMeuble])) return false;
+        if (!MatchesClientFacet(ClientUsageFacets, FurnitureUsagesFor(card.Record))) return false;
+        if (!MatchesClientFacet(ClientFamilyFacets, [card.Record.Family])) return false;
+        if (!MatchesClientFacet(ClientTagFacets, resolvedTags.Select(tag => tag.Label))) return false;
+        if (!MatchesClientFacet(ClientFormFacets, [card.Record.Forme])) return false;
+        if (!MatchesClientFacet(ClientConstructionFacets, [card.Record.PrincipleConstruction])) return false;
+        if (!MatchesClientFacet(ClientAssemblyFacets, [card.Record.TypeAssemblage])) return false;
+        if (!MatchesClientFacet(ClientBackFacets, [card.Record.PositionDos])) return false;
         if (string.IsNullOrWhiteSpace(ClientSearch)) return true;
         var query = ClientSearch.Trim(); return new[] { card.Reference, card.DisplayName, card.Record.Family, card.Description, card.Record.UsageSpecifique, card.Universes, string.Join(" ", resolvedTags.Select(x => x.Label)) }.Any(value => value.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesClientFacet(IEnumerable<CatalogFacetViewModel> facets, IEnumerable<string> values)
+    {
+        var selected = facets.Where(option => option.IsSelected).Select(option => option.Label).ToArray();
+        if (selected.Length == 0) return true;
+        var candidates = values.Where(value => !string.IsNullOrWhiteSpace(value)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return selected.Any(candidates.Contains);
     }
 
     private static string NormalizeBucket(string value) => string.IsNullOrWhiteSpace(value) ? "Non classés" : value;

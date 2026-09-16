@@ -186,6 +186,36 @@ public sealed class FilterOptionViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
+public sealed class CatalogFacetViewModel : INotifyPropertyChanged
+{
+    private bool _isSelected;
+    private readonly Action<CatalogFacetViewModel> _changed;
+
+    public CatalogFacetViewModel(string label, int count, Action<CatalogFacetViewModel> changed)
+    {
+        Label = label;
+        Count = count;
+        _changed = changed;
+    }
+
+    public string Label { get; }
+    public int Count { get; }
+    public string CountLabel => Count.ToString("N0");
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new(nameof(IsSelected)));
+            _changed(this);
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
 public sealed class ToggleOptionViewModel : INotifyPropertyChanged
 {
     private bool _isSelected;

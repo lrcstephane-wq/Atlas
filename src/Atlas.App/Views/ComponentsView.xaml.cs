@@ -87,6 +87,25 @@ public partial class ComponentsView : UserControl
         RefreshEditor();
     }
 
+    private void ComponentItem_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source || FindAncestor<CheckBox>(source) is not null) return;
+        var container = ItemsControl.ContainerFromElement((ItemsControl)sender, source) as FrameworkElement;
+        if (container?.DataContext is ComponentCardViewModel card) card.IsMarked = !card.IsMarked;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match) return match;
+            current = current is FrameworkContentElement content
+                ? content.Parent
+                : VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
     private void RefreshFamilyOptions()
     {
         if (DataContext is not MainViewModel vm || AtlasFamilyCombo is null) return;
