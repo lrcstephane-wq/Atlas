@@ -179,16 +179,16 @@
               <TextBlock Text="{Binding Label}" FontWeight="SemiBold"/>
               <TextBlock Text="{Binding Category}" Style="{StaticResource Caption}" Margin="0,3,0,0"/>
              </StackPanel>
-             <Border x:Name="StatusBadge" Grid.Column="1" Background="#123C38" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
+             <Border x:Name="StatusBadge" Grid.Column="1" Background="#0E2D39" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
               <TextBlock x:Name="StatusText" Text="Actif" Foreground="{StaticResource CyanBrush}" FontSize="11"/>
              </Border>
             </Grid>
            </Border>
            <DataTemplate.Triggers>
             <DataTrigger Binding="{Binding IsActive}" Value="False">
-             <Setter TargetName="StatusBadge" Property="Background" Value="#263348"/>
+             <Setter TargetName="StatusBadge" Property="Background" Value="{StaticResource RaisedBrush}"/>
              <Setter TargetName="StatusText" Property="Text" Value="Inactif"/>
-             <Setter TargetName="StatusText" Property="Foreground" Value="#94A3B8"/>
+             <Setter TargetName="StatusText" Property="Foreground" Value="{StaticResource MutedBrush}"/>
             </DataTrigger>
            </DataTemplate.Triggers>
           </DataTemplate>
@@ -220,7 +220,7 @@
           <TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/>
           <TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="90" TextWrapping="Wrap"/>
           <CheckBox Content="Tag disponible dans les fiches composants" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,16,0,0"/>
-          <Border Background="#102B31" BorderBrush="#23515A" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,22,0,0">
+          <Border Background="#0E2D39" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,22,0,0">
            <StackPanel>
             <TextBlock Text="AFFECTATION" Style="{StaticResource Eyebrow}"/>
             <TextBlock Text="Les tags sont ajoutés directement dans chaque fiche composant. La fiche meuble récupère ensuite automatiquement les tags de tous ses composants." TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
@@ -267,7 +267,7 @@
 <TextBlock Text="Capacités paramétriques" Style="{StaticResource SectionTitle}"/>
 <Border Style="{StaticResource Card}" Margin="0,16,0,0">
 <StackPanel>
-<Border Background="#322A18" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" CornerRadius="9" Padding="12">
+<Border Background="#2B251B" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" CornerRadius="9" Padding="12">
 <TextBlock Text="Hors périmètre du MVP — conservé pour une prochaine version." Foreground="{StaticResource AmberBrush}"/>
 </Border>
 <TextBlock Text="Cet espace accueillera les capacités, leurs paramètres TopSolid, valeurs, unités, conditions et règles d’affichage client." Style="{StaticResource Caption}" Margin="0,14,0,0"/>
@@ -320,7 +320,7 @@
  <Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel>
   <TextBlock Text="COMMENT ÇA MARCHE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Atlas combine quatre niveaux, entièrement en local :" FontWeight="SemiBold" Margin="0,8,0,12"/>
   <TextBlock Text="1  Accents et ponctuation ignorés" Margin="0,0,0,9"/><TextBlock Text="2  Lettres inversées et petites fautes tolérées" Margin="0,0,0,9"/><TextBlock Text="3  Synonymes métier appliqués" Margin="0,0,0,9"/><TextBlock Text="4  Résultats classés par pertinence" Margin="0,0,0,18"/>
-  <Border Background="#103A38" BorderBrush="#2DD4BF" BorderThickness="1" CornerRadius="10" Padding="12"><TextBlock Text="Exemple : « meubel evrier » peut retrouver « meuble sous-évier ». Ajoutez ici « lavabo » comme synonyme de « sous évier » pour couvrir aussi le vocabulaire client." TextWrapping="Wrap" Foreground="#C8EDE7"/></Border>
+  <Border Background="#0E2D39" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="10" Padding="12"><TextBlock Text="Exemple : « meubel evrier » peut retrouver « meuble sous-évier ». Ajoutez ici « lavabo » comme synonyme de « sous évier » pour couvrir aussi le vocabulaire client." TextWrapping="Wrap" Foreground="{StaticResource InkBrush}"/></Border>
  </StackPanel></Border>
 </Grid>
 <Grid Margin="0,14,0,0"><TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Enregistrer le dictionnaire" HorizontalAlignment="Right" Click="SaveSearchDictionary_OnClick"/></Grid>

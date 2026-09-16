@@ -4,10 +4,10 @@
         Width="500" SizeToContent="Height" MinHeight="230" MaxHeight="620"
         WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="NoResize"
         Background="Transparent" AllowsTransparency="True" ShowInTaskbar="False">
-    <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="16">
+    <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="16" Effect="{StaticResource PanelShadow}">
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="48"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Background="{StaticResource RaisedBrush}" CornerRadius="16,16,0,0" MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown">
+            <Border Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" CornerRadius="16,16,0,0" MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown">
                 <Grid Margin="18,0,10,0"><TextBlock Text="BIBLIDÉO ATLAS" Style="{StaticResource Eyebrow}" VerticalAlignment="Center"/><Button Content="×" Style="{StaticResource IconButton}" HorizontalAlignment="Right" Background="Transparent" BorderBrush="Transparent" Click="Close_OnClick"/></Grid>
             </Border>
             <Grid Grid.Row="1" Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
