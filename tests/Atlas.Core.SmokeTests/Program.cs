@@ -67,6 +67,25 @@ baseComponent.AddedTagIds.Add("tag-specifique");
 taxonomy.Tags.Add(new ComponentTagRecord { Id = "tag-specifique", Label = "Legrabox", Category = "Gamme" });
 Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == "tag-specifique"), "Un tag propre doit pouvoir être ajouté à une fiche composant.");
 
+var taxonomyTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-taxonomy-{Guid.NewGuid():N}");
+try
+{
+    var persistedTaxonomy = new ComponentTaxonomy
+    {
+        Tags =
+        [
+            new ComponentTagRecord { Id = "tag-persisted", Label = "Tag persistant", Category = "Test" }
+        ]
+    };
+    await ComponentTaxonomyStore.SaveAsync(taxonomyTestRoot, persistedTaxonomy);
+    var reloadedTaxonomy = await ComponentTaxonomyStore.LoadAsync(taxonomyTestRoot);
+    Assert(reloadedTaxonomy.Tags.Any(x => x.Id == "tag-persisted" && x.Label == "Tag persistant"), "Un tag enregistré doit être retrouvé après redémarrage.");
+}
+finally
+{
+    if (Directory.Exists(taxonomyTestRoot)) Directory.Delete(taxonomyTestRoot, true);
+}
+
 var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
 Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 0, "Le secret ne doit jamais être stocké en clair.");
