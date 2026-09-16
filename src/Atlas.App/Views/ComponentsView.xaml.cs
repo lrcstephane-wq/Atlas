@@ -55,7 +55,9 @@ public partial class ComponentsView : UserControl
 
     private void MainViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.MarkedComponentCount)) RefreshBulkTagSummary();
+        if (e.PropertyName != nameof(MainViewModel.MarkedComponentCount)) return;
+        ResetBulkTagSelection();
+        RefreshBulkTagSummary();
     }
 
     private async void MainViewModel_OnTaxonomyChanged(object? sender, EventArgs e)
@@ -181,6 +183,13 @@ public partial class ComponentsView : UserControl
         BulkRemoveButton.IsEnabled = enabled;
     }
 
+    private void ResetBulkTagSelection()
+    {
+        _isRefreshing = true;
+        try { foreach (var choice in _bulkTagChoices) choice.IsSelected = false; }
+        finally { _isRefreshing = false; }
+    }
+
     private void SingleTagSearch_OnChanged(object sender, TextChangedEventArgs e)
     {
         if (IsLoaded) CollectionViewSource.GetDefaultView(_singleTagChoices).Refresh();
@@ -266,7 +275,60 @@ public partial class ComponentsView : UserControl
 
         vm.StatusText = $"{tags.Length} tag(s) {(add ? "ajouté(s) à" : "retiré(s) de")} {cards.Length} composant(s).";
         AtlasDialog.Info(vm.StatusText, "Affectation terminée");
+        ResetBulkTagSelection();
+        RefreshBulkTagSummary();
         RefreshEditor();
+    }
+
+    private async void ValidateMarkedComponents_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.CanValidate)
+        {
+            AtlasDialog.Warning("Votre compte ne possède pas le droit de validation.", "Validation en masse");
+            return;
+        }
+
+        var marked = vm.ComponentCards.Where(card => card.IsMarked).Select(card => card.Record).ToArray();
+        if (marked.Length == 0)
+        {
+            AtlasDialog.Warning("Cochez d’abord les fiches à valider.", "Validation en masse");
+            return;
+        }
+
+        var blocked = marked.Where(component => component.IsMissing || (!component.IsNameCompliant && string.IsNullOrWhiteSpace(component.ForcedValidationReason))).ToArray();
+        var alreadyValidated = marked.Where(component => component.Status is RecordStatus.Validee or RecordStatus.Retenue or RecordStatus.Publiee).ToArray();
+        var eligible = marked.Except(blocked).Except(alreadyValidated).ToArray();
+        if (eligible.Length == 0)
+        {
+            AtlasDialog.Warning("Aucune fiche sélectionnée ne peut être validée. Vérifiez les fichiers absents, les noms non conformes et les motifs de validation forcée.", "Validation en masse");
+            return;
+        }
+
+        if (!AtlasDialog.Confirm($"Valider {eligible.Length} fiche(s) composant ?", "Validation en masse", $"{blocked.Length} bloquée(s) · {alreadyValidated.Length} déjà validée(s) ou publiée(s).")) return;
+
+        var snapshots = eligible.ToDictionary(component => component.Id, component => (component.Status, component.ValidatedBy, component.ValidatedUtc), StringComparer.OrdinalIgnoreCase);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var component in eligible)
+        {
+            component.Status = RecordStatus.Validee;
+            component.ValidatedBy = vm.CurrentUser.DisplayName;
+            component.ValidatedUtc = now;
+        }
+
+        if (!await vm.SaveCatalogAsync())
+        {
+            foreach (var component in eligible)
+            {
+                var previous = snapshots[component.Id];
+                component.Status = previous.Status;
+                component.ValidatedBy = previous.ValidatedBy;
+                component.ValidatedUtc = previous.ValidatedUtc;
+            }
+            return;
+        }
+
+        vm.StatusText = $"{eligible.Length} fiche(s) validée(s) par {vm.CurrentUser.DisplayName}.";
+        AtlasDialog.Info(vm.StatusText, "Validation terminée", blocked.Length == 0 ? null : $"{blocked.Length} fiche(s) sont restées non validées car elles nécessitent une correction ou un motif de forçage.");
     }
 
     private void AtlasFamilyCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)

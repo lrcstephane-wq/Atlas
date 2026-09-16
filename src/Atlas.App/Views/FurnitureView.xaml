@@ -143,7 +143,7 @@
 </StackPanel>
 </Grid>
      <StackPanel Visibility="{Binding CurrentFurnitureStep, Converter={StaticResource PageVisibility}, ConverterParameter=Classification}">
-<TextBlock Text="02 / CLASSEMENT" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="03 / CLASSEMENT" Style="{StaticResource Eyebrow}"/>
 <TextBlock Text="Où et comment le retrouver" Style="{StaticResource SectionTitle}" Margin="0,5,0,18"/>
 <TextBlock Text="Univers — plusieurs choix possibles" Style="{StaticResource FieldLabel}"/>
 <ItemsControl ItemsSource="{Binding UniverseOptions}">
@@ -205,7 +205,7 @@
 <RowDefinition Height="*"/>
 </Grid.RowDefinitions>
 <StackPanel>
-<TextBlock Text="03 / COMPOSITION" Style="{StaticResource Eyebrow}"/>
+<TextBlock Text="02 / COMPOSITION" Style="{StaticResource Eyebrow}"/>
 <TextBlock Text="Sélectionner les vrais composants" Style="{StaticResource SectionTitle}" Margin="0,5,0,13"/>
 </StackPanel>
 <Grid Grid.Row="1">
@@ -252,7 +252,7 @@
 </Grid>
 </Border>
 <StackPanel Grid.Row="1" Margin="0,7,0,0">
-<TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+<TextBlock Text="{Binding DetailedName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxHeight="36" ToolTip="{Binding DetailedName}"/>
 <TextBlock Text="{Binding Location}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,4,0,0"/>
 </StackPanel>
 </Grid>

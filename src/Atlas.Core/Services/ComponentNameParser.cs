@@ -7,7 +7,15 @@ public static class ComponentNameParser
     public static string SuggestDisplayName(string technicalName)
     {
         if (!TryParse(technicalName, out var parsed) || string.IsNullOrWhiteSpace(parsed.Variant)) return technicalName;
-        return string.Join(' ', parsed.Variant.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        return FormatMarker(parsed.Variant);
+    }
+
+    public static string SuggestDetailedDisplayName(string displayName, string technicalName)
+    {
+        if (!TryParse(technicalName, out var parsed) || string.IsNullOrWhiteSpace(parsed.Construction)) return displayName;
+        var construction = FormatMarker(parsed.Construction);
+        if (displayName.Contains(construction, StringComparison.OrdinalIgnoreCase)) return displayName;
+        return $"{displayName} · {construction}";
     }
 
     public static bool TryParse(string technicalName, out ParsedComponentName parsed)
@@ -27,4 +35,6 @@ public static class ComponentNameParser
         parsed = new ParsedComponentName(type, variant ?? string.Empty, index ?? string.Empty, range ?? string.Empty, construction ?? string.Empty);
         return type.Length > 0 && parsed.Variant.Length > 0 && parsed.Index.Length > 0;
     }
+
+    private static string FormatMarker(string value) => string.Join(' ', value.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 }
