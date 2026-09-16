@@ -1,156 +1,116 @@
-<Window x:Class="Atlas.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:Atlas.App.Views"
- Title="Biblidéo Atlas" MinWidth="1240" MinHeight="780" Width="1540" Height="940" WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True" Background="Transparent">
- <Border Background="{StaticResource CanvasBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Effect="{StaticResource PanelShadow}">
-  <Grid ClipToBounds="True">
-   <Grid.ColumnDefinitions>
-<ColumnDefinition Width="{Binding NavigationWidth}"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-   <Border Background="{StaticResource NavGradient}" CornerRadius="11,0,0,11">
-    <Grid>
-     <Grid.RowDefinitions>
-<RowDefinition Height="88"/>
-<RowDefinition Height="*"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-     <Grid Margin="14,14,12,8">
-      <Grid.ColumnDefinitions>
-<ColumnDefinition Width="50"/>
-<ColumnDefinition Width="*"/>
-<ColumnDefinition Width="40"/>
-</Grid.ColumnDefinitions>
-      <Border Width="44" Height="44" CornerRadius="12" Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
-<Image Source="pack://application:,,,/Assets/IdeoMark.png" Margin="7"/>
-</Border>
-      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
-<TextBlock Text="ATLAS" FontWeight="Bold" FontSize="14"/>
-<TextBlock Text="BIBLIDÉO" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/>
-</StackPanel>
-      <Button Grid.Column="2" Content="‹" FontSize="22" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Réduire ou développer le menu"/>
-     </Grid>
-     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel>
-       <TextBlock Text="PILOTAGE" Style="{StaticResource NavSection}" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-<Button Style="{StaticResource NavButton}" Background="{Binding DashboardNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" ToolTip="Vue d’ensemble">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="36"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<TextBlock Text="⌂" Style="{StaticResource NavIcon}"/>
-<TextBlock Grid.Column="1" Text="Vue d’ensemble" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-</Grid>
-</Button>
-       <TextBlock Text="FORGE" Style="{StaticResource NavSection}" Margin="22,24,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-<Button Style="{StaticResource NavButton}" Background="{Binding ComponentsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Components" ToolTip="Bibliothèque de composants">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="36"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<TextBlock Text="▦" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/>
-<TextBlock Grid.Column="1" Text="Composants" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-</Grid>
-</Button>
-<Button Style="{StaticResource NavButton}" Background="{Binding FurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Furniture" ToolTip="Meubles et compositions">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="36"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<TextBlock Text="▤" Style="{StaticResource NavIcon}" Foreground="{StaticResource AmberBrush}"/>
-<TextBlock Grid.Column="1" Text="Meubles &amp; variantes" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-</Grid>
-</Button>
-<Button Style="{StaticResource NavButton}" Background="{Binding FutureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Future" ToolTip="Compatibilités">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="36"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<TextBlock Text="⇄" Style="{StaticResource NavIcon}" Foreground="{StaticResource RoseBrush}"/>
-<TextBlock Grid.Column="1" Text="Compatibilités" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-</Grid>
-</Button>
-       <TextBlock Text="EXPÉRIENCE" Style="{StaticResource NavSection}" Margin="22,24,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-<Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Horizon — expérience client Atlas">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="36"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<TextBlock Text="◈" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/>
-<TextBlock Grid.Column="1" Text="Horizon" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-</Grid>
-</Button>
-       <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="22,24,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-<Button Style="{StaticResource NavButton}" Background="{Binding SettingsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Settings" ToolTip="Paramètres et comptes">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="36"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<TextBlock Text="⚙" Style="{StaticResource NavIcon}"/>
-<TextBlock Grid.Column="1" Text="Paramètres" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-</Grid>
-</Button>
-      </StackPanel>
-     </ScrollViewer>
-     <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Margin="10" Padding="12">
-      <Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="38"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource CobaltBrush}">
-<TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/>
-</Border>
-<StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
-<TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-<TextBlock Text="Session sécurisée" Style="{StaticResource Caption}"/>
-</StackPanel>
-</Grid>
-     </Border>
-    </Grid>
-   </Border>
-   <Grid Grid.Column="1">
-    <Grid.RowDefinitions>
-<RowDefinition Height="64"/>
-<RowDefinition Height="*"/>
-<RowDefinition Height="34"/>
-</Grid.RowDefinitions>
-    <Border Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-     <Grid Margin="22,0,8,0">
-      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-<Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="13" Padding="10,5">
-<TextBlock Text="{Binding EnvironmentLabel}" Foreground="{StaticResource CyanBrush}" FontSize="10" FontWeight="Bold"/>
-</Border>
-<TextBlock Text="{Binding LastModification}" Style="{StaticResource Caption}" Margin="14,0,0,0" VerticalAlignment="Center"/>
-</StackPanel>
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-<Button Content="{Binding UpdateLabel}" Style="{StaticResource GhostButton}" Command="{Binding CheckUpdateCommand}" Margin="0,0,8,0" Padding="12,7"/>
-<Button Content="Enregistrer" Command="{Binding SaveCommand}" Margin="0,0,14,0" Padding="14,7"/>
-<Button Content="—" Style="{StaticResource WindowButton}" Click="Minimize_Click"/>
-<Button Content="□" Style="{StaticResource WindowButton}" Click="Maximize_Click"/>
-<Button Content="×" Style="{StaticResource WindowCloseButton}" Click="Close_Click"/>
-</StackPanel>
-     </Grid>
+<Window x:Class="Atlas.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Atlas.App.Views"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Biblidéo Atlas" MinWidth="1280" MinHeight="720" Width="1500" Height="920"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
+        Background="{StaticResource CanvasBrush}" StateChanged="Window_StateChanged">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="8" GlassFrameThickness="0" CornerRadius="12" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Border x:Name="WindowFrame" Background="{StaticResource CanvasBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12">
+        <Grid ClipToBounds="True">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding NavigationWidth}"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Navigation -->
+            <Border Background="{StaticResource NavGradient}" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,0,1,0" CornerRadius="11,0,0,11">
+                <Grid>
+                    <Rectangle Fill="{StaticResource AtlasGridBrush}" IsHitTestVisible="False"/>
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="88"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid Margin="16,14,12,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
+                            <Border Width="46" Height="46" CornerRadius="13" Background="#122C41" BorderBrush="#345875" BorderThickness="1">
+                                <Image Source="pack://application:,,,/Assets/IdeoMark.png" Margin="7"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="11,0,0,0" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
+                                <TextBlock Text="ATLAS" FontWeight="Bold" FontSize="15"/>
+                                <TextBlock Text="BIBLIDÉO" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/>
+                            </StackPanel>
+                            <Button Grid.Column="2" Content="‹" FontSize="23" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Réduire ou développer le menu" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <TextBlock Text="PILOTAGE" Style="{StaticResource NavSection}" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding DashboardNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" ToolTip="Vue d’ensemble">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⌂" Style="{StaticResource NavIcon}"/><TextBlock Grid.Column="1" Text="Vue d’ensemble" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
+
+                                <TextBlock Text="FORGE" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding ComponentsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Components" ToolTip="Bibliothèque de composants">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="▦" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Composants" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding FurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Furniture" ToolTip="Meubles et compositions">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="▤" Style="{StaticResource NavIcon}" Foreground="{StaticResource AmberBrush}"/><TextBlock Grid.Column="1" Text="Meubles &amp; variantes" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding FutureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Future" ToolTip="Compatibilités">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⇄" Style="{StaticResource NavIcon}" Foreground="{StaticResource RoseBrush}"/><TextBlock Grid.Column="1" Text="Compatibilités" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
+
+                                <TextBlock Text="EXPÉRIENCE" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Horizon — expérience client Atlas">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="◇" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
+
+                                <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding SettingsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Settings" ToolTip="Paramètres et comptes">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⚙" Style="{StaticResource NavIcon}"/><TextBlock Grid.Column="1" Text="Paramètres" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="2" Background="#9A102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="12" Margin="12" Padding="12">
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource PrimaryGradient}"><TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/></Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="Session sécurisée" Style="{StaticResource Caption}"/></StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Espace de travail -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="32"/></Grid.RowDefinitions>
+                <Border Background="#F2091927" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,0,0,1">
+                    <Grid Margin="24,0,8,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="#152F43" BorderBrush="#345875" BorderThickness="1" CornerRadius="14" Padding="11,6"><TextBlock Text="{Binding EnvironmentLabel}" Foreground="{StaticResource CyanBrush}" FontSize="10" FontWeight="Bold"/></Border>
+                            <Border Width="1" Height="22" Background="{StaticResource LineBrush}" Margin="14,0"/>
+                            <StackPanel VerticalAlignment="Center"><TextBlock Text="Espace Atlas" FontWeight="SemiBold"/><TextBlock Text="{Binding LastModification}" Style="{StaticResource Caption}"/></StackPanel>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                            <Button Content="{Binding UpdateLabel}" Style="{StaticResource GhostButton}" Command="{Binding CheckUpdateCommand}" Margin="0,0,8,0" Padding="12,7"/>
+                            <Button Content="Enregistrer" Command="{Binding SaveCommand}" Margin="0,0,12,0" Padding="15,7"/>
+                            <Button Content="—" Style="{StaticResource WindowButton}" Click="Minimize_Click"/>
+                            <Button x:Name="MaximizeButton" Content="□" Style="{StaticResource WindowButton}" Click="Maximize_Click"/>
+                            <Button Content="×" Style="{StaticResource WindowCloseButton}" Click="Close_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1" Background="{StaticResource CanvasBrush}">
+                    <Rectangle Fill="{StaticResource AmbientGlow}" IsHitTestVisible="False"/>
+                    <Grid Margin="24,22,24,20" MaxWidth="1880" HorizontalAlignment="Stretch">
+                        <views:DashboardView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Dashboard}"/>
+                        <views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
+                        <views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>
+                        <views:CatalogView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Catalog}"/>
+                        <views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}"/>
+                        <views:FutureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Future}"/>
+                    </Grid>
+                </Grid>
+
+                <Border Grid.Row="2" Background="#F2091927" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,1,0,0" Padding="24,0,16,0">
+                    <Grid><TextBlock Text="{Binding StatusText}" Style="{StaticResource Caption}" VerticalAlignment="Center"/><TextBlock Text="{Binding Version, StringFormat='Atlas v{0}'}" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid>
+                </Border>
+            </Grid>
+        </Grid>
     </Border>
-    <Grid Grid.Row="1" Margin="20,18">
-<views:DashboardView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Dashboard}"/>
-<views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
-<views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>
-<views:CatalogView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Catalog}"/>
-<views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}"/>
-<views:FutureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Future}"/>
-</Grid>
-    <Border Grid.Row="2" Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="22,0,14,0">
-<Grid>
-<TextBlock Text="{Binding StatusText}" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
-<TextBlock Text="{Binding Version, StringFormat='Atlas v{0}'}" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-</Grid>
-</Border>
-   </Grid>
-  </Grid>
- </Border>
 </Window>
