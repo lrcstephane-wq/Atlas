@@ -67,6 +67,13 @@ baseComponent.AddedTagIds.Add("tag-specifique");
 taxonomy.Tags.Add(new ComponentTagRecord { Id = "tag-specifique", Label = "Legrabox", Category = "Gamme" });
 Assert(ComponentTaxonomyStore.Resolve(baseComponent, taxonomy).Any(x => x.Id == "tag-specifique"), "Un tag propre doit pouvoir être ajouté à une fiche composant.");
 
+var bulkComponentA = new ComponentRecord { Id = "bulk-a" };
+var bulkComponentB = new ComponentRecord { Id = "bulk-b", AddedTagIds = ["tag-existant"] };
+Assert(ComponentTaxonomyStore.ApplyDirectTags([bulkComponentA, bulkComponentB], ["tag-blum", "tag-specifique"], true) == 2, "L’affectation groupée doit modifier tous les composants sélectionnés.");
+Assert(bulkComponentA.AddedTagIds.Contains("tag-blum") && bulkComponentB.AddedTagIds.Contains("tag-specifique"), "Tous les tags choisis doivent être ajoutés en masse.");
+Assert(ComponentTaxonomyStore.ApplyDirectTags([bulkComponentA, bulkComponentB], ["tag-blum"], false) == 2, "Le retrait groupé doit modifier tous les composants concernés.");
+Assert(!bulkComponentA.AddedTagIds.Contains("tag-blum") && !bulkComponentB.AddedTagIds.Contains("tag-blum"), "Le tag retiré ne doit rester sur aucun composant sélectionné.");
+
 var taxonomyTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-taxonomy-{Guid.NewGuid():N}");
 try
 {

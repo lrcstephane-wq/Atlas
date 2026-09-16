@@ -19,7 +19,7 @@
       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Margin" Value="0,2"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="B" Background="Transparent" CornerRadius="8" Padding="10,9"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="B" Property="Background" Value="#1B3B68"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="B" Property="Background" Value="#172B46"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style></ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate><Grid><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><Border HorizontalAlignment="Right" Style="{StaticResource Pill}" Padding="7,2"><TextBlock Text="{Binding CountLabel}" Style="{StaticResource Caption}"/></Border></Grid></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
-     <Border Grid.Row="2" Background="#0D1725" CornerRadius="0,0,13,13" Padding="14"><StackPanel><TextBlock Text="Sélection de travail" FontWeight="SemiBold"/><TextBlock Text="{Binding MarkedComponentCount, StringFormat='{}{0} composant(s) coché(s)'}" Style="{StaticResource Caption}" Margin="0,3,0,8"/><Button Content="Tout décocher" Style="{StaticResource GhostButton}" Command="{Binding ClearMarkedComponentsCommand}"/></StackPanel></Border>
+     <Border Grid.Row="2" Background="#0D1725" CornerRadius="0,0,13,13" Padding="14"><StackPanel><TextBlock Text="Sélection de travail" FontWeight="SemiBold"/><TextBlock Text="{Binding MarkedComponentCount, StringFormat='{}{0} composant(s) coché(s)'}" Style="{StaticResource Caption}" Margin="0,3,0,8"/><Button Content="Affecter des tags" Click="OpenBulkTags_OnClick"/><Button Content="Tout décocher" Style="{StaticResource GhostButton}" Command="{Binding ClearMarkedComponentsCommand}" Margin="0,7,0,0"/></StackPanel></Border>
     </Grid>
    </Border>
 
@@ -46,35 +46,67 @@
 
    <GridSplitter Grid.Column="3" Width="8" HorizontalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"/>
    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="0">
-    <Grid><Grid.RowDefinitions><RowDefinition Height="178"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <Border Background="#0B1421" CornerRadius="13,13,0,0"><Grid><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="76" Opacity=".1"/><Image Source="{Binding SelectedComponentCard.Thumbnail}" Stretch="Uniform" Margin="15"/><Border Background="#D0080D16" VerticalAlignment="Bottom" Padding="15,10"><StackPanel><TextBlock Text="{Binding SelectedComponent.DisplayName}" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="{Binding SelectedComponent.Classification}" Foreground="{StaticResource CyanBrush}" FontSize="10"/></StackPanel></Border></Grid></Border>
-     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel Margin="16" IsEnabled="{Binding CanEdit}">
-      <TextBlock Text="FICHE COMPOSANT" Style="{StaticResource Eyebrow}"/>
-      <TextBlock Text="Nom affiché" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/><TextBox Text="{Binding SelectedComponent.DisplayName, UpdateSourceTrigger=PropertyChanged}"/>
+    <Grid>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Border Background="#0D1725" CornerRadius="13,13,0,0" Padding="12">
+      <Grid>
+       <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+       <Button x:Name="SingleModeButton" Content="Fiche sélectionnée" Click="ShowSingleMode_OnClick" Margin="0,0,5,0"/>
+       <Button x:Name="BulkModeButton" Grid.Column="1" Content="Action groupée" Style="{StaticResource GhostButton}" Click="ShowBulkMode_OnClick" Margin="5,0,0,0"/>
+      </Grid>
+     </Border>
 
-      <TextBlock Text="CLASSIFICATION" Style="{StaticResource Eyebrow}" Margin="0,18,0,9"/>
-      <TextBlock Text="Famille détectée dans Biblidéo" Style="{StaticResource FieldLabel}"/>
-      <Border Background="{StaticResource FieldBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8"><TextBlock x:Name="DetectedFamilyText" Foreground="{StaticResource MutedBrush}"/></Border>
-      <Grid Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Famille Atlas" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="AtlasFamilyCombo" IsEditable="False" IsTextSearchEnabled="True" SelectionChanged="AtlasFamilyCombo_OnSelectionChanged"/></StackPanel><Button Grid.Column="1" Content="↺" Style="{StaticResource IconButton}" Margin="7,20,0,0" VerticalAlignment="Bottom" ToolTip="Reprendre la famille détectée" Click="ResetFamily_OnClick"/></Grid>
-      <TextBlock x:Name="FamilyOverrideHint" Text="Dérogation active : la famille Atlas diffère de l’architecture Biblidéo." Foreground="{StaticResource AmberBrush}" FontSize="10" Margin="0,6,0,0" Visibility="Collapsed"/>
+     <Grid x:Name="SingleEditorPanel" Grid.Row="1">
+      <Grid.RowDefinitions><RowDefinition Height="154"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <Border Background="#0B1421"><Grid><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="76" Opacity=".1"/><Image Source="{Binding SelectedComponentCard.Thumbnail}" Stretch="Uniform" Margin="15"/><Border Background="#D0080D16" VerticalAlignment="Bottom" Padding="15,10"><StackPanel><TextBlock Text="{Binding SelectedComponent.DisplayName}" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="{Binding SelectedComponent.Classification}" Foreground="{StaticResource CyanBrush}" FontSize="10"/></StackPanel></Border></Grid></Border>
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel Margin="16" IsEnabled="{Binding CanEdit}">
+       <TextBlock Text="FICHE COMPOSANT" Style="{StaticResource Eyebrow}"/>
+       <TextBlock Text="Nom affiché" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/><TextBox Text="{Binding SelectedComponent.DisplayName, UpdateSourceTrigger=PropertyChanged}"/>
 
-      <TextBlock Text="TAGS DU COMPOSANT" Style="{StaticResource Eyebrow}" Margin="0,18,0,5"/>
-      <TextBlock Text="Sélectionnez directement les informations utiles pour qualifier ce composant." Style="{StaticResource Caption}" Margin="0,0,0,11" TextWrapping="Wrap"/>
+       <TextBlock Text="CLASSIFICATION" Style="{StaticResource Eyebrow}" Margin="0,18,0,9"/>
+       <TextBlock Text="Famille détectée dans Biblidéo" Style="{StaticResource FieldLabel}"/>
+       <Border Background="{StaticResource FieldBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8"><TextBlock x:Name="DetectedFamilyText" Foreground="{StaticResource MutedBrush}"/></Border>
+       <Grid Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Famille Atlas" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="AtlasFamilyCombo" IsEditable="False" IsTextSearchEnabled="True" SelectionChanged="AtlasFamilyCombo_OnSelectionChanged"/></StackPanel><Button Grid.Column="1" Content="↺" Style="{StaticResource IconButton}" Margin="7,20,0,0" VerticalAlignment="Bottom" ToolTip="Reprendre la famille détectée" Click="ResetFamily_OnClick"/></Grid>
+       <TextBlock x:Name="FamilyOverrideHint" Text="Dérogation active : la famille Atlas diffère de l’architecture Biblidéo." Foreground="{StaticResource AmberBrush}" FontSize="10" Margin="0,6,0,0" Visibility="Collapsed"/>
 
-      <TextBlock Text="TAGS SÉLECTIONNÉS" Style="{StaticResource Eyebrow}" Margin="0,4,0,7"/>
-      <ItemsControl x:Name="SpecificTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="Spécifique au composant" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+       <Grid Margin="0,20,0,7"><TextBlock Text="TAGS DU COMPOSANT" Style="{StaticResource Eyebrow}"/><Button Content="↻" Style="{StaticResource IconButton}" HorizontalAlignment="Right" ToolTip="Recharger les tags des paramètres" Click="ReloadTags_OnClick"/></Grid>
+       <TextBlock x:Name="SingleTagSummary" Style="{StaticResource Caption}" Margin="0,0,0,9"/>
+       <TextBox x:Name="SingleTagSearch" TextChanged="SingleTagSearch_OnChanged" ToolTip="Rechercher un tag" Margin="0,0,0,9"/>
+       <Border Background="#0D1725" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="9" Padding="9">
+        <ScrollViewer MaxHeight="230" VerticalScrollBarVisibility="Auto">
+         <ItemsControl x:Name="SingleTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="{Binding OriginLabel}" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </ScrollViewer>
+       </Border>
+       <TextBlock x:Name="NoTagsText" Text="Aucun tag actif. Créez vos tags dans Paramètres › Forge › Tags." Style="{StaticResource Caption}" Margin="0,7,0,0"/>
 
-      <TextBlock Text="AJOUTER UN TAG" Style="{StaticResource Eyebrow}" Margin="0,14,0,7"/>
-      <ItemsControl x:Name="AvailableTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="{Binding OriginLabel}" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-      <TextBlock x:Name="NoTagsText" Text="Aucun tag actif. Créez vos tags dans Paramètres › Forge › Tags." Style="{StaticResource Caption}" Margin="0,4,0,0"/>
+       <TextBlock Text="Description" Style="{StaticResource FieldLabel}" Margin="0,17,0,5"/><TextBox Text="{Binding SelectedComponent.Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="62"/>
+       <TextBlock Text="Conseils d’utilisation" Style="{StaticResource FieldLabel}" Margin="0,11,0,5"/><TextBox Text="{Binding SelectedComponent.UsageNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="52"/>
+       <Border Background="#0D1725" CornerRadius="8" Padding="10" Margin="0,14,0,0"><StackPanel><TextBlock Text="PROVENANCE AUTOMATIQUE" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding SelectedComponent.SourceRelativePath}" Style="{StaticResource Caption}" Margin="0,5,0,0"/><TextBlock Text="{Binding SelectedComponent.TechnicalName}" Style="{StaticResource Caption}"/></StackPanel></Border>
+       <TextBlock Text="Motif de validation forcée" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/><TextBox Text="{Binding SelectedComponent.ForcedValidationReason, UpdateSourceTrigger=PropertyChanged}"/>
+      </StackPanel></ScrollViewer>
+     </Grid>
 
-      <TextBlock Text="Description" Style="{StaticResource FieldLabel}" Margin="0,17,0,5"/><TextBox Text="{Binding SelectedComponent.Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="62"/>
-      <TextBlock Text="Conseils d’utilisation" Style="{StaticResource FieldLabel}" Margin="0,11,0,5"/><TextBox Text="{Binding SelectedComponent.UsageNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="52"/>
+     <Grid x:Name="BulkEditorPanel" Grid.Row="1" Visibility="Collapsed" Margin="16">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <StackPanel>
+       <TextBlock Text="AFFECTATION EN MASSE" Style="{StaticResource Eyebrow}"/>
+       <TextBlock Text="{Binding MarkedComponentCount, StringFormat='{}{0} composant(s) dans la sélection'}" FontSize="19" FontWeight="SemiBold" Margin="0,5,0,3"/>
+       <TextBlock Text="Choisissez un ou plusieurs tags, puis ajoutez-les ou retirez-les de tous les composants cochés." Style="{StaticResource Caption}" TextWrapping="Wrap"/>
+      </StackPanel>
+      <TextBox x:Name="BulkTagSearch" Grid.Row="1" TextChanged="BulkTagSearch_OnChanged" ToolTip="Rechercher un tag" Margin="0,16,0,9"/>
+      <Border Grid.Row="2" Background="#0D1725" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="9" Padding="10">
+       <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="BulkTagList"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource ChipCheck}" IsChecked="{Binding IsSelected}"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"/><TextBlock Text="{Binding OriginLabel}" Foreground="{StaticResource MutedBrush}" FontSize="9"/></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+       </ScrollViewer>
+      </Border>
+      <StackPanel Grid.Row="3" Margin="0,12,0,0">
+       <TextBlock x:Name="BulkTagSummary" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+       <Button x:Name="BulkAddButton" Content="Ajouter les tags à la sélection" Click="BulkAddTags_OnClick"/>
+       <Button x:Name="BulkRemoveButton" Content="Retirer les tags de la sélection" Style="{StaticResource GhostButton}" Margin="0,7,0,0" Click="BulkRemoveTags_OnClick"/>
+      </StackPanel>
+     </Grid>
 
-      <Border Background="#0D1725" CornerRadius="8" Padding="10" Margin="0,14,0,0"><StackPanel><TextBlock Text="PROVENANCE AUTOMATIQUE" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding SelectedComponent.SourceRelativePath}" Style="{StaticResource Caption}" Margin="0,5,0,0"/><TextBlock Text="{Binding SelectedComponent.TechnicalName}" Style="{StaticResource Caption}"/></StackPanel></Border>
-      <TextBlock Text="Motif de validation forcée" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/><TextBox Text="{Binding SelectedComponent.ForcedValidationReason, UpdateSourceTrigger=PropertyChanged}"/>
-     </StackPanel></ScrollViewer>
-     <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="14"><Button Content="Valider cette fiche" Command="{Binding ValidateComponentCommand}" IsEnabled="{Binding CanValidate}" HorizontalAlignment="Stretch"/></Border>
+     <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="14"><Button x:Name="ValidateSingleComponentButton" Content="Valider cette fiche" Command="{Binding ValidateComponentCommand}" IsEnabled="{Binding CanValidate}" HorizontalAlignment="Stretch"/></Border>
     </Grid>
    </Border>
   </Grid>

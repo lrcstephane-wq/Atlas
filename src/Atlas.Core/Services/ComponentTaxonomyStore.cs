@@ -88,7 +88,33 @@ public static class ComponentTaxonomyStore
             .DistinctBy(tag => tag.Id, StringComparer.OrdinalIgnoreCase).OrderBy(tag => tag.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
+    public static int ApplyDirectTags(IEnumerable<ComponentRecord> components, IEnumerable<string> tagIds, bool add)
+    {
+        var ids = tagIds.Where(id => !string.IsNullOrWhiteSpace(id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var changed = 0;
+        foreach (var component in components)
+        {
+            component.NormalizeTags();
+            var before = component.AddedTagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var id in ids)
+            {
+                RemoveIgnoreCase(component.AddedTagIds, id);
+                RemoveIgnoreCase(component.RemovedInheritedTagIds, id);
+                component.RemovedInheritedTagReasons.Remove(id);
+                if (add) component.AddedTagIds.Add(id);
+            }
+            if (!before.SetEquals(component.AddedTagIds)) changed++;
+        }
+        return changed;
+    }
+
     public static string FamilyKey(string libraryName, string familyName) => $"{libraryName.Trim()}|{familyName.Trim()}";
+
+    private static void RemoveIgnoreCase(List<string> values, string id)
+    {
+        var existing = values.FirstOrDefault(value => value.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null) values.Remove(existing);
+    }
 
     private static void Normalize(ComponentTaxonomy taxonomy)
     {
