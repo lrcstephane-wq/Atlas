@@ -98,10 +98,11 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
-public sealed class FurnitureCardViewModel
+public sealed class FurnitureCardViewModel : INotifyPropertyChanged
 {
     private readonly string _libraryRoot;
     private bool _thumbnailLoaded;
+    private bool _isChosen;
     private BitmapImage? _thumbnail;
 
     public FurnitureCardViewModel(FurnitureRecord record, string libraryRoot)
@@ -117,6 +118,16 @@ public sealed class FurnitureCardViewModel
     public string Universes => string.Join(" · ", Record.Universes);
     public string Description => Record.Description;
     public string Forme => Record.Forme;
+    public bool IsChosen
+    {
+        get => _isChosen;
+        set
+        {
+            if (_isChosen == value) return;
+            _isChosen = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChosen)));
+        }
+    }
 
     public BitmapImage? Thumbnail
     {
@@ -137,6 +148,8 @@ public sealed class FurnitureCardViewModel
             return _thumbnail;
         }
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 public sealed class LibraryFilterViewModel : INotifyPropertyChanged
