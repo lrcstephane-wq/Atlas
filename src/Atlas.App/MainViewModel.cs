@@ -180,6 +180,7 @@ public sealed class MainViewModel : ObservableObject
     public int FurnitureCount => Furniture.Count(item => !item.IsDemo);
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
     public int ClientResultCount => ClientFurnitureView.Cast<object>().Count();
+    public bool HasClientResults => ClientResultCount > 0;
     public int ActiveClientFilterCount => ClientFacetGroups().Sum(group => group.Count(option => option.IsSelected));
     public int ClientSelectionCount => ClientFurnitureCards.Count(item => item.IsChosen);
     public string ClientSelectionLabel => ClientSelectionCount == 0 ? "Aucun meuble sélectionné" : ClientSelectionCount == 1 ? "1 meuble sélectionné" : $"{ClientSelectionCount} meubles sélectionnés";
@@ -725,6 +726,7 @@ public sealed class MainViewModel : ObservableObject
         ClientFurnitureView.Refresh();
         OnPropertyChanged(nameof(PublishedCount));
         OnPropertyChanged(nameof(ClientResultCount));
+        OnPropertyChanged(nameof(HasClientResults));
         OnPropertyChanged(nameof(ClientResultLabel));
         OnPropertyChanged(nameof(ActiveClientFilterCount));
         OnPropertyChanged(nameof(ClientFilterButtonLabel));
