@@ -47,6 +47,51 @@ public partial class SettingsView : UserControl
         TaxonomyStatus.Text = $"{_tags.Count} tag(s) disponible(s).";
     }
 
+    private void AddSearchSynonym_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        var item = new SearchSynonymRecord { Canonical = "Nouveau concept" };
+        vm.Settings.SearchSynonyms.Add(item);
+        SearchSynonymGrid.Items.Refresh();
+        SearchSynonymGrid.SelectedItem = item;
+        SearchSynonymGrid.ScrollIntoView(item);
+        SearchDictionaryStatus.Text = "Nouvelle ligne ajoutée. Renseignez ses synonymes puis enregistrez.";
+    }
+
+    private void DeleteSearchSynonym_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || SearchSynonymGrid.SelectedItem is not SearchSynonymRecord item) return;
+        vm.Settings.SearchSynonyms.Remove(item);
+        SearchSynonymGrid.Items.Refresh();
+        SearchDictionaryStatus.Text = "Ligne retirée. Enregistrez pour confirmer.";
+    }
+
+    private async void SaveSearchDictionary_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        SearchSynonymGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+        SearchSynonymGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        foreach (var item in vm.Settings.SearchSynonyms)
+        {
+            item.Canonical = (item.Canonical ?? string.Empty).Trim();
+            item.AliasesCsv = (item.AliasesCsv ?? string.Empty).Trim();
+        }
+        if (vm.Settings.SearchSynonyms.Any(item => string.IsNullOrWhiteSpace(item.Canonical)))
+        {
+            SearchDictionaryStatus.Text = "Chaque ligne doit avoir un concept principal.";
+            return;
+        }
+        var duplicate = vm.Settings.SearchSynonyms.GroupBy(item => item.Canonical, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            SearchDictionaryStatus.Text = $"Concept en double : {duplicate.Key}.";
+            return;
+        }
+        if (!await vm.SaveCatalogAsync()) return;
+        vm.RefreshHorizonSearchSettings();
+        SearchDictionaryStatus.Text = "Dictionnaire enregistré et immédiatement actif dans Horizon.";
+    }
+
     private void RefreshCollections()
     {
         var selectedTagId = (TagList.SelectedItem as ComponentTagRecord)?.Id;
