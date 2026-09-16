@@ -1,6 +1,6 @@
 <Window x:Class="Atlas.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:Atlas.App.Views"
  Title="Biblidéo Atlas" MinWidth="1240" MinHeight="780" Width="1540" Height="940" WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True" Background="Transparent">
- <Border Background="{StaticResource CanvasBrush}" BorderBrush="#344A68" BorderThickness="1" CornerRadius="12">
+ <Border Background="{StaticResource CanvasBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Effect="{StaticResource PanelShadow}">
   <Grid ClipToBounds="True">
    <Grid.ColumnDefinitions>
 <ColumnDefinition Width="{Binding NavigationWidth}"/>
@@ -19,12 +19,12 @@
 <ColumnDefinition Width="*"/>
 <ColumnDefinition Width="40"/>
 </Grid.ColumnDefinitions>
-      <Border Width="44" Height="44" CornerRadius="12" Background="#152D4E">
+      <Border Width="44" Height="44" CornerRadius="12" Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
 <Image Source="pack://application:,,,/Assets/IdeoMark.png" Margin="7"/>
 </Border>
       <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
-<TextBlock Text="BIBLIDÉO" FontWeight="Bold" FontSize="13"/>
-<TextBlock Text="ATLAS" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="11"/>
+<TextBlock Text="ATLAS" FontWeight="Bold" FontSize="14"/>
+<TextBlock Text="BIBLIDÉO" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/>
 </StackPanel>
       <Button Grid.Column="2" Content="‹" FontSize="22" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Réduire ou développer le menu"/>
      </Grid>
@@ -79,7 +79,7 @@
 <ColumnDefinition Width="36"/>
 <ColumnDefinition Width="*"/>
 </Grid.ColumnDefinitions>
-<TextBlock Text="◈" Style="{StaticResource NavIcon}" Foreground="#9AB9FF"/>
+<TextBlock Text="◈" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/>
 <TextBlock Grid.Column="1" Text="Horizon" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
 </Grid>
 </Button>
@@ -96,7 +96,7 @@
 </Button>
       </StackPanel>
      </ScrollViewer>
-     <Border Grid.Row="2" Background="#101E31" CornerRadius="10" Margin="10" Padding="12">
+     <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Margin="10" Padding="12">
       <Grid>
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="38"/>
@@ -119,11 +119,11 @@
 <RowDefinition Height="*"/>
 <RowDefinition Height="34"/>
 </Grid.RowDefinitions>
-    <Border Background="#0D1624" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+    <Border Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
      <Grid Margin="22,0,8,0">
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-<Border Background="#172C4A" BorderBrush="#2F5C9B" BorderThickness="1" CornerRadius="13" Padding="10,5">
-<TextBlock Text="{Binding EnvironmentLabel}" Foreground="#BBD3FF" FontSize="10" FontWeight="Bold"/>
+<Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="13" Padding="10,5">
+<TextBlock Text="{Binding EnvironmentLabel}" Foreground="{StaticResource CyanBrush}" FontSize="10" FontWeight="Bold"/>
 </Border>
 <TextBlock Text="{Binding LastModification}" Style="{StaticResource Caption}" Margin="14,0,0,0" VerticalAlignment="Center"/>
 </StackPanel>
@@ -136,7 +136,7 @@
 </StackPanel>
      </Grid>
     </Border>
-    <Grid Grid.Row="1" Margin="22,20">
+    <Grid Grid.Row="1" Margin="20,18">
 <views:DashboardView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Dashboard}"/>
 <views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
 <views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>
@@ -144,7 +144,7 @@
 <views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}"/>
 <views:FutureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Future}"/>
 </Grid>
-    <Border Grid.Row="2" Background="#0D1624" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="22,0,14,0">
+    <Border Grid.Row="2" Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="22,0,14,0">
 <Grid>
 <TextBlock Text="{Binding StatusText}" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
 <TextBlock Text="{Binding Version, StringFormat='Atlas v{0}'}" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
