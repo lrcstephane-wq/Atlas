@@ -68,10 +68,23 @@ public sealed class WorkspaceSettings : BindableModel
     private CatalogEnvironment _environment;
     private string _libraryRoot = string.Empty;
     private bool _autoUpdate = true;
+    private bool _searchDictionaryInitialized;
 
     public CatalogEnvironment Environment { get => _environment; set => Set(ref _environment, value); }
     public string LibraryRoot { get => _libraryRoot; set => Set(ref _libraryRoot, value); }
     public bool AutoUpdate { get => _autoUpdate; set => Set(ref _autoUpdate, value); }
+    public bool SearchDictionaryInitialized { get => _searchDictionaryInitialized; set => Set(ref _searchDictionaryInitialized, value); }
+    public List<SearchSynonymRecord> SearchSynonyms { get; set; } = [];
+}
+
+public sealed class SearchSynonymRecord : BindableModel
+{
+    private string _canonical = string.Empty;
+    private string _aliasesCsv = string.Empty;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string Canonical { get => _canonical; set => Set(ref _canonical, value); }
+    public string AliasesCsv { get => _aliasesCsv; set => Set(ref _aliasesCsv, value); }
 }
 
 public sealed class LocalBootstrap : BindableModel
