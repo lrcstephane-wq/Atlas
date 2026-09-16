@@ -36,6 +36,9 @@ public sealed class MainViewModel : ObservableObject
     private FurnitureFamilyRecord? _selectedFurnitureFamily;
     private LibraryFilterViewModel? _selectedLibraryFilter;
     private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _showAdvancedClientFilters, _suppressClientFacetRefresh;
+    private bool _isTopSolidBridgeReady;
+    private string _topSolidBridgeFolder = string.Empty;
+    private IReadOnlyList<string> _topSolidBridgeFiles = Array.Empty<string>();
     private BitmapImage? _furniturePreview;
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
 
@@ -63,6 +66,9 @@ public sealed class MainViewModel : ObservableObject
         ClearMarkedComponentsCommand = new(_ => MarkVisibleComponents(false), _ => CanEdit);
         ClearClientFiltersCommand = new(_ => ClearClientFilters());
         ToggleClientFiltersCommand = new(_ => ShowAdvancedClientFilters = !ShowAdvancedClientFilters);
+        ClearClientSelectionCommand = new(_ => ClearClientSelection(), _ => ClientSelectionCount > 0);
+        PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => ClientSelectionCount > 0 && !IsBusy);
+        OpenTopSolidBridgeFolderCommand = new(_ => OpenTopSolidBridgeFolder(), _ => IsTopSolidBridgeReady && Directory.Exists(TopSolidBridgeFolder));
         CreateFurnitureCommand = new(_ => CreateFurniture(), _ => CanEdit);
         CreateFamilyCommand = new(_ => CreateFamily(), _ => CanEdit);
         SetCreationModeCommand = new(value => CreationMode = value?.ToString() ?? "Quick");
@@ -170,6 +176,12 @@ public sealed class MainViewModel : ObservableObject
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
     public int ClientResultCount => ClientFurnitureView.Cast<object>().Count();
     public int ActiveClientFilterCount => ClientFacetGroups().Sum(group => group.Count(option => option.IsSelected));
+    public int ClientSelectionCount => ClientFurnitureCards.Count(item => item.IsChosen);
+    public string ClientSelectionLabel => ClientSelectionCount == 0 ? "Aucun meuble sélectionné" : ClientSelectionCount == 1 ? "1 meuble sélectionné" : $"{ClientSelectionCount} meubles sélectionnés";
+    public bool IsTopSolidBridgeReady { get => _isTopSolidBridgeReady; private set => SetProperty(ref _isTopSolidBridgeReady, value); }
+    public string TopSolidBridgeFolder { get => _topSolidBridgeFolder; private set => SetProperty(ref _topSolidBridgeFolder, value); }
+    public IReadOnlyList<string> TopSolidBridgeFiles { get => _topSolidBridgeFiles; private set => SetProperty(ref _topSolidBridgeFiles, value); }
+    public string TopSolidBridgeCountLabel => TopSolidBridgeFiles.Count == 1 ? "1 copie prête" : $"{TopSolidBridgeFiles.Count} copies prêtes";
     public string ClientResultLabel => ClientResultCount <= 1 ? $"{ClientResultCount} meuble trouvé" : $"{ClientResultCount} meubles trouvés";
     public string ClientFilterButtonLabel => ActiveClientFilterCount == 0 ? "Filtres techniques" : $"Filtres techniques · {ActiveClientFilterCount}";
     public int HealthIssueCount => Components.Count(item => !item.IsNameCompliant || item.IsMissing) + Furniture.Count(item => item.ComponentIds.Count == 0);
@@ -273,6 +285,9 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ClearMarkedComponentsCommand { get; }
     public RelayCommand ClearClientFiltersCommand { get; }
     public RelayCommand ToggleClientFiltersCommand { get; }
+    public RelayCommand ClearClientSelectionCommand { get; }
+    public RelayCommand PrepareTopSolidBridgeCommand { get; }
+    public RelayCommand OpenTopSolidBridgeFolderCommand { get; }
     public RelayCommand CreateFurnitureCommand { get; }
     public RelayCommand CreateFamilyCommand { get; }
     public RelayCommand SetCreationModeCommand { get; }
@@ -439,7 +454,15 @@ public sealed class MainViewModel : ObservableObject
 
     private void RebuildClientCards()
     {
-        ClientFurnitureCards.Clear(); foreach (var item in Furniture) ClientFurnitureCards.Add(new(item, Settings.LibraryRoot));
+        ClientFurnitureCards.Clear();
+        foreach (var item in Furniture)
+        {
+            var card = new FurnitureCardViewModel(item, Settings.LibraryRoot);
+            card.PropertyChanged += ClientFurnitureCardOnPropertyChanged;
+            ClientFurnitureCards.Add(card);
+        }
+        InvalidateTopSolidBridge();
+        NotifyClientSelectionChanged();
         RebuildClientFacets();
         RefreshClientFurnitureView();
         if (SelectedClientFurnitureCard is null || !ClientFurnitureView.Cast<FurnitureCardViewModel>().Contains(SelectedClientFurnitureCard))
@@ -510,6 +533,125 @@ public sealed class MainViewModel : ObservableObject
         }
         finally { _suppressClientFacetRefresh = false; }
         RefreshClientFurnitureView();
+    }
+
+    private void ClientFurnitureCardOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(FurnitureCardViewModel.IsChosen)) return;
+        InvalidateTopSolidBridge();
+        NotifyClientSelectionChanged();
+    }
+
+    private void NotifyClientSelectionChanged()
+    {
+        OnPropertyChanged(nameof(ClientSelectionCount));
+        OnPropertyChanged(nameof(ClientSelectionLabel));
+        ClearClientSelectionCommand.RaiseCanExecuteChanged();
+        PrepareTopSolidBridgeCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ClearClientSelection()
+    {
+        foreach (var card in ClientFurnitureCards.Where(item => item.IsChosen).ToArray()) card.IsChosen = false;
+        InvalidateTopSolidBridge();
+        NotifyClientSelectionChanged();
+    }
+
+    private void PrepareTopSolidBridge()
+    {
+        var selected = ClientFurnitureCards.Where(item => item.IsChosen).ToArray();
+        if (selected.Length == 0)
+        {
+            AtlasDialog.Warning("Sélectionnez au moins un meuble dans Horizon.", "Passerelle TopSolid");
+            return;
+        }
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Choisir le dossier de travail pour ce transfert",
+            Multiselect = false
+        };
+        if (Directory.Exists(TopSolidBridgeFolder)) dialog.InitialDirectory = TopSolidBridgeFolder;
+        if (dialog.ShowDialog() != true) return;
+
+        IsBusy = true;
+        try
+        {
+            var sourceFiles = selected.Select(card => (card.DisplayName, Path: ResolveLibraryPath(card.Record.SourceRelativePath))).ToArray();
+            var missing = sourceFiles.Where(item => string.IsNullOrWhiteSpace(item.Path) || !File.Exists(item.Path)).Select(item => item.DisplayName).ToArray();
+            if (missing.Length > 0)
+            {
+                AtlasDialog.Warning(
+                    "La passerelle ne peut pas être préparée car certains fichiers .TOP sont introuvables.",
+                    "Fichiers manquants",
+                    string.Join(Environment.NewLine, missing.Take(8)) + (missing.Length > 8 ? $"{Environment.NewLine}… et {missing.Length - 8} autre(s)" : string.Empty));
+                return;
+            }
+
+            Directory.CreateDirectory(dialog.FolderName);
+            var copies = new List<string>();
+            foreach (var source in sourceFiles)
+            {
+                var destination = NextAvailableFileName(dialog.FolderName, Path.GetFileName(source.Path));
+                File.Copy(source.Path, destination, false);
+                copies.Add(destination);
+            }
+
+            TopSolidBridgeFolder = dialog.FolderName;
+            TopSolidBridgeFiles = copies;
+            IsTopSolidBridgeReady = copies.Count > 0;
+            OnPropertyChanged(nameof(TopSolidBridgeCountLabel));
+            OpenTopSolidBridgeFolderCommand.RaiseCanExecuteChanged();
+            StatusText = $"Passerelle prête · {copies.Count} copie(s) créée(s) dans {dialog.FolderName}";
+        }
+        catch (Exception exception)
+        {
+            InvalidateTopSolidBridge();
+            ShowError(exception);
+        }
+        finally { IsBusy = false; }
+    }
+
+    private static string NextAvailableFileName(string folder, string fileName)
+    {
+        var candidate = Path.Combine(folder, fileName);
+        if (!File.Exists(candidate)) return candidate;
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        var extension = Path.GetExtension(fileName);
+        for (var index = 2; ; index++)
+        {
+            candidate = Path.Combine(folder, $"{stem} ({index}){extension}");
+            if (!File.Exists(candidate)) return candidate;
+        }
+    }
+
+    private void InvalidateTopSolidBridge()
+    {
+        IsTopSolidBridgeReady = false;
+        TopSolidBridgeFiles = Array.Empty<string>();
+        OnPropertyChanged(nameof(TopSolidBridgeCountLabel));
+        OpenTopSolidBridgeFolderCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OpenTopSolidBridgeFolder()
+    {
+        try
+        {
+            if (!Directory.Exists(TopSolidBridgeFolder))
+            {
+                AtlasDialog.Warning("Le dossier préparé n’existe plus.", "Passerelle TopSolid");
+                InvalidateTopSolidBridge();
+                return;
+            }
+            Process.Start(new ProcessStartInfo("explorer.exe", TopSolidBridgeFolder) { UseShellExecute = true });
+        }
+        catch (Exception exception) { ShowError(exception); }
+    }
+
+    public void CompleteTopSolidBridgeDrop()
+    {
+        StatusText = $"Transfert remis à TopSolid · {TopSolidBridgeFiles.Count} fichier(s).";
+        ClearClientSelection();
     }
 
     private void ComponentCardOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -983,7 +1125,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand }) command.RaiseCanExecuteChanged();
     }
 
     private static void ShowError(Exception exception) => AtlasDialog.Error(exception.Message, "Biblidéo Atlas");
