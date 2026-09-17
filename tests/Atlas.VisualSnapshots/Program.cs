@@ -66,6 +66,7 @@ internal static class Program
     {
         var catalog = DemoCatalogFactory.Create();
         catalog.Settings.AutoUpdate = false;
+        catalog.Settings.LibraryRoot = root;
         catalog.UniverseDefinitions.Clear();
         var universes = new[] { "Cuisine", "Dressing", "Salle de bain", "Bibliothèque", "Séjour", "Bureau / Tertiaire", "Buanderie", "Agencement commercial", "Chambre", "Hôtellerie / Hébergement", "Restaurant / Bar" };
         for (var index = 0; index < universes.Length; index++)
@@ -77,14 +78,15 @@ internal static class Program
         catalog.Universes = universes.ToList();
         catalog.Furniture.Clear();
         var names = new[] { "Meuble sous-évier", "Colonne four", "Meuble vasque", "Bibliothèque ouverte", "Banquette coffre", "Bureau direction", "Meuble buanderie", "Comptoir accueil", "Dressing penderie", "Tête de lit", "Bar technique", "Console murale", "Armoire portes", "Meuble TV", "Présentoir boutique", "Rangement sous pente", "Caisson imprimante", "Meuble machine à café" };
-        for (var index = 0; index < names.Length; index++)
+        for (var index = 0; index < 1200; index++)
         {
-            var path = Path.Combine("Images", "Furniture", $"furniture-{index:00}.png");
-            DrawPreview(Path.Combine(root, path), names[index], index, false);
+            var modelIndex = index % names.Length;
+            var path = Path.Combine("Images", "Furniture", $"furniture-{modelIndex:00}.png");
+            if (index < names.Length) DrawPreview(Path.Combine(root, path), names[modelIndex], modelIndex, false);
             catalog.Furniture.Add(new FurnitureRecord
             {
-                Id = $"visual-{index:00}", Reference = $"MEU-{index + 1:0000}", DisplayName = names[index], Description = "Mobilier paramétrique prêt à intégrer au projet.",
-                ImageRelativePath = path, SourceRelativePath = $"Models\\{names[index]}.top", Status = RecordStatus.Publiee,
+                Id = $"visual-{index:0000}", Reference = $"MEU-{index + 1:0000}", DisplayName = $"{names[modelIndex]} {index + 1:0000}", Description = "Mobilier paramétrique prêt à intégrer au projet.",
+                ImageRelativePath = path, SourceRelativePath = $"Models\\{names[modelIndex]}.top", Status = RecordStatus.Publiee,
                 TypeMeuble = index % 3 == 0 ? "Colonne" : "Meuble bas", Forme = "Droit", Universes = [universes[index % universes.Length]],
                 Usages = [index % 2 == 0 ? "Rangement" : "Technique"], PrincipleConstruction = "Montant filant", TypeAssemblage = "Tourillons + excentriques", PositionDos = "Rainuré"
             });
