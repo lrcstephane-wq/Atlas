@@ -26,6 +26,7 @@ public partial class MainWindow : Window
         var maximized = WindowState == WindowState.Maximized;
         MaximizeButton.Content = maximized ? "❐" : "□";
         MaximizeButton.ToolTip = maximized ? "Restaurer" : "Agrandir";
+        HorizonExperience?.UpdateWindowState(maximized);
         WindowFrame.CornerRadius = maximized ? new CornerRadius(0) : new CornerRadius(12);
         WindowFrame.BorderThickness = maximized ? new Thickness(0) : new Thickness(1);
     }

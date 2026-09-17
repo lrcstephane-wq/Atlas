@@ -26,6 +26,14 @@ jobs:
         run: dotnet build Atlas.sln --configuration Release --no-restore
       - name: Contrôles métier
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release --no-build
+      - name: Générer les captures visuelles Horizon
+        run: dotnet run --project tests/Atlas.VisualSnapshots/Atlas.VisualSnapshots.csproj --configuration Release --no-build -- artifacts/visual-snapshots
+      - name: Publier les captures de contrôle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Atlas-visual-snapshots
+          path: artifacts/visual-snapshots/*.png
+          if-no-files-found: error
       - name: Produire Atlas pour Windows
         run: dotnet publish src/Atlas.App/Atlas.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output artifacts/Atlas-win-x64
       - name: Produire le module de mise à jour
