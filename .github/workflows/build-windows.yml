@@ -27,6 +27,7 @@ jobs:
       - name: Contrôles métier
         run: dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release --no-build
       - name: Générer les captures visuelles Horizon
+        timeout-minutes: 3
         run: dotnet run --project tests/Atlas.VisualSnapshots/Atlas.VisualSnapshots.csproj --configuration Release --no-build -- artifacts/visual-snapshots
       - name: Publier les captures de contrôle
         uses: actions/upload-artifact@v4

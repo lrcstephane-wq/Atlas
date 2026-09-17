@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.IO;
-using System.Threading;
+using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -16,14 +16,22 @@ internal static class Program
     {
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.InitializeComponent();
-        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
-        WaitWithDispatcher(RunAsync(args));
-        app.Shutdown();
+        Exception? failure = null;
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        dispatcher.BeginInvoke(new Action(async () =>
+        {
+            try { await RunAsync(args); }
+            catch (Exception exception) { failure = exception; }
+            finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
+        }));
+        Dispatcher.Run();
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     private static async Task RunAsync(string[] args)
     {
         var output = Path.GetFullPath(args.FirstOrDefault() ?? Path.Combine("artifacts", "visual-snapshots"));
+        Console.WriteLine($"Captures Horizon vers {output}");
         Directory.CreateDirectory(output);
         var root = Path.Combine(Path.GetTempPath(), $"atlas-visual-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
@@ -31,31 +39,26 @@ internal static class Program
         {
             var catalog = BuildVisualCatalog(root);
             var store = new SharedCatalogStore(root);
+            Console.WriteLine("Écriture du catalogue visuel…");
             await store.SaveAsync(catalog, 0, "Contrôle visuel");
             var bootstrap = new LocalBootstrap { SharedRoot = root };
             var account = UserAccountStore.CreateAccount("visual", "Contrôle visuel", "Atlas-Visual-2026", UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer);
             var vm = new MainViewModel(store, new UserAccountStore(root), bootstrap, account);
+            Console.WriteLine("Initialisation d’Atlas…");
             await vm.InitializeAsync();
             vm.CurrentPage = "Catalog";
 
             foreach (var size in new[] { (1366, 768), (1920, 1080), (2560, 1440) })
+            {
+                Console.WriteLine($"Rendu {size.Item1} × {size.Item2}…");
                 Render(vm, output, size.Item1, size.Item2);
+            }
+            Console.WriteLine("Captures Horizon terminées.");
         }
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, true);
         }
-    }
-
-    private static void WaitWithDispatcher(Task task)
-    {
-        if (!task.IsCompleted)
-        {
-            var frame = new DispatcherFrame();
-            task.GetAwaiter().OnCompleted(() => frame.Continue = false);
-            Dispatcher.PushFrame(frame);
-        }
-        task.GetAwaiter().GetResult();
     }
 
     private static AtlasCatalog BuildVisualCatalog(string root)
