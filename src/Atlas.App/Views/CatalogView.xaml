@@ -6,143 +6,83 @@
   <Geometry x:Key="SearchGeometry">M9,2 A7,7 0 1 0 9,16 A7,7 0 1 0 9,2 M14,14 L20,20</Geometry>
   <Geometry x:Key="SlidersGeometry">M3,6 L17,6 M7,3 L7,9 M3,14 L17,14 M13,11 L13,17</Geometry>
   <Geometry x:Key="TransferGeometry">M12,3 L12,16 M7,8 L12,3 L17,8 M5,14 L3,14 L3,21 L21,21 L21,14 L19,14</Geometry>
-
-  <Style x:Key="MiniFavoriteButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
-   <Setter Property="Width" Value="31"/><Setter Property="Height" Value="31"/><Setter Property="MinHeight" Value="0"/>
-   <Setter Property="Padding" Value="0"/><Setter Property="Background" Value="#C40A1A28"/>
-   <Setter Property="BorderBrush" Value="#5A7890"/><Setter Property="Foreground" Value="White"/>
-   <Setter Property="FontSize" Value="15"/><Setter Property="ToolTip" Value="Épingler ce critère"/>
-  </Style>
-
-  <Style x:Key="UniverseCard" TargetType="CheckBox">
-   <Setter Property="Foreground" Value="White"/><Setter Property="Cursor" Value="Hand"/>
-   <Setter Property="Width" Value="166"/><Setter Property="Height" Value="116"/><Setter Property="Margin" Value="0,0,10,0"/>
-   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
-    <Border x:Name="Card" Background="#152C3E" BorderBrush="#315773" BorderThickness="1" CornerRadius="11" ClipToBounds="True">
-     <Grid>
-      <Rectangle Fill="{StaticResource HeroGradient}"/>
-      <Rectangle Fill="{StaticResource AtlasGridBrush}" Opacity=".28"/>
-      <Image Source="{Binding Image}" Stretch="UniformToFill"/>
-      <Border Background="#B8061421" VerticalAlignment="Bottom" Padding="11,25,11,9">
-       <StackPanel>
-        <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-        <TextBlock Text="{Binding Count, StringFormat='{}{0} modèle(s)'}" Foreground="#BED0DD" FontSize="9" Margin="0,3,0,0"/>
-       </StackPanel>
-      </Border>
-      <Border x:Name="Selection" Width="25" Height="25" CornerRadius="7" Background="#C7071724" BorderBrush="#7894A7" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
-       <Path x:Name="Tick" Data="M5,12 L10,17 L20,7" Stroke="White" StrokeThickness="2.2" Visibility="Collapsed"/>
-      </Border>
-     </Grid>
-    </Border>
-    <ControlTemplate.Triggers>
-     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="#76B1D2"/></Trigger>
-     <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="Card" Property="BorderThickness" Value="2"/><Setter TargetName="Selection" Property="Background" Value="{StaticResource CobaltBrush}"/><Setter TargetName="Selection" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger>
-    </ControlTemplate.Triggers>
-   </ControlTemplate></Setter.Value></Setter>
-  </Style>
+  <Geometry x:Key="BookmarkGeometry">M5,3 L17,3 L17,21 L11,16 L5,21 Z</Geometry>
 
   <Style x:Key="FilterChip" TargetType="CheckBox">
-   <Setter Property="Foreground" Value="#D0DCE6"/><Setter Property="Cursor" Value="Hand"/>
+   <Setter Property="Foreground" Value="#DCE4EA"/><Setter Property="Cursor" Value="Hand"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
-    <Border x:Name="Chip" Background="#142A3B" BorderBrush="#34536A" BorderThickness="1" CornerRadius="16" Padding="11,7" Margin="0,0,7,0">
-     <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Label}" FontWeight="SemiBold"/><TextBlock Text="{Binding CountLabel}" Foreground="#829CAF" FontSize="9" Margin="6,2,0,0"/></StackPanel>
+    <Border x:Name="Chip" Background="#252F38" BorderBrush="#46545F" BorderThickness="1" CornerRadius="8" Padding="10,7" Margin="0,0,5,6">
+     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding CountLabel}" Foreground="#93A2AE" FontSize="9" Margin="8,2,22,0"/></Grid>
     </Border>
-    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chip" Property="BorderBrush" Value="#70A1BD"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Chip" Property="Background" Value="{StaticResource SelectionGradient}"/><Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter Property="Foreground" Value="White"/></Trigger></ControlTemplate.Triggers>
+    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chip" Property="BorderBrush" Value="#7D8D98"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Chip" Property="Background" Value="#183E55"/><Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter Property="Foreground" Value="White"/></Trigger></ControlTemplate.Triggers>
    </ControlTemplate></Setter.Value></Setter>
   </Style>
 
   <Style x:Key="FurnitureCard" TargetType="ToggleButton">
-   <Setter Property="Background" Value="#102437"/><Setter Property="BorderBrush" Value="#31516A"/><Setter Property="BorderThickness" Value="1"/>
+   <Setter Property="Background" Value="#202A33"/><Setter Property="BorderBrush" Value="#46545F"/><Setter Property="BorderThickness" Value="1"/>
    <Setter Property="Padding" Value="0"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="Cursor" Value="Hand"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
-    <Border x:Name="Card" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="11" ClipToBounds="True">
-     <Grid><ContentPresenter/><Border x:Name="Choice" Width="27" Height="27" CornerRadius="7" Background="#D1071724" BorderBrush="#7894A7" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"><Path x:Name="Tick" Data="M5,12 L10,17 L20,7" Stretch="Uniform" Margin="5" Stroke="White" StrokeThickness="2.2" Visibility="Collapsed"/></Border></Grid>
+    <Border x:Name="Card" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10" ClipToBounds="True">
+     <Grid><ContentPresenter/><Border x:Name="Choice" Width="28" Height="28" CornerRadius="7" Background="#D30B151E" BorderBrush="#81909A" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"><Path x:Name="Tick" Data="M5,12 L10,17 L20,7" Stretch="Uniform" Margin="5" Stroke="White" StrokeThickness="2.2" Visibility="Collapsed"/></Border></Grid>
     </Border>
-    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="#6F9DB8"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="Card" Property="BorderThickness" Value="2"/><Setter TargetName="Choice" Property="Background" Value="{StaticResource CobaltBrush}"/><Setter TargetName="Choice" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers>
+    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="#81909A"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="Card" Property="BorderThickness" Value="2"/><Setter TargetName="Choice" Property="Background" Value="{StaticResource CobaltBrush}"/><Setter TargetName="Choice" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers>
    </ControlTemplate></Setter.Value></Setter>
   </Style>
 
-  <DataTemplate x:Key="UniverseTemplate">
-   <Grid><CheckBox Style="{StaticResource UniverseCard}" IsChecked="{Binding IsSelected}"/><Button Content="{Binding FavoriteGlyph}" Style="{StaticResource MiniFavoriteButton}" Click="ClientFacetFavorite_OnClick" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"/></Grid>
+  <DataTemplate x:Key="FilterFacetTemplate">
+   <Grid MinWidth="128" MaxWidth="235"><CheckBox Style="{StaticResource FilterChip}" IsChecked="{Binding IsSelected}"/><Button Width="24" Height="24" MinHeight="0" Padding="0" Margin="0,3,8,0" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Click="ClientFacetFavorite_OnClick" ToolTip="Épingler ce filtre"><Path Data="{StaticResource BookmarkGeometry}" Stretch="Uniform" Width="10" Height="13" Stroke="{StaticResource CyanBrush}" Fill="Transparent" StrokeThickness="1.5"/></Button></Grid>
   </DataTemplate>
-  <DataTemplate x:Key="FilterTemplate"><CheckBox Style="{StaticResource FilterChip}" IsChecked="{Binding IsSelected}"/></DataTemplate>
  </UserControl.Resources>
 
  <Grid>
-  <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="510"/><ColumnDefinition Width="16"/><ColumnDefinition Width="380" MinWidth="340" MaxWidth="420"/></Grid.ColumnDefinitions>
-
-  <!-- Collection -->
+  <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="510"/><ColumnDefinition Width="14"/><ColumnDefinition Width="360" MinWidth="330" MaxWidth="390"/></Grid.ColumnDefinitions>
   <Grid>
-   <Grid.RowDefinitions>
-    <RowDefinition Height="Auto"/><RowDefinition Height="13"/><RowDefinition Height="52"/><RowDefinition Height="12"/>
-    <RowDefinition Height="Auto"/><RowDefinition Height="11"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
-   </Grid.RowDefinitions>
-
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="14"/><RowDefinition Height="54"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
    <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-    <StackPanel><TextBlock Text="ATLAS HORIZON" Style="{StaticResource Eyebrow}"/><TextBlock Text="Explorez la collection" FontSize="34" FontWeight="SemiBold" Margin="0,3,0,0"/><TextBlock Text="Mobilier professionnel pour des espaces qui inspirent." Foreground="#BBCAD6" FontSize="14" Margin="0,3,0,0"/></StackPanel>
-    <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right"><TextBlock Text="DESIGN POUR" Foreground="#B7C8D5" FontWeight="SemiBold" FontSize="9"/><TextBlock Text="LE RÉEL" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/></StackPanel>
+    <StackPanel><TextBlock Text="ATLAS / HORIZON" Style="{StaticResource Eyebrow}"/><TextBlock Text="Explorez la collection" FontSize="30" FontWeight="SemiBold" Margin="0,3,0,0"/><TextBlock Text="Cherchez naturellement, puis affinez seulement si nécessaire." Foreground="#B9C5CE" FontSize="13" Margin="0,3,0,0"/></StackPanel>
+    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right"><TextBlock Text="DESIGN POUR" Foreground="#B7C4CD" FontWeight="SemiBold" FontSize="9"/><TextBlock Text="LE RÉEL" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/></StackPanel>
    </Grid>
-
    <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-    <Border Background="#0B1C2A" BorderBrush="#4C728B" BorderThickness="1" CornerRadius="26"><Grid><Path Data="{StaticResource SearchGeometry}" Stroke="#E1ECF3" StrokeThickness="1.8" Width="21" Height="21" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="18,0,0,0"/><TextBox Text="{Binding ClientSearch, UpdateSourceTrigger=PropertyChanged}" Background="Transparent" BorderThickness="0" FontSize="16" Padding="53,0,48,0" ToolTip="Exemple : meubel evrier blum"/><Border Width="32" Height="32" CornerRadius="8" Background="#17354B" BorderBrush="#3D6B87" BorderThickness="1" HorizontalAlignment="Right" Margin="0,0,9,0"><Path Data="{StaticResource SlidersGeometry}" Stroke="{StaticResource CyanBrush}" StrokeThickness="1.7" Stretch="Uniform" Margin="8"/></Border></Grid></Border>
-    <TextBlock Grid.Column="1" Text="{Binding ClientResultLabel}" Foreground="#D4E2EB" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="18,0,4,0"/>
+    <Border Background="#111A22" BorderBrush="#536673" BorderThickness="1" CornerRadius="25"><Grid><Path Data="{StaticResource SearchGeometry}" Stroke="#E7EDF1" StrokeThickness="1.8" Width="21" Height="21" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="18,0,0,0"/><TextBox Text="{Binding ClientSearch, UpdateSourceTrigger=PropertyChanged}" Background="Transparent" BorderThickness="0" FontSize="16" Padding="53,0,18,0" ToolTip="Exemple : meubel evrier blum"/></Grid></Border>
+    <Border Grid.Column="1" Background="#202A33" BorderBrush="#46545F" BorderThickness="1" CornerRadius="18" Padding="14,8" Margin="12,7,0,7"><TextBlock Text="{Binding ClientResultLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Border>
    </Grid>
-
-   <Grid Grid.Row="4"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="8"/><RowDefinition Height="116"/></Grid.RowDefinitions>
-    <TextBlock Text="Univers" FontSize="14" FontWeight="SemiBold"/>
-    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly"><ItemsControl ItemsSource="{Binding ClientUniverseFacets}" ItemTemplate="{StaticResource UniverseTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></ScrollViewer>
+   <Grid Grid.Row="4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <StackPanel Orientation="Horizontal"><Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleClientFiltersCommand}" Padding="13,8" Margin="0,0,9,0"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource SlidersGeometry}" Stroke="{StaticResource CyanBrush}" StrokeThickness="1.6" Width="15" Height="15" Stretch="Uniform" Margin="0,0,8,0"/><TextBlock Text="{Binding ClientFilterButtonLabel}"/></StackPanel></Button><ItemsControl ItemsSource="{Binding ClientFavoriteFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
+    <StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="Tout effacer" Style="{StaticResource GhostButton}" Command="{Binding ClearClientFiltersCommand}" Padding="11,7"/><Border Style="{StaticResource Pill}" Padding="12,7" Margin="8,0,0,0"><TextBlock Text="Pertinence" Foreground="#CBD5DC"/></Border></StackPanel>
    </Grid>
-
-   <Grid Grid.Row="6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly"><StackPanel Orientation="Horizontal"><Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleClientFiltersCommand}" Padding="12,7" Margin="0,0,8,0"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource SlidersGeometry}" Stroke="{StaticResource CyanBrush}" StrokeThickness="1.6" Width="14" Height="14" Stretch="Uniform" Margin="0,0,7,0"/><TextBlock Text="{Binding ClientFilterButtonLabel}"/></StackPanel></Button><ItemsControl ItemsSource="{Binding ClientFavoriteFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel></ScrollViewer>
-    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0"><Button Content="Tout effacer" Style="{StaticResource GhostButton}" Command="{Binding ClearClientFiltersCommand}" Padding="11,7" Margin="0,0,7,0"/><Border Style="{StaticResource Pill}" Padding="12,7"><TextBlock Text="Tri : pertinence" Foreground="#CBD8E2"/></Border></StackPanel>
-   </Grid>
-
-   <Border Grid.Row="7" Visibility="{Binding ShowAdvancedClientFilters, Converter={StaticResource BoolVisibility}}" Background="#0E2030" BorderBrush="#2D5068" BorderThickness="1" CornerRadius="11" Padding="13" Margin="0,10,0,0">
-    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"><StackPanel Orientation="Horizontal">
-     <StackPanel Margin="0,0,18,0"><TextBlock Text="TYPE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientTypeFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
-     <StackPanel Margin="0,0,18,0"><TextBlock Text="USAGE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientUsageFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
-     <StackPanel Margin="0,0,18,0"><TextBlock Text="TAGS" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientTagFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
-     <StackPanel Margin="0,0,18,0"><TextBlock Text="FORME" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientFormFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
-     <StackPanel Margin="0,0,18,0"><TextBlock Text="CONSTRUCTION" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientConstructionFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
-     <StackPanel><TextBlock Text="ASSEMBLAGE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientAssemblyFacets}" ItemTemplate="{StaticResource FilterTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></StackPanel>
-    </StackPanel></ScrollViewer>
+   <Border Grid.Row="5" Visibility="{Binding ShowAdvancedClientFilters, Converter={StaticResource BoolVisibility}}" Background="#1C252D" BorderBrush="#46545F" BorderThickness="1" CornerRadius="11" Padding="14" Margin="0,10,0,0" MaxHeight="250">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><WrapPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="TYPE DE MEUBLE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientTypeFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="USAGE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientUsageFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="FAMILLE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientFamilyFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="TAGS" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientTagFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="FORME" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientFormFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="CONSTRUCTION" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientConstructionFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="ASSEMBLAGE" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientAssemblyFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+     <StackPanel Width="270" Margin="0,0,18,13"><TextBlock Text="DOS" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/><ItemsControl ItemsSource="{Binding ClientBackFacets}" ItemTemplate="{StaticResource FilterFacetTemplate}"/></StackPanel>
+    </WrapPanel></ScrollViewer>
    </Border>
-
-   <Grid Grid.Row="8" Margin="0,12,0,0">
-    <Rectangle Fill="{StaticResource AtlasGridBrush}" Opacity=".11" RadiusX="12" RadiusY="12"/>
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" Visibility="{Binding HasClientResults, Converter={StaticResource InverseBoolVisibility}}"><Border Width="78" Height="78" CornerRadius="39" Background="#102638"><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="45" Opacity=".18"/></Border><TextBlock Text="Aucun meuble ne correspond à cette combinaison" Style="{StaticResource Caption}" Margin="0,13,0,0"/></StackPanel>
-    <ListBox ItemsSource="{Binding ClientFurnitureView}" SelectedItem="{Binding SelectedClientFurnitureCard}" ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
-     <ListBox.ItemsPanel><ItemsPanelTemplate><controls:VirtualizingWrapPanel TargetItemWidth="250" ItemHeight="278" Spacing="11"/></ItemsPanelTemplate></ListBox.ItemsPanel>
-     <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><ContentPresenter/></ControlTemplate></Setter.Value></Setter></Style></ListBox.ItemContainerStyle>
-     <ListBox.ItemTemplate><DataTemplate>
-      <ToggleButton Style="{StaticResource FurnitureCard}" IsChecked="{Binding IsChosen}" Click="FurnitureCard_OnClick">
-       <Grid><Grid.RowDefinitions><RowDefinition Height="186"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border Background="{StaticResource PreviewBrush}"><Grid><Rectangle Fill="{StaticResource AtlasGridBrush}" Opacity=".38"/><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="54" Opacity=".07"/><Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="12"/><Border HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource Pill}" Margin="9"><TextBlock Text="{Binding TypeMeuble}" Foreground="#BFE9F6" FontSize="9"/></Border></Grid></Border>
-        <Grid Grid.Row="1" Margin="12,9"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}"/><TextBlock Grid.Row="1" Text="{Binding Reference}" Foreground="#B1C3D1" FontSize="10" Margin="0,4,0,0"/><TextBlock Grid.Row="2" Text="{Binding Universes}" Foreground="{StaticResource CyanBrush}" FontSize="9" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/></Grid>
-       </Grid>
-      </ToggleButton>
-     </DataTemplate></ListBox.ItemTemplate>
-    </ListBox>
-   </Grid>
+   <Border Grid.Row="6" Background="#151E26" BorderBrush="#34434F" BorderThickness="1" CornerRadius="12" Margin="0,12,0,0" Padding="9">
+    <Grid>
+     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" Visibility="{Binding HasClientResults, Converter={StaticResource InverseBoolVisibility}}"><Border Width="72" Height="72" CornerRadius="36" Background="#202A33"><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="40" Opacity=".18"/></Border><TextBlock Text="Aucun meuble ne correspond à cette combinaison" Style="{StaticResource Caption}" Margin="0,13,0,0"/></StackPanel>
+     <ListBox ItemsSource="{Binding ClientFurnitureView}" SelectedItem="{Binding SelectedClientFurnitureCard}" ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+      <ListBox.ItemsPanel><ItemsPanelTemplate><controls:VirtualizingWrapPanel TargetItemWidth="225" ItemHeight="262" Spacing="9"/></ItemsPanelTemplate></ListBox.ItemsPanel>
+      <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><ContentPresenter/></ControlTemplate></Setter.Value></Setter></Style></ListBox.ItemContainerStyle>
+      <ListBox.ItemTemplate><DataTemplate><ToggleButton Style="{StaticResource FurnitureCard}" IsChecked="{Binding IsChosen}" Click="FurnitureCard_OnClick"><Grid><Grid.RowDefinitions><RowDefinition Height="176"/><RowDefinition Height="*"/></Grid.RowDefinitions><Border Background="#111820"><Grid><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="50" Opacity=".06"/><Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="10"/><Border HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource Pill}" Margin="9" Background="#D31A242C"><TextBlock Text="{Binding TypeMeuble}" Foreground="#D9E4EA" FontSize="9"/></Border></Grid></Border><Grid Grid.Row="1" Margin="12,9"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}"/><TextBlock Grid.Row="1" Text="{Binding Reference}" Foreground="{StaticResource CyanBrush}" FontSize="10" Margin="0,4,0,0"/><TextBlock Grid.Row="2" Text="{Binding Universes}" Foreground="#AEBAC3" FontSize="9" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/></Grid></Grid></ToggleButton></DataTemplate></ListBox.ItemTemplate>
+     </ListBox>
+    </Grid>
+   </Border>
   </Grid>
-
-  <!-- Fiche produit -->
-  <Border Grid.Column="2" Background="#0C1E2D" BorderBrush="#3A6581" BorderThickness="1" CornerRadius="12" Padding="0" Effect="{StaticResource SoftShadow}">
-   <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="255"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Border Padding="20,17" BorderBrush="#284B63" BorderThickness="0,0,0,1" CornerRadius="12,12,0,0"><StackPanel><TextBlock Text="MOBILIER / SÉLECTION" Foreground="#8CA9BD" FontSize="9"/><TextBlock Text="{Binding SelectedClientFurniture.DisplayName}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0"/><TextBlock Text="{Binding SelectedClientFurniture.TypeMeuble}" Foreground="#C4D1DB" FontSize="13" Margin="0,4,0,0"/></StackPanel></Border>
-    <Border Grid.Row="1" Background="{StaticResource PreviewBrush}" Margin="16,14,16,0" CornerRadius="9" ClipToBounds="True"><Grid><Rectangle Fill="{StaticResource AtlasGridBrush}" Opacity=".35"/><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="72" Opacity=".08"/><Image Source="{Binding SelectedClientFurnitureCard.Thumbnail}" Stretch="Uniform" Margin="12"/></Grid></Border>
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel Margin="20,16"><Grid><TextBlock Text="INFORMATIONS" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding SelectedClientFurniture.Reference}" Foreground="{StaticResource CyanBrush}" HorizontalAlignment="Right"/></Grid><Separator Margin="0,10"/><TextBlock Text="{Binding SelectedClientFurniture.Description}" Foreground="#C4D0E1" TextWrapping="Wrap"/>
-     <TextBlock Text="UNIVERS" Style="{StaticResource Eyebrow}" Margin="0,16,0,0"/><TextBlock Text="{Binding SelectedClientFurniture.UniversesCsv}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-     <TextBlock Text="TYPE ET FORME" Style="{StaticResource Eyebrow}" Margin="0,15,0,0"/><TextBlock Margin="0,5,0,0"><Run Text="{Binding SelectedClientFurniture.TypeMeuble}"/><Run Text=" · "/><Run Text="{Binding SelectedClientFurniture.Forme}"/></TextBlock>
-     <TextBlock Text="USAGES" Style="{StaticResource Eyebrow}" Margin="0,15,0,0"/><TextBlock Text="{Binding SelectedClientUses}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-     <TextBlock Text="TAGS" Style="{StaticResource Eyebrow}" Margin="0,15,0,0"/><TextBlock Text="{Binding SelectedClientTags}" Foreground="#9FCDF1" TextWrapping="Wrap" Margin="0,5,0,0"/>
-     <TextBlock Text="CONCEPTION" Style="{StaticResource Eyebrow}" Margin="0,15,0,0"/><TextBlock Text="{Binding SelectedClientStructure}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+  <Border Grid.Column="2" Background="#202A33" BorderBrush="#52616C" BorderThickness="1" CornerRadius="12" Padding="0" Effect="{StaticResource SoftShadow}">
+   <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="235"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Border Padding="19,16" BorderBrush="#46545F" BorderThickness="0,0,0,1" CornerRadius="12,12,0,0"><StackPanel><TextBlock Text="FICHE MEUBLE" Foreground="{StaticResource CyanBrush}" FontSize="9" FontWeight="Bold"/><TextBlock Text="{Binding SelectedClientFurniture.DisplayName}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0"/><TextBlock Text="{Binding SelectedClientFurniture.TypeMeuble}" Foreground="#BBC6CE" FontSize="12" Margin="0,4,0,0"/></StackPanel></Border>
+    <Border Grid.Row="1" Background="#111820" Margin="15,13,15,0" CornerRadius="9" ClipToBounds="True"><Grid><Image Source="pack://application:,,,/Assets/IdeoMark.png" Width="68" Opacity=".07"/><Image Source="{Binding SelectedClientFurnitureCard.Thumbnail}" Stretch="Uniform" Margin="12"/></Grid></Border>
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel Margin="19,15">
+     <Border Background="#162F3D" BorderBrush="#356177" BorderThickness="1" CornerRadius="8" Padding="12,9"><Grid><StackPanel><TextBlock Text="RÉFÉRENCE ATLAS" Style="{StaticResource Eyebrow}"/><TextBlock Text="À communiquer à notre équipe" Style="{StaticResource Caption}"/></StackPanel><TextBlock Text="{Binding SelectedClientFurniture.Reference}" Foreground="White" FontSize="17" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Border>
+     <TextBlock Text="{Binding SelectedClientFurniture.Description}" Foreground="#C7D0D6" TextWrapping="Wrap" Margin="0,13,0,2"/><TextBlock Text="UNIVERS" Style="{StaticResource Eyebrow}" Margin="0,15,0,0"/><TextBlock Text="{Binding SelectedClientFurniture.UniversesCsv}" TextWrapping="Wrap" Margin="0,5,0,0"/><TextBlock Text="TYPE ET FORME" Style="{StaticResource Eyebrow}" Margin="0,14,0,0"/><TextBlock Margin="0,5,0,0"><Run Text="{Binding SelectedClientFurniture.TypeMeuble}"/><Run Text=" · "/><Run Text="{Binding SelectedClientFurniture.Forme}"/></TextBlock><TextBlock Text="USAGES" Style="{StaticResource Eyebrow}" Margin="0,14,0,0"/><TextBlock Text="{Binding SelectedClientUses}" TextWrapping="Wrap" Margin="0,5,0,0"/><TextBlock Text="TAGS" Style="{StaticResource Eyebrow}" Margin="0,14,0,0"/><TextBlock Text="{Binding SelectedClientTags}" Foreground="#A8DDF0" TextWrapping="Wrap" Margin="0,5,0,0"/><TextBlock Text="CONCEPTION" Style="{StaticResource Eyebrow}" Margin="0,14,0,0"/><TextBlock Text="{Binding SelectedClientStructure}" TextWrapping="Wrap" Margin="0,5,0,0"/>
     </StackPanel></ScrollViewer>
-    <Border Grid.Row="3" Background="#11283A" BorderBrush="#2C5068" BorderThickness="0,1,0,0" CornerRadius="0,0,12,12" Padding="15"><StackPanel><Grid Margin="0,0,0,10"><TextBlock Text="{Binding ClientSelectionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="Vider" Style="{StaticResource GhostButton}" Command="{Binding ClearClientSelectionCommand}" HorizontalAlignment="Right" Padding="9,5"/></Grid><Button Command="{Binding PrepareTopSolidBridgeCommand}" HorizontalAlignment="Stretch"><StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><Path Data="{StaticResource TransferGeometry}" Stroke="White" StrokeThickness="1.7" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/><TextBlock Text="Préparer dans TopSolid" FontWeight="SemiBold"/></StackPanel></Button>
-     <Border Visibility="{Binding IsTopSolidBridgeReady, Converter={StaticResource BoolVisibility}}" Background="#0D2C38" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="10" Padding="11" Margin="0,9,0,0"><StackPanel><TextBlock Text="{Binding TopSolidBridgeCountLabel}" FontWeight="SemiBold"/><Border x:Name="TopSolidDragCapsule" Background="{StaticResource PrimaryGradient}" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="8" Padding="11,9" Cursor="Hand" Margin="0,8,0,0" PreviewMouseLeftButtonDown="TopSolidDragCapsule_OnMouseLeftButtonDown" PreviewMouseMove="TopSolidDragCapsule_OnMouseMove"><TextBlock Text="Glisser vers TopSolid" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/></Border><Button Content="Afficher les copies" Style="{StaticResource GhostButton}" Command="{Binding OpenTopSolidBridgeFolderCommand}" HorizontalAlignment="Stretch" Margin="0,6,0,0"/></StackPanel></Border>
-    </StackPanel></Border>
+    <Border Grid.Row="3" Background="#172129" BorderBrush="#46545F" BorderThickness="0,1,0,0" CornerRadius="0,0,12,12" Padding="14"><StackPanel><Grid Margin="0,0,0,9"><TextBlock Text="{Binding ClientSelectionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="Vider" Style="{StaticResource GhostButton}" Command="{Binding ClearClientSelectionCommand}" HorizontalAlignment="Right" Padding="9,5"/></Grid><Button Command="{Binding PrepareTopSolidBridgeCommand}" HorizontalAlignment="Stretch"><StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><Path Data="{StaticResource TransferGeometry}" Stroke="White" StrokeThickness="1.7" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/><TextBlock Text="Préparer dans TopSolid" FontWeight="SemiBold"/></StackPanel></Button><Border Visibility="{Binding IsTopSolidBridgeReady, Converter={StaticResource BoolVisibility}}" Background="#15303A" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="9" Padding="10" Margin="0,8,0,0"><StackPanel><TextBlock Text="{Binding TopSolidBridgeCountLabel}" FontWeight="SemiBold"/><Border x:Name="TopSolidDragCapsule" Background="{StaticResource PrimaryGradient}" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="8" Padding="11,9" Cursor="Hand" Margin="0,7,0,0" PreviewMouseLeftButtonDown="TopSolidDragCapsule_OnMouseLeftButtonDown" PreviewMouseMove="TopSolidDragCapsule_OnMouseMove"><TextBlock Text="Glisser vers TopSolid" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/></Border><Button Content="Afficher les copies" Style="{StaticResource GhostButton}" Command="{Binding OpenTopSolidBridgeFolderCommand}" HorizontalAlignment="Stretch" Margin="0,6,0,0"/></StackPanel></Border></StackPanel></Border>
    </Grid>
   </Border>
  </Grid>
