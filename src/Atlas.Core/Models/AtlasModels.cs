@@ -412,6 +412,22 @@ public sealed class FurnitureFamilyRecord : BindableModel
     public string CreatedBy { get; set; } = string.Empty;
 }
 
+public sealed class CatalogUniverseRecord : BindableModel
+{
+    private string _name = string.Empty;
+    private string _description = string.Empty;
+    private string _imageRelativePath = string.Empty;
+    private bool _isActive = true;
+    private int _sortOrder;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string Name { get => _name; set => Set(ref _name, value?.Trim() ?? string.Empty); }
+    public string Description { get => _description; set => Set(ref _description, value?.Trim() ?? string.Empty); }
+    public string ImageRelativePath { get => _imageRelativePath; set => Set(ref _imageRelativePath, value ?? string.Empty); }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    public int SortOrder { get => _sortOrder; set => Set(ref _sortOrder, value); }
+}
+
 public sealed class AtlasCatalog
 {
     public int SchemaVersion { get; set; } = 3;
@@ -423,6 +439,8 @@ public sealed class AtlasCatalog
     public List<CapabilityTagRecord> CapabilityTags { get; set; } = [];
     public List<FurnitureRecord> Furniture { get; set; } = [];
     public List<FurnitureFamilyRecord> FurnitureFamilies { get; set; } = [];
+    public List<CatalogUniverseRecord> UniverseDefinitions { get; set; } = [];
+    // Conservé pour lire les catalogues historiques et les fiches qui référencent encore un univers par son libellé.
     public List<string> Universes { get; set; } =
     [
         "Cuisine", "Dressing", "Salle de bain", "Bibliothèque", "Séjour", "Bureau / Tertiaire",

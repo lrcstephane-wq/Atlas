@@ -149,6 +149,11 @@ public static class DemoCatalogFactory
         return new AtlasCatalog
         {
             Settings = new WorkspaceSettings(),
+            UniverseDefinitions =
+            [
+                new CatalogUniverseRecord { Id = "univers-cuisine", Name = "Cuisine", Description = "Préparation, cuisson et rangement", SortOrder = 0 },
+                new CatalogUniverseRecord { Id = "univers-buanderie", Name = "Buanderie", Description = "Entretien et rangements techniques", SortOrder = 1 }
+            ],
             Components = [componentA, componentB],
             Furniture =
             [

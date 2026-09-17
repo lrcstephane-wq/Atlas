@@ -216,17 +216,22 @@ public sealed class CatalogFacetViewModel : INotifyPropertyChanged
     private bool _isFavorite;
     private readonly Action<CatalogFacetViewModel> _changed;
 
-    public CatalogFacetViewModel(string group, string label, int count, Action<CatalogFacetViewModel> changed)
+    public CatalogFacetViewModel(string group, string label, int count, Action<CatalogFacetViewModel> changed, string description = "", BitmapImage? image = null)
     {
         Group = group;
         Label = label;
         Count = count;
         _changed = changed;
+        Description = description;
+        Image = image;
     }
 
     public string Group { get; }
     public string Label { get; }
     public int Count { get; }
+    public string Description { get; }
+    public BitmapImage? Image { get; }
+    public bool HasImage => Image is not null;
     public string CountLabel => Count.ToString("N0");
     public bool IsSelected
     {

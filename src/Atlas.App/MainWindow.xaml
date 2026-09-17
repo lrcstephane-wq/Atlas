@@ -3,9 +3,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:Atlas.App.Views"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="Biblidéo Atlas" MinWidth="1280" MinHeight="720" Width="1500" Height="920"
+        Title="Biblidéo Atlas" MinWidth="1180" MinHeight="720" Width="1500" Height="920"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
         Background="{StaticResource CanvasBrush}" StateChanged="Window_StateChanged">
+    <Window.Resources>
+        <Geometry x:Key="HomeIcon">M3,10 L12,3 L21,10 M5,9 L5,21 L19,21 L19,9 M9,21 L9,14 L15,14 L15,21</Geometry>
+        <Geometry x:Key="ComponentsIcon">M3,3 L10,3 L10,10 L3,10 Z M14,3 L21,3 L21,10 L14,10 Z M3,14 L10,14 L10,21 L3,21 Z M14,14 L21,14 L21,21 L14,21 Z</Geometry>
+        <Geometry x:Key="FurnitureIcon">M4,5 L20,5 M4,12 L20,12 M4,19 L20,19 M4,5 L4,19 M20,5 L20,19 M8,8 L16,8 M8,15 L16,15</Geometry>
+        <Geometry x:Key="LinksIcon">M9,15 L7,17 A4,4 0 0 1 1,11 L5,7 A4,4 0 0 1 11,7 M15,9 L17,7 A4,4 0 0 1 23,13 L19,17 A4,4 0 0 1 13,17 M8,12 L16,12</Geometry>
+        <Geometry x:Key="HorizonIcon">M12,2 L22,12 L12,22 L2,12 Z M7,12 L17,12 M12,7 L12,17</Geometry>
+        <Geometry x:Key="SettingsIcon">M12,8 A4,4 0 1 0 12,16 A4,4 0 1 0 12,8 M12,2 L13.5,5.2 L17,4 L18.3,7.3 L22,8.5 L21,12 L22,15.5 L18.3,16.7 L17,20 L13.5,18.8 L12,22 L10.5,18.8 L7,20 L5.7,16.7 L2,15.5 L3,12 L2,8.5 L5.7,7.3 L7,4 L10.5,5.2 Z</Geometry>
+    </Window.Resources>
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="8" GlassFrameThickness="0" CornerRadius="12" UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
@@ -39,28 +47,28 @@
                             <StackPanel>
                                 <TextBlock Text="PILOTAGE" Style="{StaticResource NavSection}" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding DashboardNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" ToolTip="Vue d’ensemble">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⌂" Style="{StaticResource NavIcon}"/><TextBlock Grid.Column="1" Text="Vue d’ensemble" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HomeIcon}" Style="{StaticResource NavPathIcon}"/><TextBlock Grid.Column="1" Text="Vue d’ensemble" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
                                 <TextBlock Text="FORGE" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding ComponentsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Components" ToolTip="Bibliothèque de composants">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="▦" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Composants" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource ComponentsIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Composants" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding FurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Furniture" ToolTip="Meubles et compositions">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="▤" Style="{StaticResource NavIcon}" Foreground="{StaticResource AmberBrush}"/><TextBlock Grid.Column="1" Text="Meubles &amp; variantes" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource FurnitureIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource AmberBrush}"/><TextBlock Grid.Column="1" Text="Meubles &amp; variantes" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding FutureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Future" ToolTip="Compatibilités">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⇄" Style="{StaticResource NavIcon}" Foreground="{StaticResource RoseBrush}"/><TextBlock Grid.Column="1" Text="Compatibilités" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource LinksIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource RoseBrush}"/><TextBlock Grid.Column="1" Text="Compatibilités" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
                                 <TextBlock Text="EXPÉRIENCE" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Horizon — expérience client Atlas">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="◇" Style="{StaticResource NavIcon}" Foreground="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HorizonIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
                                 <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding SettingsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Settings" ToolTip="Paramètres et comptes">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⚙" Style="{StaticResource NavIcon}"/><TextBlock Grid.Column="1" Text="Paramètres" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource NavPathIcon}"/><TextBlock Grid.Column="1" Text="Paramètres" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
                             </StackPanel>
                         </ScrollViewer>
@@ -97,7 +105,7 @@
 
                 <Grid Grid.Row="1" Background="{StaticResource CanvasBrush}">
                     <Rectangle Fill="{StaticResource AmbientGlow}" IsHitTestVisible="False"/>
-                    <Grid Margin="24,22,24,20" MaxWidth="1880" HorizontalAlignment="Stretch">
+                    <Grid Margin="18,16,18,14" HorizontalAlignment="Stretch">
                         <views:DashboardView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Dashboard}"/>
                         <views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
                         <views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>

@@ -147,7 +147,13 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<string> TagCategories { get; } = ["Fonction", "Marque", "Gamme", "Implantation", "Technologie", "Système", "Autre"];
     public IReadOnlyList<string> DoorTypes { get; } = ["Applique", "Semi-applique", "Encastrée"];
     public IReadOnlyList<string> DrawerTypes { get; } = ["Applique", "Encastré"];
-    public IReadOnlyList<string> CatalogUniverses => _catalog.Universes;
+    public IReadOnlyList<string> CatalogUniverses => _catalog.UniverseDefinitions
+        .Where(item => item.IsActive)
+        .OrderBy(item => item.SortOrder)
+        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+        .Select(item => item.Name)
+        .ToList();
+    public IReadOnlyList<CatalogUniverseRecord> CatalogUniverseDefinitions => _catalog.UniverseDefinitions;
 
     public WorkspaceSettings Settings => _catalog.Settings;
     public string Version => _updater.CurrentVersion;
@@ -171,7 +177,7 @@ public sealed class MainViewModel : ObservableObject
     public string UpdateLabel { get => _updateLabel; set => SetProperty(ref _updateLabel, value); }
     public bool IsBusy { get => _isBusy; private set { if (SetProperty(ref _isBusy, value)) RaiseCommandStates(); } }
     public bool IsNavigationExpanded { get => _isNavigationExpanded; set { if (SetProperty(ref _isNavigationExpanded, value)) OnPropertyChanged(nameof(NavigationWidth)); } }
-    public double NavigationWidth => IsNavigationExpanded ? 268 : 82;
+    public double NavigationWidth => IsNavigationExpanded ? 224 : 76;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
     public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set => SetProperty(ref _showAdvancedClientFilters, value); }
     public bool IsFamilyMode => CreationMode == "Family";
@@ -357,7 +363,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void NormalizeCatalog()
     {
-        _catalog.Settings ??= new(); _catalog.Components ??= []; _catalog.Furniture ??= []; _catalog.FurnitureFamilies ??= []; _catalog.Universes ??= [];
+        _catalog.Settings ??= new(); _catalog.Components ??= []; _catalog.Furniture ??= []; _catalog.FurnitureFamilies ??= []; _catalog.Universes ??= []; _catalog.UniverseDefinitions ??= [];
         _catalog.Settings.SearchSynonyms ??= [];
         if (!_catalog.Settings.SearchDictionaryInitialized)
         {
@@ -365,6 +371,18 @@ public sealed class MainViewModel : ObservableObject
             _catalog.Settings.SearchDictionaryInitialized = true;
         }
         if (_catalog.Universes.Count == 0) _catalog.Universes.AddRange(DefaultUniverses);
+        if (_catalog.UniverseDefinitions.Count == 0)
+        {
+            _catalog.UniverseDefinitions.AddRange(_catalog.Universes.Select((name, index) => new CatalogUniverseRecord
+            {
+                Name = name,
+                SortOrder = index,
+                Description = DefaultUniverseDescription(name)
+            }));
+        }
+        foreach (var legacyName in _catalog.Universes.Where(name => !_catalog.UniverseDefinitions.Any(item => item.Name.Equals(name, StringComparison.OrdinalIgnoreCase))))
+            _catalog.UniverseDefinitions.Add(new CatalogUniverseRecord { Name = legacyName, SortOrder = _catalog.UniverseDefinitions.Count, Description = DefaultUniverseDescription(legacyName) });
+        NormalizeUniverseDefinitions();
         foreach (var item in _catalog.Components) item.NormalizeTags();
         foreach (var item in _catalog.Furniture)
         {
@@ -385,6 +403,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             _catalog.Components = Components.ToList(); _catalog.Furniture = Furniture.ToList(); _catalog.FurnitureFamilies = FurnitureFamilies.ToList();
+            NormalizeUniverseDefinitions();
             await _store.SaveAsync(_catalog, _catalog.Revision, CurrentUser.DisplayName); StatusText = $"Enregistré · révision {_catalog.Revision}"; NotifySummary();
             return true;
         }
@@ -492,7 +511,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             var published = Furniture.Where(item => item.Status == RecordStatus.Publiee).ToArray();
-            BuildClientFacet("Univers", ClientUniverseFacets, _catalog.Universes.Select(universe => (universe, published.Count(item => item.Universes.Contains(universe, StringComparer.OrdinalIgnoreCase)))));
+            BuildUniverseFacets(published);
             BuildClientFacet("Types", ClientTypeFacets, CountValues(published.Select(item => item.TypeMeuble)));
             BuildClientFacet("Usages", ClientUsageFacets, CountValues(published.SelectMany(FurnitureUsagesFor)));
             BuildClientFacet("Familles", ClientFamilyFacets, CountValues(published.Select(item => item.Family)));
@@ -504,6 +523,46 @@ public sealed class MainViewModel : ObservableObject
             UpdateFavoriteFacets();
         }
         finally { _suppressClientFacetRefresh = false; }
+    }
+
+    private void BuildUniverseFacets(IReadOnlyCollection<FurnitureRecord> published)
+    {
+        var selected = ClientUniverseFacets.Where(option => option.IsSelected).Select(option => option.Label).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ClientUniverseFacets.Clear();
+        foreach (var universe in _catalog.UniverseDefinitions.Where(item => item.IsActive)
+                     .OrderByDescending(item => _horizonPreferences.FavoriteFacetKeys.Contains(FavoriteFacetKey("Univers", item.Name)))
+                     .ThenBy(item => item.SortOrder)
+                     .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var count = published.Count(item => item.Universes.Contains(universe.Name, StringComparer.OrdinalIgnoreCase));
+            var option = new CatalogFacetViewModel("Univers", universe.Name, count, _ => ClientFacetChanged(), universe.Description, LoadUniverseImage(universe))
+            {
+                IsFavorite = _horizonPreferences.FavoriteFacetKeys.Contains(FavoriteFacetKey("Univers", universe.Name))
+            };
+            ClientUniverseFacets.Add(option);
+            if (selected.Contains(universe.Name)) option.IsSelected = true;
+        }
+    }
+
+    private BitmapImage? LoadUniverseImage(CatalogUniverseRecord universe)
+    {
+        if (string.IsNullOrWhiteSpace(universe.ImageRelativePath)) return null;
+        var path = Path.IsPathRooted(universe.ImageRelativePath)
+            ? universe.ImageRelativePath
+            : Path.Combine(SharedRoot, universe.ImageRelativePath);
+        if (!File.Exists(path)) return null;
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 420;
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch { return null; }
     }
 
     private void BuildClientFacet(string group, ObservableCollection<CatalogFacetViewModel> target, IEnumerable<(string Label, int Count)> values)
@@ -773,6 +832,44 @@ public sealed class MainViewModel : ObservableObject
         RefreshClientFurnitureView();
     }
 
+    private void NormalizeUniverseDefinitions()
+    {
+        _catalog.UniverseDefinitions ??= [];
+        var cleaned = _catalog.UniverseDefinitions
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(item => item.SortOrder)
+            .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        for (var index = 0; index < cleaned.Count; index++)
+        {
+            cleaned[index].Name = cleaned[index].Name.Trim();
+            cleaned[index].Description = string.IsNullOrWhiteSpace(cleaned[index].Description)
+                ? DefaultUniverseDescription(cleaned[index].Name)
+                : cleaned[index].Description.Trim();
+            cleaned[index].SortOrder = index;
+        }
+        _catalog.UniverseDefinitions = cleaned;
+        _catalog.Universes = cleaned.Where(item => item.IsActive).Select(item => item.Name).ToList();
+    }
+
+    private static string DefaultUniverseDescription(string name) => name switch
+    {
+        "Cuisine" => "Préparation, cuisson et rangement",
+        "Dressing" => "Vestiaires et rangements sur mesure",
+        "Salle de bain" => "Meubles vasque et rangements d’eau",
+        "Bibliothèque" => "Livres, objets et compositions murales",
+        "Séjour" => "Mobilier de vie et rangements",
+        "Bureau / Tertiaire" => "Postes de travail et espaces professionnels",
+        "Buanderie" => "Entretien et rangements techniques",
+        "Agencement commercial" => "Accueil, présentation et vente",
+        "Chambre" => "Couchage et rangements privés",
+        "Hôtellerie / Hébergement" => "Accueil et mobilier d’hébergement",
+        "Restaurant / Bar" => "Service, convivialité et restauration",
+        _ => "Collection de meubles dédiée"
+    };
+
     private static List<SearchSynonymRecord> DefaultSearchSynonyms() =>
     [
         new() { Canonical = "meuble", AliasesCsv = "mobilier, caisson" },
@@ -889,16 +986,41 @@ public sealed class MainViewModel : ObservableObject
     private void AddUniverse()
     {
         var name = NewUniverseName.Trim();
-        if (_catalog.Universes.Contains(name, StringComparer.OrdinalIgnoreCase)) { AtlasDialog.Info("Cet univers existe déjà.", "Univers"); return; }
-        _catalog.Universes.Add(name); NewUniverseName = ""; RebuildUniverseOptions(); RebuildClientCards(); StatusText = $"Univers « {name} » ajouté au référentiel.";
+        if (_catalog.UniverseDefinitions.Any(item => item.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) { AtlasDialog.Info("Cet univers existe déjà.", "Univers"); return; }
+        _catalog.UniverseDefinitions.Add(new CatalogUniverseRecord { Name = name, SortOrder = _catalog.UniverseDefinitions.Count, Description = DefaultUniverseDescription(name) });
+        NormalizeUniverseDefinitions();
+        NewUniverseName = ""; RebuildUniverseOptions(); RebuildClientCards(); StatusText = $"Univers « {name} » ajouté au référentiel.";
     }
 
     public void ReplaceUniverses(IEnumerable<string> universes)
     {
-        _catalog.Universes = universes.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+        var names = universes.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        _catalog.UniverseDefinitions = names.Select((name, index) => _catalog.UniverseDefinitions.FirstOrDefault(item => item.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            ?? new CatalogUniverseRecord { Name = name, SortOrder = index, Description = DefaultUniverseDescription(name) }).ToList();
+        NormalizeUniverseDefinitions();
         RebuildUniverseOptions();
         RebuildClientCards();
         StatusText = "Référentiel des univers modifié. Pensez à enregistrer le catalogue.";
+    }
+
+    public void ReplaceUniverseDefinitions(IEnumerable<CatalogUniverseRecord> universes)
+    {
+        _catalog.UniverseDefinitions = universes.Where(item => !string.IsNullOrWhiteSpace(item.Name)).ToList();
+        NormalizeUniverseDefinitions();
+        RebuildUniverseOptions();
+        RebuildClientCards();
+        OnPropertyChanged(nameof(CatalogUniverses));
+        OnPropertyChanged(nameof(CatalogUniverseDefinitions));
+        StatusText = "Référentiel illustré des univers modifié. Enregistrez pour le partager.";
+    }
+
+    public void RefreshUniversePresentation()
+    {
+        NormalizeUniverseDefinitions();
+        RebuildClientFacets();
+        RefreshClientFurnitureView();
+        OnPropertyChanged(nameof(CatalogUniverses));
+        OnPropertyChanged(nameof(CatalogUniverseDefinitions));
     }
 
     private void AddComponent()

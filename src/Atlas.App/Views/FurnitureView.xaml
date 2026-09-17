@@ -1,5 +1,5 @@
 <UserControl x:Class="Atlas.App.Views.FurnitureView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:Atlas.App.Controls">
- <Grid MaxWidth="1780" HorizontalAlignment="Stretch">
+ <Grid HorizontalAlignment="Stretch">
 <Grid.RowDefinitions>
 <RowDefinition Height="Auto"/>
 <RowDefinition Height="14"/>
@@ -95,7 +95,7 @@
 </Grid>
 </Border>
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-<Grid Margin="22" MaxWidth="1480" HorizontalAlignment="Stretch">
+<Grid Margin="22" HorizontalAlignment="Stretch">
      <Grid Visibility="{Binding CurrentFurnitureStep, Converter={StaticResource PageVisibility}, ConverterParameter=Identity}">
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="1.1*" MinWidth="400"/>

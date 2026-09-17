@@ -1,11 +1,14 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Atlas.App.ViewModels;
 using Atlas.Core.Models;
 using Atlas.Core.Services;
+using Microsoft.Win32;
 
 namespace Atlas.App.Views;
 
@@ -13,7 +16,7 @@ public partial class SettingsView : UserControl
 {
     private readonly ObservableCollection<ComponentTagRecord> _tags = [];
     private readonly ObservableCollection<string> _tagCategoryFilters = ["Toutes les catégories"];
-    private readonly ObservableCollection<string> _universes = [];
+    private readonly ObservableCollection<CatalogUniverseRecord> _universes = [];
     private ComponentTaxonomy _taxonomy = new();
     private Button? _activeSettingsButton;
 
@@ -33,7 +36,7 @@ public partial class SettingsView : UserControl
         await ReloadTaxonomyAsync();
         if (DataContext is MainViewModel vm)
         {
-            foreach (var universe in vm.CatalogUniverses.Order(StringComparer.CurrentCultureIgnoreCase)) _universes.Add(universe);
+            foreach (var universe in vm.CatalogUniverseDefinitions.OrderBy(item => item.SortOrder)) _universes.Add(universe);
             foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
         }
         ActivateSettingsButton(GeneralSettingsButton);
@@ -218,16 +221,89 @@ public partial class SettingsView : UserControl
     {
         if (DataContext is not MainViewModel { CanEdit: true } vm) return;
         var name = NewUniverseSetting.Text.Trim();
-        if (string.IsNullOrWhiteSpace(name) || _universes.Contains(name, StringComparer.OrdinalIgnoreCase)) return;
-        _universes.Add(name); NewUniverseSetting.Clear(); vm.ReplaceUniverses(_universes);
+        if (string.IsNullOrWhiteSpace(name) || _universes.Any(item => item.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) return;
+        var universe = new CatalogUniverseRecord { Name = name, SortOrder = _universes.Count, Description = "Collection de meubles dédiée" };
+        _universes.Add(universe); NewUniverseSetting.Clear(); UniverseList.SelectedItem = universe; vm.ReplaceUniverseDefinitions(_universes);
     }
 
     private void DeleteUniverseSetting_OnClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainViewModel { CanEdit: true } vm || UniverseList.SelectedItem is not string selected) return;
-        var count = vm.Furniture.Count(x => x.Universes.Contains(selected, StringComparer.OrdinalIgnoreCase));
-        if (!AtlasDialog.Confirm($"Supprimer l’univers « {selected} » ?", "Suppression d’un univers", $"{count} meuble(s) utilisent encore cet univers. Leur fiche conservera la valeur jusqu’à modification manuelle.")) return;
-        _universes.Remove(selected); vm.ReplaceUniverses(_universes);
+        if (DataContext is not MainViewModel { CanEdit: true } vm || UniverseList.SelectedItem is not CatalogUniverseRecord selected) return;
+        var count = vm.Furniture.Count(x => x.Universes.Contains(selected.Name, StringComparer.OrdinalIgnoreCase));
+        if (!AtlasDialog.Confirm($"Supprimer l’univers « {selected.Name} » ?", "Suppression d’un univers", $"{count} meuble(s) utilisent encore cet univers. Leur fiche conservera la valeur jusqu’à modification manuelle.")) return;
+        _universes.Remove(selected); vm.ReplaceUniverseDefinitions(_universes);
+    }
+
+    private void MoveUniverseUp_OnClick(object sender, RoutedEventArgs e) => MoveUniverse(-1);
+    private void MoveUniverseDown_OnClick(object sender, RoutedEventArgs e) => MoveUniverse(1);
+
+    private void MoveUniverse(int direction)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || UniverseList.SelectedItem is not CatalogUniverseRecord selected) return;
+        var index = _universes.IndexOf(selected);
+        var target = index + direction;
+        if (index < 0 || target < 0 || target >= _universes.Count) return;
+        _universes.Move(index, target);
+        for (var i = 0; i < _universes.Count; i++) _universes[i].SortOrder = i;
+        vm.ReplaceUniverseDefinitions(_universes);
+        UniverseList.SelectedItem = selected;
+    }
+
+    private void ChooseUniverseImage_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || UniverseList.SelectedItem is not CatalogUniverseRecord selected) return;
+        var dialog = new OpenFileDialog
+        {
+            Title = $"Image de l’univers {selected.Name}",
+            Filter = "Images (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|Tous les fichiers (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            var folder = Path.Combine(vm.SharedRoot, "Images", "Universes");
+            Directory.CreateDirectory(folder);
+            var extension = Path.GetExtension(dialog.FileName).ToLowerInvariant();
+            var destination = Path.Combine(folder, $"{selected.Id}{extension}");
+            File.Copy(dialog.FileName, destination, true);
+            selected.ImageRelativePath = Path.GetRelativePath(vm.SharedRoot, destination);
+            vm.ReplaceUniverseDefinitions(_universes);
+            UniverseImagePreview.Source = LoadPreview(destination);
+            UniverseStatus.Text = $"Image associée à « {selected.Name} ». Enregistrez les univers pour la partager.";
+        }
+        catch (Exception exception)
+        {
+            AtlasDialog.Error(exception.Message, "Image impossible à associer", "Vérifiez l’accès au dossier partagé Atlas.");
+        }
+    }
+
+    private async void SaveUniverses_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        if (_universes.Any(item => string.IsNullOrWhiteSpace(item.Name))) { UniverseStatus.Text = "Chaque univers doit avoir un nom."; return; }
+        var duplicate = _universes.GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null) { UniverseStatus.Text = $"Univers en double : {duplicate.Key}."; return; }
+        vm.ReplaceUniverseDefinitions(_universes);
+        if (!await vm.SaveCatalogAsync()) return;
+        vm.RefreshUniversePresentation();
+        UniverseStatus.Text = "Univers enregistrés et immédiatement disponibles dans Horizon.";
+    }
+
+    private void UniverseList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UniverseList.SelectedItem is not CatalogUniverseRecord item || DataContext is not MainViewModel vm)
+        {
+            UniverseImagePreview.Source = null;
+            return;
+        }
+        var path = string.IsNullOrWhiteSpace(item.ImageRelativePath) ? string.Empty : Path.Combine(vm.SharedRoot, item.ImageRelativePath);
+        UniverseImagePreview.Source = File.Exists(path) ? LoadPreview(path) : null;
+    }
+
+    private static BitmapImage LoadPreview(string path)
+    {
+        var image = new BitmapImage();
+        image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.DecodePixelWidth = 720; image.UriSource = new Uri(path, UriKind.Absolute); image.EndInit(); image.Freeze();
+        return image;
     }
 
 }
