@@ -44,7 +44,8 @@
                             <Button Grid.Column="2" Content="‹" FontSize="23" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Réduire ou développer le menu" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid Grid.Row="1">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                             <StackPanel>
                                 <TextBlock Text="PILOTAGE" Style="{StaticResource NavSection}" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
                                 <Button Style="{StaticResource NavButton}" Background="{Binding DashboardNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" ToolTip="Vue d’ensemble">
@@ -67,53 +68,52 @@
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HorizonIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
-                                <Border Margin="14,5,12,3" Padding="7" CornerRadius="12" Background="#95121C25" BorderBrush="#33465260" BorderThickness="1"
-                                        Visibility="{Binding IsCatalogPage, Converter={StaticResource BoolVisibility}}">
-                                    <Grid>
-                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                                        <Grid Margin="5,2,5,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
-                                            <TextBlock Text="UNIVERS" Style="{StaticResource Eyebrow}"/>
-                                            <TextBlock Text="défiler" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
-                                        </Grid>
-                                        <ScrollViewer Grid.Row="1" MaxHeight="390" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                            <ItemsControl ItemsSource="{Binding ClientUniverseFacets}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid Margin="0,0,3,8" Height="82">
-                                                            <CheckBox IsChecked="{Binding IsSelected}" Foreground="White">
-                                                                <CheckBox.Template>
-                                                                    <ControlTemplate TargetType="CheckBox">
-                                                                        <Border x:Name="UniverseCard" Background="#202A33" BorderBrush="#46545F" BorderThickness="1" CornerRadius="9" ClipToBounds="True">
-                                                                            <Grid>
-                                                                                <Image Source="{Binding Image}" Stretch="UniformToFill"/>
-                                                                                <Rectangle Fill="#B3091118"/>
-                                                                                <Border VerticalAlignment="Bottom" Background="#C5121A21" Padding="9,16,9,8">
-                                                                                    <StackPanel>
-                                                                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11" TextTrimming="CharacterEllipsis"/>
-                                                                                        <TextBlock Text="{Binding Count, StringFormat='{}{0} modèle(s)'}" FontSize="9" Foreground="#BEC8D0"/>
-                                                                                    </StackPanel>
-                                                                                </Border>
-                                                                                <Border x:Name="SelectedMark" Width="5" Background="{StaticResource CyanBrush}" HorizontalAlignment="Left" Visibility="Collapsed"/>
-                                                                            </Grid>
-                                                                        </Border>
-                                                                        <ControlTemplate.Triggers>
-                                                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="UniverseCard" Property="BorderBrush" Value="#82939F"/></Trigger>
-                                                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="UniverseCard" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="SelectedMark" Property="Visibility" Value="Visible"/></Trigger>
-                                                                        </ControlTemplate.Triggers>
-                                                                    </ControlTemplate>
-                                                                </CheckBox.Template>
-                                                            </CheckBox>
-                                                            <Button Content="{Binding FavoriteGlyph}" Style="{StaticResource IconButton}" Width="29" Height="29" MinHeight="0" Padding="0" FontSize="13" Background="#C9141D24" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0" Click="ClientFacetFavorite_OnClick" ToolTip="Épingler cet univers"/>
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
-                                    </Grid>
-                                </Border>
-
                             </StackPanel>
-                        </ScrollViewer>
+                            <Border Grid.Row="1" Margin="14,5,12,5" Padding="7" CornerRadius="12" Background="#95121C25" BorderBrush="#445764" BorderThickness="1"
+                                    Visibility="{Binding IsCatalogPage, Converter={StaticResource BoolVisibility}}">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                    <Grid Margin="5,3,5,9" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
+                                        <TextBlock Text="UNIVERS" Style="{StaticResource Eyebrow}"/>
+                                        <TextBlock Text="Choisir un espace" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                                        <ItemsControl ItemsSource="{Binding ClientUniverseFacets}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,3,9" Height="108">
+                                                        <CheckBox IsChecked="{Binding IsSelected}" Foreground="White">
+                                                            <CheckBox.Template>
+                                                                <ControlTemplate TargetType="CheckBox">
+                                                                    <Border x:Name="UniverseCard" Background="#202A33" BorderBrush="#52636F" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                                                                        <Grid>
+                                                                            <Image Source="{Binding Image}" Stretch="UniformToFill"/>
+                                                                            <Rectangle>
+                                                                                <Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#08040A0E" Offset="0"/><GradientStop Color="#38040A0E" Offset="0.48"/><GradientStop Color="#E00A1117" Offset="1"/></LinearGradientBrush></Rectangle.Fill>
+                                                                            </Rectangle>
+                                                                            <StackPanel VerticalAlignment="Bottom" Margin="11,0,38,10">
+                                                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                                                                <TextBlock Text="{Binding Count, StringFormat='{}{0} modèle(s)'}" FontSize="10" Foreground="#D3DCE2" Margin="0,3,0,0"/>
+                                                                            </StackPanel>
+                                                                            <Border x:Name="SelectedMark" Width="5" Background="{StaticResource CyanBrush}" HorizontalAlignment="Left" Visibility="Collapsed"/>
+                                                                        </Grid>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="UniverseCard" Property="BorderBrush" Value="#9BAAB3"/></Trigger>
+                                                                        <Trigger Property="IsChecked" Value="True"><Setter TargetName="UniverseCard" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="UniverseCard" Property="BorderThickness" Value="2"/><Setter TargetName="SelectedMark" Property="Visibility" Value="Visible"/></Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </CheckBox.Template>
+                                                        </CheckBox>
+                                                        <Button Content="{Binding FavoriteGlyph}" Style="{StaticResource IconButton}" Width="32" Height="32" MinHeight="0" Padding="0" FontSize="14" Background="#D20E171E" BorderBrush="#78909E" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0" Click="ClientFacetFavorite_OnClick" ToolTip="Épingler cet univers"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Grid>
 
                         <StackPanel Grid.Row="2" Margin="0,4,0,0">
                             <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="24,5,0,5" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
