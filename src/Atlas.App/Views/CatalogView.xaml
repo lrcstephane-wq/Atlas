@@ -30,7 +30,7 @@
   </Style>
 
   <DataTemplate x:Key="FilterFacetTemplate">
-   <Grid MinWidth="128" MaxWidth="235"><CheckBox Style="{StaticResource FilterChip}" IsChecked="{Binding IsSelected}"/><Button Width="24" Height="24" MinHeight="0" Padding="0" Margin="0,3,8,0" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Click="ClientFacetFavorite_OnClick" ToolTip="Épingler ce filtre"><Path Data="{StaticResource BookmarkGeometry}" Stretch="Uniform" Width="10" Height="13" Stroke="{StaticResource CyanBrush}" Fill="Transparent" StrokeThickness="1.5"/></Button></Grid>
+   <Grid MinWidth="128" MaxWidth="235"><CheckBox Style="{StaticResource FilterChip}" IsChecked="{Binding IsSelected}"/><Button Content="{Binding FavoriteGlyph}" Width="24" Height="24" MinHeight="0" Padding="0" Margin="0,3,8,0" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Foreground="{StaticResource CyanBrush}" FontSize="13" Click="ClientFacetFavorite_OnClick" ToolTip="Épingler ce filtre"/></Grid>
   </DataTemplate>
  </UserControl.Resources>
 
