@@ -3,7 +3,7 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:controls="clr-namespace:Atlas.App.Controls"
  Loaded="ComponentsView_OnLoaded" IsVisibleChanged="ComponentsView_OnIsVisibleChanged">
- <Grid MaxWidth="1780" HorizontalAlignment="Stretch">
+ <Grid HorizontalAlignment="Stretch">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
   <Border Background="{StaticResource SurfaceGradient}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="14" Padding="20,16" Margin="0,0,0,16">
    <Grid><StackPanel><TextBlock Text="FORGE / COMPOSANTS" Style="{StaticResource Eyebrow}"/><TextBlock Text="Bibliothèque vivante" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/><TextBlock Text="Repérez, filtrez et enrichissez les composants TopSolid sans ouvrir ni interpréter les fichiers .TOP." Style="{StaticResource Caption}" FontSize="13" Margin="0,3,0,0"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Content="Choisir la bibliothèque" Style="{StaticResource GhostButton}" Command="{Binding ChooseLibraryCommand}" Margin="0,0,8,0"/><Button Content="Indexer maintenant" Command="{Binding ScanCommand}"/></StackPanel></Grid>

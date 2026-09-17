@@ -18,6 +18,9 @@ var demo = DemoCatalogFactory.Create();
 Assert(demo.Components.Count >= 2 && demo.Furniture.Count >= 1, "Le catalogue de démonstration doit permettre l’aperçu de la V0.1.");
 Assert(demo.Furniture[0].ComponentIds.All(id => demo.Components.Any(component => component.Id == id)), "La composition doit référencer des composants connus.");
 Assert(demo.Furniture[0].Universes.Count > 1, "Un meuble doit pouvoir appartenir à plusieurs univers.");
+Assert(demo.UniverseDefinitions.Count >= 2 && demo.UniverseDefinitions.All(item => !string.IsNullOrWhiteSpace(item.Name)), "Les univers illustrés doivent être persistés comme des fiches administrables.");
+demo.UniverseDefinitions[0].ImageRelativePath = Path.Combine("Images", "Universes", "cuisine.jpg");
+Assert(demo.UniverseDefinitions[0].ImageRelativePath.Contains("Universes"), "Un univers doit pouvoir référencer une image partagée.");
 Assert(demo.FurnitureFamilies.Any(family => family.Id == demo.Furniture[0].FamilyId), "Une variante doit pouvoir référencer sa famille.");
 
 var drawerTag = new CapabilityTagRecord { Id = "cap-tiroirs", Label = "Tiroirs", DefaultFamilyNames = ["Coulissants"] };
@@ -122,6 +125,11 @@ Assert(mainWindowXaml.Contains("WindowChrome") && !mainWindowXaml.Contains("Allo
 Assert(mainWindowXaml.Contains("StateChanged=\"Window_StateChanged\""), "La fenêtre principale doit adapter son cadre au mode agrandi.");
 Assert(catalogXaml.Contains("FavoriteButton") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit intégrer les favoris et conserver des filtres défilants.");
 Assert(catalogXaml.Contains("MinWidth=\"330\"") && catalogXaml.Contains("MaxWidth=\"410\""), "Horizon doit protéger les dimensions minimales de ses panneaux.");
+Assert(catalogXaml.Contains("ClientUniverseFacets") && catalogXaml.Contains("UniformToFill"), "Horizon doit présenter les univers comme une galerie illustrée.");
+Assert(!catalogXaml.Contains("MaxWidth=\"1820\""), "Horizon doit utiliser toute la largeur disponible en plein écran.");
+Assert(mainWindowXaml.Contains("NavPathIcon") && !mainWindowXaml.Contains("Text=\"⚙\""), "Le menu principal doit utiliser des icônes vectorielles cohérentes.");
+var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
+Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
 Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");
 
 Console.WriteLine("Atlas.Core : contrôles métier réussis.");
