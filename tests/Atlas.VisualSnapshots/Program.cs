@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -11,7 +12,16 @@ using Atlas.Core.Services;
 internal static class Program
 {
     [STAThread]
-    private static async Task Main(string[] args)
+    private static void Main(string[] args)
+    {
+        var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        app.InitializeComponent();
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
+        WaitWithDispatcher(RunAsync(args));
+        app.Shutdown();
+    }
+
+    private static async Task RunAsync(string[] args)
     {
         var output = Path.GetFullPath(args.FirstOrDefault() ?? Path.Combine("artifacts", "visual-snapshots"));
         Directory.CreateDirectory(output);
@@ -28,16 +38,24 @@ internal static class Program
             await vm.InitializeAsync();
             vm.CurrentPage = "Catalog";
 
-            var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            app.InitializeComponent();
             foreach (var size in new[] { (1366, 768), (1920, 1080), (2560, 1440) })
                 Render(vm, output, size.Item1, size.Item2);
-            app.Shutdown();
         }
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, true);
         }
+    }
+
+    private static void WaitWithDispatcher(Task task)
+    {
+        if (!task.IsCompleted)
+        {
+            var frame = new DispatcherFrame();
+            task.GetAwaiter().OnCompleted(() => frame.Continue = false);
+            Dispatcher.PushFrame(frame);
+        }
+        task.GetAwaiter().GetResult();
     }
 
     private static AtlasCatalog BuildVisualCatalog(string root)
