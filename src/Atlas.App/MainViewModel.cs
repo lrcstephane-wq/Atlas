@@ -901,11 +901,28 @@ public sealed class MainViewModel : ObservableObject
         var family = CreationMode == "Family" ? SelectedFurnitureFamily : null;
         var item = new FurnitureRecord
         {
-            Reference = $"MEU-{Furniture.Count(value => !value.IsDemo) + 1:0000}", DisplayName = family is null ? "Nouveau meuble" : $"{family.Name} · nouvelle variante",
+            Reference = NextFurnitureReference(), DisplayName = family is null ? "Nouveau meuble" : $"{family.Name} · nouvelle variante",
             Family = family?.Name ?? "", FamilyId = family?.Id ?? "", Description = family?.Description ?? "", TypeMeuble = family?.TypeMeuble ?? "", UsageSpecifique = family?.UsageSpecifique ?? "", Forme = family?.Forme ?? "Droit",
             Universes = family?.Universes.ToList() ?? [], Usages = string.IsNullOrWhiteSpace(family?.UsageSpecifique) ? [] : [family.UsageSpecifique], ConceptionDate = DateTime.Today, Status = RecordStatus.Brouillon
         };
         Furniture.Add(item); SelectedFurniture = item; FurnitureView.Refresh(); RebuildClientCards(); CurrentPage = "Furniture"; CurrentFurnitureStep = "Identity"; NotifySummary();
+    }
+
+    private string NextFurnitureReference()
+    {
+        var used = Furniture.Select(value => value.Reference?.Trim() ?? string.Empty).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var maximum = Furniture
+            .Select(value => value.Reference?.Trim())
+            .Where(value => value is { Length: 9 } && value.All(char.IsDigit))
+            .Select(value => int.TryParse(value, out var number) ? number : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+        for (var number = maximum + 1; number <= 999_999_999; number++)
+        {
+            var candidate = number.ToString("D9");
+            if (!used.Contains(candidate)) return candidate;
+        }
+        throw new InvalidOperationException("Le compteur des références Atlas a atteint sa limite.");
     }
 
     private void CreateFamily()
@@ -1078,6 +1095,7 @@ public sealed class MainViewModel : ObservableObject
     private async Task PublishFurnitureAsync()
     {
         if (SelectedFurniture is null) return;
+        if (Furniture.Any(value => value.Id != SelectedFurniture.Id && string.Equals(value.Reference, SelectedFurniture.Reference, StringComparison.OrdinalIgnoreCase))) { AtlasDialog.Warning("Cette référence Atlas est déjà utilisée par un autre meuble.", "Publication bloquée"); CurrentFurnitureStep = "Identity"; return; }
         if (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath)) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais il faut lui associer un fichier .TOP avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Identity"; return; }
         if (SelectedFurniture.Universes.Count == 0 || string.IsNullOrWhiteSpace(SelectedFurniture.TypeMeuble)) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais un univers et un type sont obligatoires avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Classification"; return; }
         if (SelectedFurniture.ComponentLines.Count == 0) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais sa composition ne peut pas être vide avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Composition"; return; }
@@ -1213,15 +1231,33 @@ public sealed class MainViewModel : ObservableObject
     private void ChooseFurnitureTop()
     {
         if (SelectedFurniture is null) return;
-        var dialog = new OpenFileDialog { Title = "Choisir le fichier meuble TopSolid", Filter = "Fichiers TopSolid (*.top)|*.top|Tous les fichiers (*.*)|*.*", CheckFileExists = true };
+        var dialog = new OpenFileDialog { Title = $"Choisir le fichier TopSolid à enregistrer sous {SelectedFurniture.Reference}.top", Filter = "Fichiers TopSolid (*.top)|*.top|Tous les fichiers (*.*)|*.*", CheckFileExists = true };
         if (Directory.Exists(Settings.LibraryRoot)) dialog.InitialDirectory = Settings.LibraryRoot;
         if (dialog.ShowDialog() != true) return;
-        var topPath = dialog.FileName;
-        SelectedFurniture.SourceRelativePath = MakeLibraryRelative(topPath);
-        var candidates = new[] { topPath + ".png", Path.ChangeExtension(topPath, ".png") };
-        var imagePath = candidates.FirstOrDefault(File.Exists);
-        SelectedFurniture.ImageRelativePath = imagePath is null ? string.Empty : MakeLibraryRelative(imagePath);
-        StatusText = imagePath is null ? "Fichier meuble lié. Aucun aperçu .top.png trouvé." : "Fichier meuble et aperçu associés.";
+        try
+        {
+            var sourceTop = dialog.FileName;
+            var targetTop = Path.Combine(Path.GetDirectoryName(sourceTop)!, $"{SelectedFurniture.Reference}.top");
+            if (!Path.GetFullPath(sourceTop).Equals(Path.GetFullPath(targetTop), StringComparison.OrdinalIgnoreCase))
+            {
+                if (File.Exists(targetTop)) throw new IOException($"Le fichier {SelectedFurniture.Reference}.top existe déjà dans ce dossier.");
+                File.Copy(sourceTop, targetTop, false);
+            }
+            SelectedFurniture.SourceRelativePath = MakeLibraryRelative(targetTop);
+            var sourceImage = new[] { sourceTop + ".png", Path.ChangeExtension(sourceTop, ".png") }.FirstOrDefault(File.Exists);
+            string? targetImage = null;
+            if (sourceImage is not null)
+            {
+                targetImage = targetTop + ".png";
+                if (!Path.GetFullPath(sourceImage).Equals(Path.GetFullPath(targetImage), StringComparison.OrdinalIgnoreCase)) File.Copy(sourceImage, targetImage, false);
+            }
+            SelectedFurniture.ImageRelativePath = targetImage is null ? string.Empty : MakeLibraryRelative(targetImage);
+            StatusText = targetImage is null ? $"Copie créée : {SelectedFurniture.Reference}.top. Aucun aperçu trouvé." : $"Meuble et aperçu enregistrés sous la référence {SelectedFurniture.Reference}.";
+        }
+        catch (Exception exception)
+        {
+            AtlasDialog.Error(exception.Message, "Impossible d'enregistrer le meuble", "Le fichier source n'a pas été modifié.");
+        }
     }
 
     private string MakeLibraryRelative(string path)
