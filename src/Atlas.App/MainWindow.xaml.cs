@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using Atlas.App.ViewModels;
 
 namespace Atlas.App;
 
@@ -26,8 +27,14 @@ public partial class MainWindow : Window
         var maximized = WindowState == WindowState.Maximized;
         MaximizeButton.Content = maximized ? "❐" : "□";
         MaximizeButton.ToolTip = maximized ? "Restaurer" : "Agrandir";
-        HorizonExperience?.UpdateWindowState(maximized);
         WindowFrame.CornerRadius = maximized ? new CornerRadius(0) : new CornerRadius(12);
         WindowFrame.BorderThickness = maximized ? new Thickness(0) : new Thickness(1);
+    }
+
+    private void ClientFacetFavorite_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: CatalogFacetViewModel facet }) return;
+        _viewModel.ToggleClientFavorite(facet);
+        e.Handled = true;
     }
 }

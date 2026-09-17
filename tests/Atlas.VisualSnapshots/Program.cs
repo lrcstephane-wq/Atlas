@@ -85,7 +85,7 @@ internal static class Program
             if (index < names.Length) DrawPreview(Path.Combine(root, path), names[modelIndex], modelIndex, false);
             catalog.Furniture.Add(new FurnitureRecord
             {
-                Id = $"visual-{index:0000}", Reference = $"MEU-{index + 1:0000}", DisplayName = $"{names[modelIndex]} {index + 1:0000}", Description = "Mobilier paramétrique prêt à intégrer au projet.",
+                Id = $"visual-{index:0000}", Reference = $"{index + 1:000000000}", DisplayName = $"{names[modelIndex]} {index + 1:0000}", Description = "Mobilier paramétrique prêt à intégrer au projet.",
                 ImageRelativePath = path, SourceRelativePath = $"Models\\{names[modelIndex]}.top", Status = RecordStatus.Publiee,
                 TypeMeuble = index % 3 == 0 ? "Colonne" : "Meuble bas", Forme = "Droit", Universes = [universes[index % universes.Length]],
                 Usages = [index % 2 == 0 ? "Rangement" : "Technique"], PrincipleConstruction = "Montant filant", TypeAssemblage = "Tourillons + excentriques", PositionDos = "Rainuré"
@@ -118,12 +118,23 @@ internal static class Program
 
     private static void Render(MainViewModel vm, string output, int width, int height)
     {
-        var view = new HorizonShell { DataContext = vm, Width = width, Height = height };
+        var window = new MainWindow(vm);
+        var view = (FrameworkElement)window.Content;
+        view.Width = width;
+        view.Height = height;
         view.Measure(new Size(width, height));
         view.Arrange(new Rect(0, 0, width, height));
         view.UpdateLayout();
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(view);
+        var pixels = new byte[width * height * 4];
+        bitmap.CopyPixels(pixels, width * 4, 0);
+        var visiblePixels = 0;
+        for (var index = 0; index < pixels.Length; index += 4)
+        {
+            if (pixels[index] + pixels[index + 1] + pixels[index + 2] > 36) visiblePixels++;
+        }
+        if (visiblePixels < width * height / 20) throw new InvalidOperationException($"Capture {width} × {height} vide ou illisible.");
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(output, $"horizon-{width}x{height}.png"));
         encoder.Save(stream);

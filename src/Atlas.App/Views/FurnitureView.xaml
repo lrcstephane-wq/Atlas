@@ -106,7 +106,8 @@
 <TextBlock Text="01 / IDENTITÉ" Style="{StaticResource Eyebrow}"/>
 <TextBlock Text="Le meuble et son fichier" Style="{StaticResource SectionTitle}" Margin="0,5,0,18"/>
 <TextBlock Text="Référence interne" Style="{StaticResource FieldLabel}"/>
-<TextBox Text="{Binding SelectedFurniture.Reference, UpdateSourceTrigger=PropertyChanged}"/>
+<TextBox Text="{Binding SelectedFurniture.Reference}" IsReadOnly="True" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource CyanBrush}"/>
+<TextBlock Text="Identifiant Atlas unique attribué automatiquement. Le fichier .TOP associé sera copié sous ce nom." Style="{StaticResource Caption}" Margin="0,5,0,0"/>
 <TextBlock Text="Nom affiché au client" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>
 <TextBox Text="{Binding SelectedFurniture.DisplayName, UpdateSourceTrigger=PropertyChanged}"/>
 <TextBlock Text="Date de conception" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>

@@ -20,7 +20,7 @@
 
     <Border x:Name="WindowFrame" Background="{StaticResource CanvasBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12">
       <Grid ClipToBounds="True">
-        <Grid Visibility="{Binding IsCatalogPage, Converter={StaticResource InverseBoolVisibility}}">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding NavigationWidth}"/>
                 <ColumnDefinition Width="*"/>
@@ -31,7 +31,7 @@
                 <Grid>
                     <Rectangle Fill="{StaticResource AtlasGridBrush}" IsHitTestVisible="False"/>
                     <Grid>
-                        <Grid.RowDefinitions><RowDefinition Height="88"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="88"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <Grid Margin="16,14,12,10">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
                             <Border Width="46" Height="46" CornerRadius="13" Background="#122C41" BorderBrush="#345875" BorderThickness="1">
@@ -67,14 +67,62 @@
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HorizonIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
-                                <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
-                                <Button Style="{StaticResource NavButton}" Background="{Binding SettingsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Settings" ToolTip="Paramètres et comptes">
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource NavPathIcon}"/><TextBlock Grid.Column="1" Text="Paramètres" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
-                                </Button>
+                                <Border Margin="14,5,12,3" Padding="7" CornerRadius="12" Background="#95121C25" BorderBrush="#33465260" BorderThickness="1"
+                                        Visibility="{Binding IsCatalogPage, Converter={StaticResource BoolVisibility}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                        <Grid Margin="5,2,5,8" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
+                                            <TextBlock Text="UNIVERS" Style="{StaticResource Eyebrow}"/>
+                                            <TextBlock Text="défiler" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                        <ScrollViewer Grid.Row="1" MaxHeight="390" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsControl ItemsSource="{Binding ClientUniverseFacets}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,0,3,8" Height="82">
+                                                            <CheckBox IsChecked="{Binding IsSelected}" Foreground="White">
+                                                                <CheckBox.Template>
+                                                                    <ControlTemplate TargetType="CheckBox">
+                                                                        <Border x:Name="UniverseCard" Background="#202A33" BorderBrush="#46545F" BorderThickness="1" CornerRadius="9" ClipToBounds="True">
+                                                                            <Grid>
+                                                                                <Image Source="{Binding Image}" Stretch="UniformToFill"/>
+                                                                                <Rectangle Fill="#B3091118"/>
+                                                                                <Border VerticalAlignment="Bottom" Background="#C5121A21" Padding="9,16,9,8">
+                                                                                    <StackPanel>
+                                                                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                                                                        <TextBlock Text="{Binding Count, StringFormat='{}{0} modèle(s)'}" FontSize="9" Foreground="#BEC8D0"/>
+                                                                                    </StackPanel>
+                                                                                </Border>
+                                                                                <Border x:Name="SelectedMark" Width="5" Background="{StaticResource CyanBrush}" HorizontalAlignment="Left" Visibility="Collapsed"/>
+                                                                            </Grid>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="UniverseCard" Property="BorderBrush" Value="#82939F"/></Trigger>
+                                                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="UniverseCard" Property="BorderBrush" Value="{StaticResource CyanBrush}"/><Setter TargetName="SelectedMark" Property="Visibility" Value="Visible"/></Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </CheckBox.Template>
+                                                            </CheckBox>
+                                                            <Button Content="{Binding FavoriteGlyph}" Style="{StaticResource IconButton}" Width="29" Height="29" MinHeight="0" Padding="0" FontSize="13" Background="#C9141D24" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0" Click="ClientFacetFavorite_OnClick" ToolTip="Épingler cet univers"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+
                             </StackPanel>
                         </ScrollViewer>
 
-                        <Border Grid.Row="2" Background="#9A102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="12" Margin="12" Padding="12">
+                        <StackPanel Grid.Row="2" Margin="0,4,0,0">
+                            <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="24,5,0,5" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
+                            <Button Style="{StaticResource NavButton}" Background="{Binding SettingsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Settings" ToolTip="Paramètres et comptes">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource NavPathIcon}"/><TextBlock Grid.Column="1" Text="Paramètres" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                            </Button>
+                        </StackPanel>
+
+                        <Border Grid.Row="3" Background="#9A102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="12" Margin="12" Padding="12">
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource PrimaryGradient}"><TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/></Border>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="Session sécurisée" Style="{StaticResource Caption}"/></StackPanel>
@@ -110,6 +158,7 @@
                         <views:DashboardView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Dashboard}"/>
                         <views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
                         <views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>
+                        <views:CatalogView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Catalog}"/>
                         <views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}"/>
                         <views:FutureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Future}"/>
                     </Grid>
@@ -120,7 +169,6 @@
                 </Border>
             </Grid>
         </Grid>
-        <views:HorizonShell x:Name="HorizonExperience" Visibility="{Binding IsCatalogPage, Converter={StaticResource BoolVisibility}}"/>
       </Grid>
     </Border>
 </Window>

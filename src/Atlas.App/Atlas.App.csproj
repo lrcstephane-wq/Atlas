@@ -6,7 +6,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>Atlas</AssemblyName>
     <RootNamespace>Atlas.App</RootNamespace>
-    <Version>0.9.3</Version>
+    <Version>0.9.4</Version>
     <ApplicationIcon>Assets\Atlas.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
