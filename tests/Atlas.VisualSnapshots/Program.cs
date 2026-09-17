@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Atlas.App;
+using Atlas.App.Views;
 using Atlas.Core.Models;
 using Atlas.Core.Services;
 
@@ -115,15 +116,14 @@ internal static class Program
 
     private static void Render(MainViewModel vm, string output, int width, int height)
     {
-        var window = new MainWindow(vm) { Width = width, Height = height, Left = -10000, Top = -10000, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
-        window.Show();
-        window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-        window.UpdateLayout();
+        var view = new HorizonShell { DataContext = vm, Width = width, Height = height };
+        view.Measure(new Size(width, height));
+        view.Arrange(new Rect(0, 0, width, height));
+        view.UpdateLayout();
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(window);
+        bitmap.Render(view);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(output, $"horizon-{width}x{height}.png"));
         encoder.Save(stream);
-        window.Close();
     }
 }
