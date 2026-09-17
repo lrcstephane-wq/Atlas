@@ -817,12 +817,38 @@ public sealed class MainViewModel : ObservableObject
     private IEnumerable<CatalogSearchField> SearchFieldsFor(FurnitureRecord furniture)
     {
         var tags = string.Join(' ', ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label));
+        var structure = new List<string>
+        {
+            furniture.PrincipleConstruction, furniture.SensMontage, furniture.TypeAssemblage, furniture.PositionDos,
+            furniture.TypologiePorte, furniture.TypologieTiroir, furniture.TypologieAbattant, furniture.TypologieRelevant
+        };
+        if (furniture.SeparationHorizontale) structure.Add("séparation horizontale");
+        if (furniture.SeparationVerticale) structure.Add("séparation verticale");
+        if (furniture.Porte) structure.Add($"porte {furniture.NombrePortes}");
+        if (furniture.Tiroir) structure.Add($"tiroir {furniture.NombreTiroirs}");
+        if (furniture.TiroirAnglaise) structure.Add($"tiroir à l'anglaise {furniture.NombreTiroirsAnglaise}");
+        if (furniture.Abattant) structure.Add($"abattant {furniture.NombreAbattants}");
+        if (furniture.Relevant) structure.Add($"relevant {furniture.NombreRelevants}");
+        if (furniture.Rayon) structure.Add($"rayon {furniture.NombreRayons}");
+        if (furniture.Penderie) structure.Add("penderie");
+        if (furniture.NicheOuverte) structure.Add($"niche ouverte {furniture.NombreNichesOuvertes}");
+        var linkedComponents = (furniture.ComponentLines ?? [])
+            .Select(line => Components.FirstOrDefault(component => component.Id.Equals(line.ComponentId, StringComparison.OrdinalIgnoreCase)))
+            .Where(component => component is not null)
+            .SelectMany(component => new[]
+            {
+                component!.DisplayName, component.TechnicalName, component.Function, component.Description, component.UsageNotes,
+                component.EffectiveFamilyName, component.LibraryName, component.TypeCode, component.VariantCode, component.RangeCode,
+                component.ConstructionCode, component.CapabilitiesCsv, component.CompatibilityCsv
+            });
         yield return new CatalogSearchField(furniture.DisplayName, 1d);
         yield return new CatalogSearchField(furniture.Reference, 0.85d);
         yield return new CatalogSearchField($"{furniture.TypeMeuble} {furniture.Family} {string.Join(' ', FurnitureUsagesFor(furniture))} {tags}", 0.95d);
         yield return new CatalogSearchField($"{string.Join(' ', furniture.Universes)} {furniture.Forme}", 0.72d);
-        yield return new CatalogSearchField($"{furniture.PrincipleConstruction} {furniture.TypeAssemblage} {furniture.PositionDos}", 0.72d);
-        yield return new CatalogSearchField(furniture.Description, 0.58d);
+        yield return new CatalogSearchField(string.Join(' ', structure.Where(value => !string.IsNullOrWhiteSpace(value))), 0.86d);
+        yield return new CatalogSearchField($"{furniture.Description} {furniture.UseCasesCsv} {furniture.UsageSpecifique}", 0.74d);
+        yield return new CatalogSearchField(string.Join(' ', linkedComponents), 0.82d);
+        yield return new CatalogSearchField($"{furniture.ConceptionDate:dd MM yyyy} {furniture.Status}", 0.62d);
     }
 
     private IEnumerable<string> ClientSearchVocabulary() => Furniture.Where(item => item.Status == RecordStatus.Publiee).SelectMany(item =>
