@@ -19,7 +19,8 @@
     </shell:WindowChrome.WindowChrome>
 
     <Border x:Name="WindowFrame" Background="{StaticResource CanvasBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12">
-        <Grid ClipToBounds="True">
+      <Grid ClipToBounds="True">
+        <Grid Visibility="{Binding IsCatalogPage, Converter={StaticResource InverseBoolVisibility}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding NavigationWidth}"/>
                 <ColumnDefinition Width="*"/>
@@ -109,7 +110,6 @@
                         <views:DashboardView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Dashboard}"/>
                         <views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
                         <views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>
-                        <views:CatalogView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Catalog}"/>
                         <views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}"/>
                         <views:FutureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Future}"/>
                     </Grid>
@@ -120,5 +120,7 @@
                 </Border>
             </Grid>
         </Grid>
+        <views:HorizonShell x:Name="HorizonExperience" Visibility="{Binding IsCatalogPage, Converter={StaticResource BoolVisibility}}"/>
+      </Grid>
     </Border>
 </Window>

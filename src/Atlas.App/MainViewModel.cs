@@ -164,8 +164,10 @@ public sealed class MainViewModel : ObservableObject
         {
             if (!SetProperty(ref _currentPage, value)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
+            OnPropertyChanged(nameof(IsCatalogPage));
         }
     }
+    public bool IsCatalogPage => CurrentPage.Equals("Catalog", StringComparison.OrdinalIgnoreCase);
     public string DashboardNavBackground => NavBackground("Dashboard");
     public string ComponentsNavBackground => NavBackground("Components");
     public string FurnitureNavBackground => NavBackground("Furniture");
