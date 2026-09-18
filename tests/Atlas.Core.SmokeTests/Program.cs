@@ -135,7 +135,14 @@ Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
 Assert(catalogXaml.Contains("RÉFÉRENCE ATLAS") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer la référence et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
+var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");
+Assert(viewModelSource.Contains("ValidateFurnitureReference") && viewModelSource.Contains("exactement 9 chiffres") && viewModelSource.Contains("est déjà utilisée par"), "Une référence meuble modifiée doit rester numérique, unique et explicite en cas de conflit.");
+Assert(viewModelSource.Contains("BuildFurnitureRenamePlan") && viewModelSource.Contains("RollbackFurnitureRenames") && viewModelSource.Contains("File.Move(rename.OldTop, rename.NewTop)"), "Le renommage de référence doit renommer le .TOP de manière réversible.");
+Assert(viewModelSource.Contains("ArchiveFurnitureAsync") && viewModelSource.Contains("RestoreFurnitureAsync") && viewModelSource.Contains("PermanentlyDeleteFurnitureAsync"), "Les meubles publiés doivent pouvoir passer par une corbeille récupérable.");
+Assert(furnitureXaml.Contains("Mettre à la corbeille") && furnitureXaml.Contains("Restaurer") && furnitureXaml.Contains("Supprimer définitivement"), "La Forge doit exposer tout le cycle de vie de la corbeille.");
+Assert(!furnitureXaml.Contains("Fiche directe") && !furnitureXaml.Contains("Famille + variantes"), "Les anciens boutons de mode de création doivent être retirés.");
+Assert(furnitureXaml.Contains("Dupliquer") && furnitureXaml.Contains("Voir dans Horizon") && furnitureXaml.Contains("MODIFICATIONS NON ENREGISTRÉES"), "La fiche meuble doit offrir les raccourcis de contrôle validés.");
 Assert(viewModelSource.Contains("linkedComponents") && viewModelSource.Contains("component.TechnicalName") && viewModelSource.Contains("furniture.NicheOuverte") && viewModelSource.Contains("furniture.UseCasesCsv"), "La recherche Horizon doit couvrir toute la fiche et les composants liés.");
 Assert(viewModelSource.Contains("$\"{SelectedFurniture.Reference}.top\"") && viewModelSource.Contains("File.Copy(sourceTop, targetTop, false)"), "Le fichier TopSolid doit être copié sous la référence Atlas sans écraser l’original.");
 Assert(catalogXaml.Contains("Grid.Column=\"2\"") && catalogXaml.Contains("ItemsSource=\"{Binding ClientFurnitureView}\""), "La collection et la fiche produit doivent partager la hauteur principale d’Horizon.");

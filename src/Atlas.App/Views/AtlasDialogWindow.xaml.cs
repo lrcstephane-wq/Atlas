@@ -8,7 +8,7 @@ public enum AtlasDialogTone { Info, Warning, Error, Confirm }
 
 public partial class AtlasDialogWindow : Window
 {
-    public AtlasDialogWindow(string title, string message, string? detail, AtlasDialogTone tone)
+    public AtlasDialogWindow(string title, string message, string? detail, AtlasDialogTone tone, string? confirmLabel = null, string? cancelLabel = null)
     {
         InitializeComponent();
         TitleText.Text = title;
@@ -17,7 +17,13 @@ public partial class AtlasDialogWindow : Window
         var color = tone switch { AtlasDialogTone.Warning => "#F4B860", AtlasDialogTone.Error => "#F06A88", AtlasDialogTone.Confirm => "#2DD4BF", _ => "#397FF6" };
         ToneBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
         ToneIcon.Text = tone switch { AtlasDialogTone.Warning => "!", AtlasDialogTone.Error => "×", AtlasDialogTone.Confirm => "?", _ => "i" };
-        if (tone == AtlasDialogTone.Confirm) { CancelButton.Visibility = Visibility.Visible; ConfirmButton.Content = "Confirmer"; }
+        if (tone == AtlasDialogTone.Confirm)
+        {
+            CancelButton.Visibility = Visibility.Visible;
+            ConfirmButton.Content = confirmLabel ?? "Confirmer";
+            CancelButton.Content = cancelLabel ?? "Annuler";
+            if (!string.IsNullOrWhiteSpace(cancelLabel)) CancelButton.IsDefault = true;
+        }
     }
 
     private void Confirm_OnClick(object sender, RoutedEventArgs e) { DialogResult = true; Close(); }
@@ -32,9 +38,10 @@ public static class AtlasDialog
     public static void Warning(string message, string title = "Attention", string? detail = null) => Show(title, message, detail, AtlasDialogTone.Warning);
     public static void Error(string message, string title = "Erreur", string? detail = null) => Show(title, message, detail, AtlasDialogTone.Error);
     public static bool Confirm(string message, string title = "Confirmation", string? detail = null) => Show(title, message, detail, AtlasDialogTone.Confirm) == true;
-    private static bool? Show(string title, string message, string? detail, AtlasDialogTone tone)
+    public static bool Choose(string message, string title, string? detail, string confirmLabel, string cancelLabel) => Show(title, message, detail, AtlasDialogTone.Confirm, confirmLabel, cancelLabel) == true;
+    private static bool? Show(string title, string message, string? detail, AtlasDialogTone tone, string? confirmLabel = null, string? cancelLabel = null)
     {
-        var dialog = new AtlasDialogWindow(title, message, detail, tone);
+        var dialog = new AtlasDialogWindow(title, message, detail, tone, confirmLabel, cancelLabel);
         if (Application.Current?.MainWindow is { IsVisible: true } owner) dialog.Owner = owner;
         return dialog.ShowDialog();
     }

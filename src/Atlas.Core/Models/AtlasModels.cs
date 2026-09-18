@@ -17,7 +17,8 @@ public enum RecordStatus
     AControler,
     Validee,
     Retenue,
-    Publiee
+    Publiee,
+    Archivee
 }
 
 [Flags]
@@ -40,7 +41,7 @@ public sealed class UserAccount
     public int PasswordIterations { get; set; } = 180_000;
     public UserPermissions Permissions { get; set; } = UserPermissions.Read;
     public bool IsActive { get; set; } = true;
-    public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? CreatedUtc { get; set; }
     public DateTimeOffset? LastLoginUtc { get; set; }
 
     public bool CanEdit => Permissions.HasFlag(UserPermissions.Edit) || Permissions.HasFlag(UserPermissions.Administer);
@@ -312,6 +313,7 @@ public sealed class FurnitureRecord : BindableModel
     private RecordStatus _status;
     private string _forcedValidationReason = string.Empty;
     private bool _isPublicationReviewed;
+    private RecordStatus _statusBeforeArchive = RecordStatus.Brouillon;
 
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public bool IsDemo { get; set; }
@@ -373,6 +375,13 @@ public sealed class FurnitureRecord : BindableModel
     public List<string> RemovedInheritedTagIds { get; set; } = [];
     public string ValidatedBy { get; set; } = string.Empty;
     public DateTimeOffset? ValidatedUtc { get; set; }
+    public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTimeOffset? ModifiedUtc { get; set; }
+    public string ModifiedBy { get; set; } = string.Empty;
+    public RecordStatus StatusBeforeArchive { get => _statusBeforeArchive; set => Set(ref _statusBeforeArchive, value); }
+    public DateTimeOffset? ArchivedUtc { get; set; }
+    public string ArchivedBy { get; set; } = string.Empty;
 }
 
 public sealed class FurnitureComponentLine : BindableModel

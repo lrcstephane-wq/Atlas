@@ -39,6 +39,7 @@ public sealed class StatusLabelConverter : IValueConverter
         "AControler" => "À contrôler",
         "Validee" => "Validée",
         "Publiee" => "Publiée",
+        "Archivee" => "Archivée",
         _ => value?.ToString() ?? string.Empty
     };
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;

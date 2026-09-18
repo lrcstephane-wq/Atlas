@@ -8,7 +8,7 @@
   <Border Background="{StaticResource SurfaceGradient}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="14" Padding="20,16">
    <Grid>
     <StackPanel><TextBlock Text="FORGE / MEUBLES" Style="{StaticResource Eyebrow}"/><TextBlock Text="Composer sans perdre le fil" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/><TextBlock Text="La composition réelle pilote automatiquement les familles et les tags du meuble." Style="{StaticResource Caption}" Margin="0,3,0,0"/></StackPanel>
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Content="Fiche directe" Style="{StaticResource GhostButton}" Command="{Binding SetCreationModeCommand}" CommandParameter="Quick"/><Button Content="Famille + variantes" Style="{StaticResource GhostButton}" Command="{Binding SetCreationModeCommand}" CommandParameter="Family" Margin="8,0,0,0"/><Button Content="+  Nouveau meuble" Command="{Binding CreateFurnitureCommand}" Margin="10,0,0,0"/></StackPanel>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Content="Dupliquer" Style="{StaticResource GhostButton}" Command="{Binding DuplicateFurnitureCommand}"/><Button Content="+  Nouveau meuble" Command="{Binding CreateFurnitureCommand}" Margin="10,0,0,0"/></StackPanel>
    </Grid>
   </Border>
   <Grid Grid.Row="2">
@@ -65,6 +65,7 @@
 <StackPanel HorizontalAlignment="Right">
 <TextBlock Text="{Binding SelectedFurniture.Reference}" FontWeight="Bold" HorizontalAlignment="Right"/>
 <TextBlock Text="{Binding SelectedFurniture.Status, Converter={StaticResource StatusLabel}}" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
+<TextBlock Text="MODIFICATIONS NON ENREGISTRÉES" Foreground="{StaticResource AmberBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,3,0,0" Visibility="{Binding HasUnsavedFurnitureChanges, Converter={StaticResource BoolVisibility}}"/>
 </StackPanel>
 </Grid>
 </Border>
@@ -106,8 +107,8 @@
 <TextBlock Text="01 / IDENTITÉ" Style="{StaticResource Eyebrow}"/>
 <TextBlock Text="Le meuble et son fichier" Style="{StaticResource SectionTitle}" Margin="0,5,0,18"/>
 <TextBlock Text="Référence interne" Style="{StaticResource FieldLabel}"/>
-<TextBox Text="{Binding SelectedFurniture.Reference}" IsReadOnly="True" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource CyanBrush}"/>
-<TextBlock Text="Identifiant Atlas unique attribué automatiquement. Le fichier .TOP associé sera copié sous ce nom." Style="{StaticResource Caption}" Margin="0,5,0,0"/>
+<TextBox Text="{Binding SelectedFurniture.Reference, UpdateSourceTrigger=PropertyChanged}" MaxLength="9" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource CyanBrush}"/>
+<TextBlock Text="Identifiant Atlas unique sur 9 chiffres. En cas de modification, le fichier .TOP associé sera renommé lors de l’enregistrement." Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"/>
 <TextBlock Text="Nom affiché au client" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>
 <TextBox Text="{Binding SelectedFurniture.DisplayName, UpdateSourceTrigger=PropertyChanged}"/>
 <TextBlock Text="Date de conception" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>
@@ -135,6 +136,7 @@
 <Button Grid.Column="2" Content="Ouvrir le dossier" Style="{StaticResource GhostButton}" Command="{Binding OpenFurnitureFolderCommand}" Margin="7,0,0,0"/>
 </Grid>
 <TextBlock Text="Atlas ne lit jamais le contenu du .TOP. Il utilise uniquement son emplacement et son image associée." Style="{StaticResource Caption}" Margin="0,9,0,0"/>
+<Border Background="#292319" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,10,0,0"><TextBlock Text="{Binding SelectedFurnitureFileHealth}" Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap"/></Border>
 </StackPanel>
 </Grid>
      <StackPanel Visibility="{Binding CurrentFurnitureStep, Converter={StaticResource PageVisibility}, ConverterParameter=Classification}">
@@ -343,13 +345,20 @@
 </Border>
 <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="{StaticResource PreviewBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Height="180"><Image Source="{Binding FurniturePreview}" Stretch="Uniform" Margin="8"/></Border><StackPanel Grid.Column="2"><TextBlock Text="Fichier .TOP" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding SelectedFurniture.SourceRelativePath}" TextWrapping="Wrap"/><Button Content="Ouvrir le dossier" Style="{StaticResource GhostButton}" Command="{Binding OpenFurnitureFolderCommand}" HorizontalAlignment="Left" Margin="0,10,0,0"/><TextBlock Text="{Binding CharacteristicWarnings}" Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel></Grid>
 <Border Background="#0E2D39" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="10" Padding="15" Margin="0,16,0,0"><CheckBox IsChecked="{Binding SelectedFurniture.IsPublicationReviewed}"><TextBlock Text="J’ai contrôlé l’identité, le classement, la composition et la structure de ce meuble." TextWrapping="Wrap" FontWeight="SemiBold"/></CheckBox></Border>
+<Border Style="{StaticResource RaisedCard}" Margin="0,16,0,0"><StackPanel><TextBlock Text="ÉTAT DE LA FICHE" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding FurnitureMissingFieldsSummary}" TextWrapping="Wrap" Margin="0,7,0,0"/><TextBlock Text="HISTORIQUE" Style="{StaticResource Eyebrow}" Margin="0,14,0,0"/><TextBlock Text="{Binding SelectedFurnitureHistory}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel></Border>
 </StackPanel>
     </Grid>
 </ScrollViewer>
     <Border Grid.Row="3" Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,13,13" Padding="16,11">
 <Grid>
-<TextBlock Text="La publication reste toujours une décision humaine." Style="{StaticResource Caption}" VerticalAlignment="Center"/>
-<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+<Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+<Button Content="Mettre à la corbeille" Style="{StaticResource GhostButton}" Command="{Binding ArchiveFurnitureCommand}" Visibility="{Binding IsSelectedFurnitureArchived, Converter={StaticResource InverseBoolVisibility}}"/>
+<Button Content="Restaurer" Style="{StaticResource GhostButton}" Command="{Binding RestoreFurnitureCommand}" Visibility="{Binding IsSelectedFurnitureArchived, Converter={StaticResource BoolVisibility}}"/>
+<Button Content="Supprimer définitivement" Style="{StaticResource GhostButton}" Foreground="{StaticResource RoseBrush}" Command="{Binding PermanentlyDeleteFurnitureCommand}" Margin="8,0,0,0" Visibility="{Binding IsSelectedFurnitureArchived, Converter={StaticResource BoolVisibility}}"/>
+</StackPanel>
+<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+<Button Content="Voir dans Horizon" Style="{StaticResource GhostButton}" Command="{Binding ViewFurnitureInHorizonCommand}"/>
 <Button Content="Précédent" Style="{StaticResource GhostButton}" Command="{Binding PreviousFurnitureStepCommand}"/>
 <Button Content="Enregistrer le brouillon" Style="{StaticResource GhostButton}" Command="{Binding SaveCommand}" Margin="8,0,0,0"/>
 <Button Content="Suivant" Command="{Binding NextFurnitureStepCommand}" Margin="8,0,0,0"/>
