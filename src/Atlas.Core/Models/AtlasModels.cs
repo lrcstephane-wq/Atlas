@@ -68,11 +68,13 @@ public sealed class WorkspaceSettings : BindableModel
 {
     private CatalogEnvironment _environment;
     private string _libraryRoot = string.Empty;
+    private string _furnitureRoot = string.Empty;
     private bool _autoUpdate = true;
     private bool _searchDictionaryInitialized;
 
     public CatalogEnvironment Environment { get => _environment; set => Set(ref _environment, value); }
     public string LibraryRoot { get => _libraryRoot; set => Set(ref _libraryRoot, value); }
+    public string FurnitureRoot { get => _furnitureRoot; set => Set(ref _furnitureRoot, value); }
     public bool AutoUpdate { get => _autoUpdate; set => Set(ref _autoUpdate, value); }
     public bool SearchDictionaryInitialized { get => _searchDictionaryInitialized; set => Set(ref _searchDictionaryInitialized, value); }
     public List<SearchSynonymRecord> SearchSynonyms { get; set; } = [];
