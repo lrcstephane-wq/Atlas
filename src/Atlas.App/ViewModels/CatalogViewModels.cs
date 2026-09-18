@@ -47,6 +47,7 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
         Record.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(ComponentRecord.DisplayName)) { OnPropertyChanged(nameof(Name)); OnPropertyChanged(nameof(DetailedName)); }
+            if (args.PropertyName == nameof(ComponentRecord.TechnicalName)) { OnPropertyChanged(nameof(TechnicalName)); OnPropertyChanged(nameof(DetailedName)); }
             if (args.PropertyName is nameof(ComponentRecord.FamilyName) or nameof(ComponentRecord.AtlasFamilyNameOverride))
             {
                 OnPropertyChanged(nameof(Family));
@@ -100,16 +101,18 @@ public sealed class ComponentCardViewModel : INotifyPropertyChanged
 
 public sealed class FurnitureCardViewModel : INotifyPropertyChanged
 {
-    private readonly string _libraryRoot;
+    private readonly string _furnitureRoot;
+    private readonly string _fallbackRoot;
     private bool _thumbnailLoaded;
     private bool _isChosen;
     private double _searchScore;
     private BitmapImage? _thumbnail;
 
-    public FurnitureCardViewModel(FurnitureRecord record, string libraryRoot)
+    public FurnitureCardViewModel(FurnitureRecord record, string furnitureRoot, string? fallbackRoot = null)
     {
         Record = record;
-        _libraryRoot = libraryRoot;
+        _furnitureRoot = furnitureRoot;
+        _fallbackRoot = fallbackRoot ?? furnitureRoot;
     }
 
     public FurnitureRecord Record { get; }
@@ -147,7 +150,8 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
             if (_thumbnailLoaded) return _thumbnail;
             _thumbnailLoaded = true;
             if (string.IsNullOrWhiteSpace(Record.ImageRelativePath)) return null;
-            var path = Path.Combine(_libraryRoot, Record.ImageRelativePath);
+            var path = Path.IsPathRooted(Record.ImageRelativePath) ? Record.ImageRelativePath : Path.Combine(_furnitureRoot, Record.ImageRelativePath);
+            if (!File.Exists(path) && !_fallbackRoot.Equals(_furnitureRoot, StringComparison.OrdinalIgnoreCase)) path = Path.Combine(_fallbackRoot, Record.ImageRelativePath);
             if (!File.Exists(path)) return null;
             try
             {
