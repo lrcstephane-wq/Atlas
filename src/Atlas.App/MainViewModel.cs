@@ -43,6 +43,8 @@ public sealed class MainViewModel : ObservableObject
     private IReadOnlyList<string> _topSolidBridgeFiles = Array.Empty<string>();
     private BitmapImage? _furniturePreview;
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
+    private readonly HashSet<string> _dirtyFurnitureIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _persistedFurnitureReferences = new(StringComparer.OrdinalIgnoreCase);
 
     public MainViewModel(SharedCatalogStore store, UserAccountStore userStore, LocalBootstrap bootstrap, UserAccount currentUser)
     {
@@ -74,6 +76,11 @@ public sealed class MainViewModel : ObservableObject
         PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => ClientSelectionCount > 0 && !IsBusy);
         OpenTopSolidBridgeFolderCommand = new(_ => OpenTopSolidBridgeFolder(), _ => IsTopSolidBridgeReady && Directory.Exists(TopSolidBridgeFolder));
         CreateFurnitureCommand = new(_ => CreateFurniture(), _ => CanEdit);
+        DuplicateFurnitureCommand = new(_ => DuplicateFurniture(), _ => CanEdit && SelectedFurniture is not null && SelectedFurniture.Status != RecordStatus.Archivee);
+        ArchiveFurnitureCommand = new(_ => _ = ArchiveFurnitureAsync(), _ => CanEdit && SelectedFurniture is not null && SelectedFurniture.Status != RecordStatus.Archivee && !IsBusy);
+        RestoreFurnitureCommand = new(_ => _ = RestoreFurnitureAsync(), _ => CanEdit && SelectedFurniture?.Status == RecordStatus.Archivee && !IsBusy);
+        PermanentlyDeleteFurnitureCommand = new(_ => _ = PermanentlyDeleteFurnitureAsync(), _ => CanEdit && SelectedFurniture?.Status == RecordStatus.Archivee && !IsBusy);
+        ViewFurnitureInHorizonCommand = new(_ => ViewFurnitureInHorizon(), _ => SelectedFurniture?.Status == RecordStatus.Publiee);
         CreateFamilyCommand = new(_ => CreateFamily(), _ => CanEdit);
         SetCreationModeCommand = new(value => CreationMode = value?.ToString() ?? "Quick");
         NavigateFurnitureStepCommand = new(value => CurrentFurnitureStep = value?.ToString() ?? "Identity");
@@ -131,7 +138,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<string> ClientTypeOptions { get; } = ["Tous les types"];
     public ObservableCollection<string> ClientFamilyOptions { get; } = ["Toutes les familles"];
     public ObservableCollection<string> ClientTagOptions { get; } = ["Tous les tags"];
-    public IReadOnlyList<string> FurnitureStatusOptions { get; } = ["Tous les statuts", "Brouillon", "À contrôler", "Validée", "Retenue", "Publiée"];
+    public IReadOnlyList<string> FurnitureStatusOptions { get; } = ["Tous les statuts", "Brouillon", "À contrôler", "Validée", "Retenue", "Publiée", "Archivée"];
     public ICollectionView ComponentView { get; }
     public ICollectionView FurnitureView { get; }
     public ICollectionView ClientFurnitureView { get; }
@@ -235,6 +242,42 @@ public sealed class MainViewModel : ObservableObject
     public int MarkedCompositionLineCount => _selectedCompositionLines.Count;
     public string RemoveCompositionLabel => MarkedCompositionLineCount == 0 ? "Sélectionnez une ou plusieurs lignes" : $"Retirer la sélection ({MarkedCompositionLineCount})";
     public int VisibleFurnitureCount => FurnitureView.Cast<object>().Count();
+    public bool IsSelectedFurnitureArchived => SelectedFurniture?.Status == RecordStatus.Archivee;
+    public bool HasUnsavedFurnitureChanges => SelectedFurniture is not null && _dirtyFurnitureIds.Contains(SelectedFurniture.Id);
+    public bool IsSelectedFurnitureTopMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath) || !File.Exists(ResolveLibraryPath(SelectedFurniture.SourceRelativePath)));
+    public bool IsSelectedFurnitureImageMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.ImageRelativePath) || !File.Exists(ResolveLibraryPath(SelectedFurniture.ImageRelativePath)));
+    public string SelectedFurnitureFileHealth => SelectedFurniture is null ? string.Empty : string.Join(" · ", new[]
+    {
+        IsSelectedFurnitureTopMissing ? "Fichier .TOP absent ou introuvable" : "Fichier .TOP disponible",
+        IsSelectedFurnitureImageMissing ? "Image absente ou introuvable" : "Image disponible"
+    });
+    public string FurnitureMissingFieldsSummary
+    {
+        get
+        {
+            if (SelectedFurniture is null) return string.Empty;
+            var missing = new List<string>();
+            if (string.IsNullOrWhiteSpace(SelectedFurniture.DisplayName)) missing.Add("nom client");
+            if (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath) || IsSelectedFurnitureTopMissing) missing.Add("fichier .TOP");
+            if (SelectedFurniture.Universes.Count == 0) missing.Add("univers");
+            if (string.IsNullOrWhiteSpace(SelectedFurniture.TypeMeuble)) missing.Add("type de meuble");
+            if (SelectedFurniture.ComponentLines.Count == 0) missing.Add("composition");
+            return missing.Count == 0 ? "La fiche contient tous les éléments obligatoires." : "À compléter avant publication : " + string.Join(", ", missing) + ".";
+        }
+    }
+    public string SelectedFurnitureHistory
+    {
+        get
+        {
+            if (SelectedFurniture is null) return string.Empty;
+            var createdBy = string.IsNullOrWhiteSpace(SelectedFurniture.CreatedBy) ? "auteur inconnu" : SelectedFurniture.CreatedBy;
+            var lines = new List<string> { SelectedFurniture.CreatedUtc is { } created ? $"Créée le {created.LocalDateTime:g} par {createdBy}" : "Date de création non disponible (fiche historique)" };
+            if (SelectedFurniture.ModifiedUtc is { } modified) lines.Add($"Dernière modification le {modified.LocalDateTime:g} par {SelectedFurniture.ModifiedBy}");
+            if (SelectedFurniture.ValidatedUtc is { } published) lines.Add($"Publiée le {published.LocalDateTime:g} par {SelectedFurniture.ValidatedBy}");
+            if (SelectedFurniture.ArchivedUtc is { } archived) lines.Add($"Archivée le {archived.LocalDateTime:g} par {SelectedFurniture.ArchivedBy}");
+            return string.Join(Environment.NewLine, lines);
+        }
+    }
     public string CreationMode { get => _creationMode; set { if (SetProperty(ref _creationMode, value)) OnPropertyChanged(nameof(IsFamilyMode)); } }
     public string NewUniverseName { get => _newUniverseName; set { if (SetProperty(ref _newUniverseName, value)) AddUniverseCommand.RaiseCanExecuteChanged(); } }
     public LibraryFilterViewModel? SelectedLibraryFilter
@@ -260,6 +303,7 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _selectedFurniture, value)) return;
             if (_selectedFurniture is not null) _selectedFurniture.PropertyChanged += SelectedFurnitureOnPropertyChanged;
             RefreshLinkedComponents(); RebuildUniverseOptions(); RebuildUsageOptions(); LoadFurniturePreview(); RaiseCommandStates();
+            NotifySelectedFurnitureState();
         }
     }
     public ComponentRecord? SelectedCompositionCandidate { get => _selectedCompositionCandidate; set { if (SetProperty(ref _selectedCompositionCandidate, value)) RaiseCommandStates(); } }
@@ -306,6 +350,11 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand PrepareTopSolidBridgeCommand { get; }
     public RelayCommand OpenTopSolidBridgeFolderCommand { get; }
     public RelayCommand CreateFurnitureCommand { get; }
+    public RelayCommand DuplicateFurnitureCommand { get; }
+    public RelayCommand ArchiveFurnitureCommand { get; }
+    public RelayCommand RestoreFurnitureCommand { get; }
+    public RelayCommand PermanentlyDeleteFurnitureCommand { get; }
+    public RelayCommand ViewFurnitureInHorizonCommand { get; }
     public RelayCommand CreateFamilyCommand { get; }
     public RelayCommand SetCreationModeCommand { get; }
     public RelayCommand NavigateFurnitureStepCommand { get; }
@@ -353,6 +402,9 @@ public sealed class MainViewModel : ObservableObject
             _catalog = await _store.LoadAsync(); _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot); NormalizeCatalog();
             Components.Clear(); foreach (var item in _catalog.Components) Components.Add(item);
             Furniture.Clear(); foreach (var item in _catalog.Furniture) Furniture.Add(item);
+            _persistedFurnitureReferences.Clear();
+            foreach (var item in Furniture) _persistedFurnitureReferences[item.Id] = item.Reference;
+            _dirtyFurnitureIds.Clear();
             FurnitureFamilies.Clear(); foreach (var item in _catalog.FurnitureFamilies) FurnitureFamilies.Add(item);
             RebuildComponentCards(); RebuildClientCards();
             SelectedComponentCard = ComponentCards.FirstOrDefault(); SelectedFurniture = Furniture.FirstOrDefault(); SelectedFurnitureFamily = FurnitureFamilies.FirstOrDefault();
@@ -396,21 +448,35 @@ public sealed class MainViewModel : ObservableObject
                 item.Usages.AddRange(item.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             item.ConceptionDate ??= DateTime.Today;
         }
-        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 6);
+        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 7);
     }
 
     private async Task<bool> SaveAsync()
     {
+        if (!ValidateChangedFurnitureReferences()) return false;
         IsBusy = true;
+        var renames = new List<FurnitureFileRename>();
         try
         {
+            renames = BuildFurnitureRenamePlan();
+            ApplyFurnitureRenames(renames);
+            var now = DateTimeOffset.UtcNow;
+            foreach (var item in Furniture.Where(item => _dirtyFurnitureIds.Contains(item.Id)))
+            {
+                item.ModifiedBy = CurrentUser.DisplayName;
+                item.ModifiedUtc = now;
+            }
             _catalog.Components = Components.ToList(); _catalog.Furniture = Furniture.ToList(); _catalog.FurnitureFamilies = FurnitureFamilies.ToList();
             NormalizeUniverseDefinitions();
             await _store.SaveAsync(_catalog, _catalog.Revision, CurrentUser.DisplayName); StatusText = $"Enregistré · révision {_catalog.Revision}"; NotifySummary();
+            _persistedFurnitureReferences.Clear();
+            foreach (var item in Furniture) _persistedFurnitureReferences[item.Id] = item.Reference;
+            _dirtyFurnitureIds.Clear();
+            NotifySelectedFurnitureState();
             return true;
         }
-        catch (CatalogConcurrencyException exception) { AtlasDialog.Warning(exception.Message, "Modification concurrente"); return false; }
-        catch (Exception exception) { ShowError(exception); return false; }
+        catch (CatalogConcurrencyException exception) { RollbackFurnitureRenames(renames); AtlasDialog.Warning(exception.Message, "Modification concurrente"); return false; }
+        catch (Exception exception) { RollbackFurnitureRenames(renames); ShowError(exception); return false; }
         finally { IsBusy = false; }
     }
 
@@ -929,9 +995,36 @@ public sealed class MainViewModel : ObservableObject
         {
             Reference = NextFurnitureReference(), DisplayName = family is null ? "Nouveau meuble" : $"{family.Name} · nouvelle variante",
             Family = family?.Name ?? "", FamilyId = family?.Id ?? "", Description = family?.Description ?? "", TypeMeuble = family?.TypeMeuble ?? "", UsageSpecifique = family?.UsageSpecifique ?? "", Forme = family?.Forme ?? "Droit",
-            Universes = family?.Universes.ToList() ?? [], Usages = string.IsNullOrWhiteSpace(family?.UsageSpecifique) ? [] : [family.UsageSpecifique], ConceptionDate = DateTime.Today, Status = RecordStatus.Brouillon
+            Universes = family?.Universes.ToList() ?? [], Usages = string.IsNullOrWhiteSpace(family?.UsageSpecifique) ? [] : [family.UsageSpecifique], ConceptionDate = DateTime.Today, Status = RecordStatus.Brouillon,
+            CreatedBy = CurrentUser.DisplayName, CreatedUtc = DateTimeOffset.UtcNow
         };
-        Furniture.Add(item); SelectedFurniture = item; FurnitureView.Refresh(); RebuildClientCards(); CurrentPage = "Furniture"; CurrentFurnitureStep = "Identity"; NotifySummary();
+        Furniture.Add(item); _dirtyFurnitureIds.Add(item.Id); SelectedFurniture = item; FurnitureView.Refresh(); RebuildClientCards(); CurrentPage = "Furniture"; CurrentFurnitureStep = "Identity"; NotifySummary(); NotifySelectedFurnitureState();
+    }
+
+    private void DuplicateFurniture()
+    {
+        if (SelectedFurniture is null) return;
+        var source = SelectedFurniture;
+        var item = new FurnitureRecord
+        {
+            Reference = NextFurnitureReference(), DisplayName = $"{source.DisplayName} · copie", Family = source.Family, FamilyId = source.FamilyId,
+            Description = source.Description, UseCasesCsv = source.UseCasesCsv, PrincipleConstruction = source.PrincipleConstruction,
+            SensMontage = source.SensMontage, TypeMeuble = source.TypeMeuble, UsageSpecifique = source.UsageSpecifique,
+            Forme = source.Forme, PositionDos = source.PositionDos, TypeAssemblage = source.TypeAssemblage,
+            ConceptionDate = DateTime.Today, SeparationHorizontale = source.SeparationHorizontale, SeparationVerticale = source.SeparationVerticale,
+            Porte = source.Porte, Tiroir = source.Tiroir, TiroirAnglaise = source.TiroirAnglaise, Abattant = source.Abattant,
+            Relevant = source.Relevant, Rayon = source.Rayon, Penderie = source.Penderie, NicheOuverte = source.NicheOuverte,
+            TypologiePorte = source.TypologiePorte, TypologieTiroir = source.TypologieTiroir, TypologieAbattant = source.TypologieAbattant,
+            TypologieRelevant = source.TypologieRelevant, NombrePortes = source.NombrePortes, NombreTiroirs = source.NombreTiroirs,
+            NombreTiroirsAnglaise = source.NombreTiroirsAnglaise, NombreAbattants = source.NombreAbattants,
+            NombreRelevants = source.NombreRelevants, NombreRayons = source.NombreRayons, NombreNichesOuvertes = source.NombreNichesOuvertes,
+            Universes = source.Universes.ToList(), Usages = source.Usages.ToList(), ComponentLines = source.ComponentLines.Select(line => new FurnitureComponentLine { ComponentId = line.ComponentId, Quantity = line.Quantity }).ToList(),
+            AddedTagIds = source.AddedTagIds.ToList(), RemovedInheritedTagIds = source.RemovedInheritedTagIds.ToList(), Status = RecordStatus.Brouillon,
+            CreatedBy = CurrentUser.DisplayName, CreatedUtc = DateTimeOffset.UtcNow
+        };
+        SyncLegacyComponentIds(item);
+        Furniture.Add(item); _dirtyFurnitureIds.Add(item.Id); SelectedFurniture = item; FurnitureView.Refresh(); CurrentFurnitureStep = "Identity"; NotifySummary(); NotifySelectedFurnitureState();
+        StatusText = $"Copie créée sous la référence {item.Reference}. Associez son fichier .TOP avant publication.";
     }
 
     private string NextFurnitureReference()
@@ -980,6 +1073,7 @@ public sealed class MainViewModel : ObservableObject
         else if (!option.IsSelected && existing is not null) SelectedFurniture.Usages.Remove(existing);
         SelectedFurniture.UsageSpecifique = string.Join(", ", SelectedFurniture.Usages);
         InvalidatePublicationReview();
+        MarkSelectedFurnitureDirty();
     }
 
     public async Task ReloadTaxonomyAsync()
@@ -1017,6 +1111,7 @@ public sealed class MainViewModel : ObservableObject
         if (!selected && inherited) SelectedFurniture.RemovedInheritedTagIds.Add(tag.Id);
         OnPropertyChanged(nameof(InheritedTags));
         StatusText = "Tags du meuble modifiés. Pensez à enregistrer.";
+        MarkSelectedFurnitureDirty();
     }
 
     private void ToggleUniverse(ToggleOptionViewModel option)
@@ -1025,6 +1120,7 @@ public sealed class MainViewModel : ObservableObject
         var existing = SelectedFurniture.Universes.FirstOrDefault(value => value.Equals(option.Label, StringComparison.OrdinalIgnoreCase));
         if (option.IsSelected && existing is null) SelectedFurniture.Universes.Add(option.Label); else if (!option.IsSelected && existing is not null) SelectedFurniture.Universes.Remove(existing);
         InvalidatePublicationReview();
+        MarkSelectedFurnitureDirty();
         RebuildClientCards();
     }
 
@@ -1073,6 +1169,7 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedFurniture is null || SelectedCompositionCandidate is null) return;
         AddOrIncrementComponent(SelectedCompositionCandidate.Id);
         InvalidatePublicationReview();
+        MarkSelectedFurnitureDirty();
         RefreshLinkedComponents();
     }
 
@@ -1087,6 +1184,7 @@ public sealed class MainViewModel : ObservableObject
             added++;
         }
         InvalidatePublicationReview();
+        MarkSelectedFurnitureDirty();
         RefreshLinkedComponents(); StatusText = $"{added} composant(s) ajouté(s) à la composition. Une référence déjà présente voit sa quantité augmenter.";
     }
 
@@ -1096,6 +1194,7 @@ public sealed class MainViewModel : ObservableObject
         var line = SelectedFurniture.ComponentLines.FirstOrDefault(x => x.ComponentId == SelectedLinkedComponent.Id);
         if (line is not null) SelectedFurniture.ComponentLines.Remove(line);
         InvalidatePublicationReview();
+        MarkSelectedFurnitureDirty();
         RefreshLinkedComponents();
     }
 
@@ -1116,12 +1215,77 @@ public sealed class MainViewModel : ObservableObject
         foreach (var line in selected) SelectedFurniture.ComponentLines.Remove(line.Line);
         InvalidatePublicationReview();
         RefreshLinkedComponents();
+        MarkSelectedFurnitureDirty();
+    }
+
+    private async Task ArchiveFurnitureAsync()
+    {
+        if (SelectedFurniture is null) return;
+        var item = SelectedFurniture;
+        if (!AtlasDialog.Confirm($"Placer « {item.DisplayName} » dans la corbeille ?", "Supprimer le meuble", "Il disparaîtra immédiatement de la Forge et d’Horizon, mais pourra être restauré.")) return;
+        var previousStatus = item.Status;
+        item.StatusBeforeArchive = previousStatus;
+        item.Status = RecordStatus.Archivee;
+        item.ArchivedBy = CurrentUser.DisplayName;
+        item.ArchivedUtc = DateTimeOffset.UtcNow;
+        MarkSelectedFurnitureDirty();
+        if (!await SaveAsync())
+        {
+            item.Status = previousStatus; item.ArchivedBy = string.Empty; item.ArchivedUtc = null;
+            return;
+        }
+        RebuildClientCards(); FurnitureView.Refresh(); SelectedFurniture = FurnitureView.Cast<FurnitureRecord>().FirstOrDefault();
+        StatusText = $"« {item.DisplayName} » a été placé dans la corbeille.";
+    }
+
+    private async Task RestoreFurnitureAsync()
+    {
+        if (SelectedFurniture?.Status != RecordStatus.Archivee) return;
+        var item = SelectedFurniture;
+        var archivedUtc = item.ArchivedUtc; var archivedBy = item.ArchivedBy;
+        item.Status = item.StatusBeforeArchive == RecordStatus.Archivee ? RecordStatus.Brouillon : item.StatusBeforeArchive;
+        item.ArchivedUtc = null; item.ArchivedBy = string.Empty;
+        MarkSelectedFurnitureDirty();
+        if (!await SaveAsync())
+        {
+            item.Status = RecordStatus.Archivee; item.ArchivedUtc = archivedUtc; item.ArchivedBy = archivedBy;
+            return;
+        }
+        RebuildClientCards(); FurnitureView.Refresh(); SelectedFurniture = FurnitureView.Cast<FurnitureRecord>().FirstOrDefault();
+        StatusText = $"« {item.DisplayName} » a été restauré.";
+    }
+
+    private async Task PermanentlyDeleteFurnitureAsync()
+    {
+        if (SelectedFurniture?.Status != RecordStatus.Archivee) return;
+        var item = SelectedFurniture;
+        if (!AtlasDialog.Confirm($"Supprimer définitivement « {item.DisplayName} » ?", "Vider la corbeille", "La fiche ne pourra plus être restaurée. Le fichier .TOP sera conservé par défaut.")) return;
+        var deleteFiles = AtlasDialog.Choose("Que faire de la copie .TOP et de son image ?", "Fichiers associés", "La conservation est le choix recommandé par défaut.", "Supprimer les fichiers", "Conserver les fichiers");
+        var index = Furniture.IndexOf(item);
+        Furniture.Remove(item); _dirtyFurnitureIds.Remove(item.Id);
+        if (!await SaveAsync())
+        {
+            Furniture.Insert(Math.Clamp(index, 0, Furniture.Count), item); FurnitureView.Refresh(); SelectedFurniture = item;
+            return;
+        }
+        _persistedFurnitureReferences.Remove(item.Id);
+        if (deleteFiles) DeleteAssociatedFurnitureFiles(item);
+        RebuildClientCards(); FurnitureView.Refresh(); SelectedFurniture = FurnitureView.Cast<FurnitureRecord>().FirstOrDefault(); NotifySummary();
+        StatusText = deleteFiles ? "Fiche et fichiers associés supprimés définitivement." : "Fiche supprimée définitivement. Les fichiers associés ont été conservés.";
+    }
+
+    private void ViewFurnitureInHorizon()
+    {
+        if (SelectedFurniture?.Status != RecordStatus.Publiee) return;
+        RebuildClientCards();
+        SelectedClientFurnitureCard = ClientFurnitureCards.FirstOrDefault(card => card.Record.Id == SelectedFurniture.Id);
+        CurrentPage = "Catalog";
     }
 
     private async Task PublishFurnitureAsync()
     {
         if (SelectedFurniture is null) return;
-        if (Furniture.Any(value => value.Id != SelectedFurniture.Id && string.Equals(value.Reference, SelectedFurniture.Reference, StringComparison.OrdinalIgnoreCase))) { AtlasDialog.Warning("Cette référence Atlas est déjà utilisée par un autre meuble.", "Publication bloquée"); CurrentFurnitureStep = "Identity"; return; }
+        if (!ValidateFurnitureReference(SelectedFurniture, true)) { CurrentFurnitureStep = "Identity"; return; }
         if (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath)) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais il faut lui associer un fichier .TOP avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Identity"; return; }
         if (SelectedFurniture.Universes.Count == 0 || string.IsNullOrWhiteSpace(SelectedFurniture.TypeMeuble)) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais un univers et un type sont obligatoires avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Classification"; return; }
         if (SelectedFurniture.ComponentLines.Count == 0) { AtlasDialog.Warning("Le meuble peut être enregistré en brouillon, mais sa composition ne peut pas être vide avant publication.", "Publication bloquée"); CurrentFurnitureStep = "Composition"; return; }
@@ -1132,6 +1296,7 @@ public sealed class MainViewModel : ObservableObject
         var previousValidator = SelectedFurniture.ValidatedBy;
         var previousValidationDate = SelectedFurniture.ValidatedUtc;
         SelectedFurniture.Status = RecordStatus.Publiee; SelectedFurniture.ValidatedBy = CurrentUser.DisplayName; SelectedFurniture.ValidatedUtc = DateTimeOffset.UtcNow;
+        MarkSelectedFurnitureDirty();
         if (!await SaveAsync())
         {
             SelectedFurniture.Status = previousStatus;
@@ -1193,7 +1358,9 @@ public sealed class MainViewModel : ObservableObject
             OpenFurnitureFolderCommand.RaiseCanExecuteChanged();
         }
         if (e.PropertyName is nameof(FurnitureRecord.DisplayName) or nameof(FurnitureRecord.Reference) or nameof(FurnitureRecord.Status)) RefreshFurnitureView();
+        if (sender is FurnitureRecord furniture) _dirtyFurnitureIds.Add(furniture.Id);
         if (e.PropertyName != nameof(FurnitureRecord.IsPublicationReviewed)) InvalidatePublicationReview();
+        NotifySelectedFurnitureState();
     }
 
     private int FurnitureStepIndex => Math.Max(0, FurnitureSteps.ToList().FindIndex(x => x.Key.Equals(CurrentFurnitureStep, StringComparison.OrdinalIgnoreCase)));
@@ -1220,6 +1387,7 @@ public sealed class MainViewModel : ObservableObject
         if (e.PropertyName == nameof(FurnitureCompositionLineViewModel.Quantity))
         {
             InvalidatePublicationReview();
+            MarkSelectedFurnitureDirty();
             OnPropertyChanged(nameof(CompositionTotalQuantity));
         }
     }
@@ -1229,8 +1397,132 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedFurniture is not null && SelectedFurniture.IsPublicationReviewed) SelectedFurniture.IsPublicationReviewed = false;
     }
 
+    private void MarkSelectedFurnitureDirty()
+    {
+        if (SelectedFurniture is null) return;
+        _dirtyFurnitureIds.Add(SelectedFurniture.Id);
+        NotifySelectedFurnitureState();
+    }
+
+    private void NotifySelectedFurnitureState()
+    {
+        OnPropertyChanged(nameof(IsSelectedFurnitureArchived));
+        OnPropertyChanged(nameof(HasUnsavedFurnitureChanges));
+        OnPropertyChanged(nameof(IsSelectedFurnitureTopMissing));
+        OnPropertyChanged(nameof(IsSelectedFurnitureImageMissing));
+        OnPropertyChanged(nameof(SelectedFurnitureFileHealth));
+        OnPropertyChanged(nameof(FurnitureMissingFieldsSummary));
+        OnPropertyChanged(nameof(SelectedFurnitureHistory));
+    }
+
+    private bool ValidateChangedFurnitureReferences()
+    {
+        foreach (var item in Furniture)
+        {
+            if (_persistedFurnitureReferences.TryGetValue(item.Id, out var persisted) && string.Equals(persisted, item.Reference, StringComparison.Ordinal)) continue;
+            if (!ValidateFurnitureReference(item, false)) return false;
+        }
+        return true;
+    }
+
+    private bool ValidateFurnitureReference(FurnitureRecord item, bool publication)
+    {
+        var reference = item.Reference?.Trim() ?? string.Empty;
+        if (reference.Length != 9 || !reference.All(char.IsDigit))
+        {
+            AtlasDialog.Warning("La référence interne doit contenir exactement 9 chiffres.", publication ? "Publication bloquée" : "Enregistrement impossible", "Exemple : 000000008");
+            return false;
+        }
+        var duplicate = Furniture.FirstOrDefault(value => value.Id != item.Id && string.Equals(value.Reference?.Trim(), reference, StringComparison.OrdinalIgnoreCase));
+        if (duplicate is not null)
+        {
+            AtlasDialog.Warning($"La référence {reference} est déjà utilisée par « {duplicate.DisplayName} ».", publication ? "Publication bloquée" : "Enregistrement impossible", "Choisissez une autre référence interne.");
+            return false;
+        }
+        item.Reference = reference;
+        return true;
+    }
+
+    private List<FurnitureFileRename> BuildFurnitureRenamePlan()
+    {
+        var plan = new List<FurnitureFileRename>();
+        foreach (var item in Furniture)
+        {
+            if (!_persistedFurnitureReferences.TryGetValue(item.Id, out var oldReference) || string.Equals(oldReference, item.Reference, StringComparison.Ordinal)) continue;
+            if (string.IsNullOrWhiteSpace(item.SourceRelativePath)) continue;
+            var oldTop = ResolveLibraryPath(item.SourceRelativePath);
+            if (!File.Exists(oldTop)) throw new FileNotFoundException($"Le fichier .TOP associé à « {item.DisplayName} » est introuvable. La référence n’a pas été modifiée.", oldTop);
+            var newTop = Path.Combine(Path.GetDirectoryName(oldTop)!, $"{item.Reference}.top");
+            if (!Path.GetFullPath(oldTop).Equals(Path.GetFullPath(newTop), StringComparison.OrdinalIgnoreCase) && File.Exists(newTop))
+                throw new IOException($"Le fichier {item.Reference}.top existe déjà dans ce dossier.");
+
+            var oldImage = string.IsNullOrWhiteSpace(item.ImageRelativePath) ? string.Empty : ResolveLibraryPath(item.ImageRelativePath);
+            var newImage = oldImage;
+            if (File.Exists(oldImage))
+            {
+                var fileName = Path.GetFileName(oldImage);
+                if (fileName.Equals($"{oldReference}.top.png", StringComparison.OrdinalIgnoreCase)) newImage = Path.Combine(Path.GetDirectoryName(oldImage)!, $"{item.Reference}.top.png");
+                else if (fileName.Equals($"{oldReference}.png", StringComparison.OrdinalIgnoreCase)) newImage = Path.Combine(Path.GetDirectoryName(oldImage)!, $"{item.Reference}.png");
+                if (!Path.GetFullPath(oldImage).Equals(Path.GetFullPath(newImage), StringComparison.OrdinalIgnoreCase) && File.Exists(newImage))
+                    throw new IOException($"L’image {Path.GetFileName(newImage)} existe déjà dans ce dossier.");
+            }
+            plan.Add(new FurnitureFileRename(item, oldTop, newTop, oldImage, newImage, item.SourceRelativePath, item.ImageRelativePath));
+        }
+        return plan;
+    }
+
+    private void ApplyFurnitureRenames(IEnumerable<FurnitureFileRename> plan)
+    {
+        foreach (var rename in plan)
+        {
+            if (!Path.GetFullPath(rename.OldTop).Equals(Path.GetFullPath(rename.NewTop), StringComparison.OrdinalIgnoreCase))
+            {
+                File.Move(rename.OldTop, rename.NewTop); rename.TopMoved = true;
+                rename.Record.SourceRelativePath = MakeLibraryRelative(rename.NewTop);
+            }
+            if (!string.IsNullOrWhiteSpace(rename.OldImage) && File.Exists(rename.OldImage) && !Path.GetFullPath(rename.OldImage).Equals(Path.GetFullPath(rename.NewImage), StringComparison.OrdinalIgnoreCase))
+            {
+                File.Move(rename.OldImage, rename.NewImage); rename.ImageMoved = true;
+                rename.Record.ImageRelativePath = MakeLibraryRelative(rename.NewImage);
+            }
+        }
+    }
+
+    private static void RollbackFurnitureRenames(IEnumerable<FurnitureFileRename> plan)
+    {
+        foreach (var rename in plan.Reverse())
+        {
+            try { if (rename.ImageMoved && File.Exists(rename.NewImage)) File.Move(rename.NewImage, rename.OldImage); } catch { }
+            try { if (rename.TopMoved && File.Exists(rename.NewTop)) File.Move(rename.NewTop, rename.OldTop); } catch { }
+            rename.Record.SourceRelativePath = rename.OldSourcePath;
+            rename.Record.ImageRelativePath = rename.OldImagePath;
+        }
+    }
+
+    private void DeleteAssociatedFurnitureFiles(FurnitureRecord item)
+    {
+        foreach (var path in new[] { item.SourceRelativePath, item.ImageRelativePath }.Where(path => !string.IsNullOrWhiteSpace(path)).Select(ResolveLibraryPath).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try { if (File.Exists(path)) File.Delete(path); }
+            catch (Exception exception) { AtlasDialog.Warning($"La fiche a été supprimée, mais le fichier « {Path.GetFileName(path)} » n’a pas pu être effacé.", "Fichier conservé", exception.Message); }
+        }
+    }
+
     private static void SyncLegacyComponentIds(FurnitureRecord furniture) =>
         furniture.ComponentIds = furniture.ComponentLines.Select(x => x.ComponentId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    private sealed class FurnitureFileRename(FurnitureRecord record, string oldTop, string newTop, string oldImage, string newImage, string oldSourcePath, string oldImagePath)
+    {
+        public FurnitureRecord Record { get; } = record;
+        public string OldTop { get; } = oldTop;
+        public string NewTop { get; } = newTop;
+        public string OldImage { get; } = oldImage;
+        public string NewImage { get; } = newImage;
+        public string OldSourcePath { get; } = oldSourcePath;
+        public string OldImagePath { get; } = oldImagePath;
+        public bool TopMoved { get; set; }
+        public bool ImageMoved { get; set; }
+    }
 
     private string NavBackground(string page) => CurrentPage.Equals(page, StringComparison.OrdinalIgnoreCase) ? "#214E86" : "Transparent";
 
@@ -1332,8 +1624,10 @@ public sealed class MainViewModel : ObservableObject
             "Validée" => RecordStatus.Validee,
             "Retenue" => RecordStatus.Retenue,
             "Publiée" => RecordStatus.Publiee,
+            "Archivée" => RecordStatus.Archivee,
             _ => (RecordStatus?)null
         };
+        if (expectedStatus is null && furniture.Status == RecordStatus.Archivee) return false;
         if (expectedStatus is not null && furniture.Status != expectedStatus) return false;
         if (string.IsNullOrWhiteSpace(FurnitureSearch)) return true;
         var query = FurnitureSearch.Trim(); return new[] { furniture.Reference, furniture.DisplayName, furniture.Family, furniture.Description, furniture.TypeMeuble }.Any(value => value.Contains(query, StringComparison.OrdinalIgnoreCase));
@@ -1421,7 +1715,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand }) command.RaiseCanExecuteChanged();
     }
 
     private sealed class ClientFurnitureSearchComparer(Func<string> query) : System.Collections.IComparer
