@@ -145,9 +145,13 @@ Assert(!furnitureXaml.Contains("Fiche directe") && !furnitureXaml.Contains("Fami
 Assert(furnitureXaml.Contains("Dupliquer") && furnitureXaml.Contains("Voir dans Horizon") && furnitureXaml.Contains("MODIFICATIONS NON ENREGISTRÉES"), "La fiche meuble doit offrir les raccourcis de contrôle validés.");
 Assert(viewModelSource.Contains("linkedComponents") && viewModelSource.Contains("component.TechnicalName") && viewModelSource.Contains("furniture.NicheOuverte") && viewModelSource.Contains("furniture.UseCasesCsv"), "La recherche Horizon doit couvrir toute la fiche et les composants liés.");
 Assert(viewModelSource.Contains("$\"{SelectedFurniture.Reference}.top\"") && viewModelSource.Contains("File.Copy(sourceTop, targetTop, false)"), "Le fichier TopSolid doit être copié sous la référence Atlas sans écraser l’original.");
+Assert(viewModelSource.Contains("Settings.FurnitureRoot") && viewModelSource.Contains("ChooseFurnitureRootCommand") && viewModelSource.Contains("ResolveFurniturePath"), "Les meubles doivent disposer d’un dossier central configurable distinct de la bibliothèque des composants.");
 Assert(catalogXaml.Contains("Grid.Column=\"2\"") && catalogXaml.Contains("ItemsSource=\"{Binding ClientFurnitureView}\""), "La collection et la fiche produit doivent partager la hauteur principale d’Horizon.");
 var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
+Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
+var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));
+Assert(componentsXaml.Contains("Binding DetailedName"), "La Forge doit afficher le libellé complet des composants possédant un code C=.");
 Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");
 
 Console.WriteLine("Atlas.Core : contrôles métier réussis.");
