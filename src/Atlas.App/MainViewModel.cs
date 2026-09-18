@@ -62,6 +62,7 @@ public sealed class MainViewModel : ObservableObject
         ReloadCommand = new(_ => _ = ReloadAsync(), _ => !IsBusy);
         ScanCommand = new(_ => _ = ScanAsync(), _ => CanEdit && !IsBusy);
         ChooseLibraryCommand = new(_ => ChooseLibrary(), _ => CanEdit);
+        ChooseFurnitureRootCommand = new(_ => ChooseFurnitureRoot(), _ => CanEdit);
         ChooseSharedRootCommand = new(_ => ChooseSharedRoot(), _ => IsAdministrator);
         SaveBootstrapCommand = new(_ => _ = SaveBootstrapAsync(), _ => IsAdministrator);
         ValidateComponentCommand = new(_ => ValidateComponent(), _ => CanValidate && SelectedComponent is not null);
@@ -244,8 +245,8 @@ public sealed class MainViewModel : ObservableObject
     public int VisibleFurnitureCount => FurnitureView.Cast<object>().Count();
     public bool IsSelectedFurnitureArchived => SelectedFurniture?.Status == RecordStatus.Archivee;
     public bool HasUnsavedFurnitureChanges => SelectedFurniture is not null && _dirtyFurnitureIds.Contains(SelectedFurniture.Id);
-    public bool IsSelectedFurnitureTopMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath) || !File.Exists(ResolveLibraryPath(SelectedFurniture.SourceRelativePath)));
-    public bool IsSelectedFurnitureImageMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.ImageRelativePath) || !File.Exists(ResolveLibraryPath(SelectedFurniture.ImageRelativePath)));
+    public bool IsSelectedFurnitureTopMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath) || !File.Exists(ResolveFurniturePath(SelectedFurniture.SourceRelativePath)));
+    public bool IsSelectedFurnitureImageMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.ImageRelativePath) || !File.Exists(ResolveFurniturePath(SelectedFurniture.ImageRelativePath)));
     public string SelectedFurnitureFileHealth => SelectedFurniture is null ? string.Empty : string.Join(" · ", new[]
     {
         IsSelectedFurnitureTopMissing ? "Fichier .TOP absent ou introuvable" : "Fichier .TOP disponible",
@@ -336,6 +337,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ReloadCommand { get; }
     public RelayCommand ScanCommand { get; }
     public RelayCommand ChooseLibraryCommand { get; }
+    public RelayCommand ChooseFurnitureRootCommand { get; }
     public RelayCommand ChooseSharedRootCommand { get; }
     public RelayCommand SaveBootstrapCommand { get; }
     public RelayCommand ValidateComponentCommand { get; }
@@ -448,7 +450,7 @@ public sealed class MainViewModel : ObservableObject
                 item.Usages.AddRange(item.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             item.ConceptionDate ??= DateTime.Today;
         }
-        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 7);
+        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 8);
     }
 
     private async Task<bool> SaveAsync()
@@ -561,7 +563,7 @@ public sealed class MainViewModel : ObservableObject
         ClientFurnitureCards.Clear();
         foreach (var item in Furniture)
         {
-            var card = new FurnitureCardViewModel(item, Settings.LibraryRoot);
+            var card = new FurnitureCardViewModel(item, EffectiveFurnitureRoot, Settings.LibraryRoot);
             card.PropertyChanged += ClientFurnitureCardOnPropertyChanged;
             ClientFurnitureCards.Add(card);
         }
@@ -761,7 +763,7 @@ public sealed class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var sourceFiles = selected.Select(card => (card.DisplayName, Path: ResolveLibraryPath(card.Record.SourceRelativePath))).ToArray();
+            var sourceFiles = selected.Select(card => (card.DisplayName, Path: ResolveFurniturePath(card.Record.SourceRelativePath))).ToArray();
             var missing = sourceFiles.Where(item => string.IsNullOrWhiteSpace(item.Path) || !File.Exists(item.Path)).Select(item => item.DisplayName).ToArray();
             if (missing.Length > 0)
             {
@@ -1450,13 +1452,13 @@ public sealed class MainViewModel : ObservableObject
         {
             if (!_persistedFurnitureReferences.TryGetValue(item.Id, out var oldReference) || string.Equals(oldReference, item.Reference, StringComparison.Ordinal)) continue;
             if (string.IsNullOrWhiteSpace(item.SourceRelativePath)) continue;
-            var oldTop = ResolveLibraryPath(item.SourceRelativePath);
+            var oldTop = ResolveFurniturePath(item.SourceRelativePath);
             if (!File.Exists(oldTop)) throw new FileNotFoundException($"Le fichier .TOP associé à « {item.DisplayName} » est introuvable. La référence n’a pas été modifiée.", oldTop);
             var newTop = Path.Combine(Path.GetDirectoryName(oldTop)!, $"{item.Reference}.top");
             if (!Path.GetFullPath(oldTop).Equals(Path.GetFullPath(newTop), StringComparison.OrdinalIgnoreCase) && File.Exists(newTop))
                 throw new IOException($"Le fichier {item.Reference}.top existe déjà dans ce dossier.");
 
-            var oldImage = string.IsNullOrWhiteSpace(item.ImageRelativePath) ? string.Empty : ResolveLibraryPath(item.ImageRelativePath);
+            var oldImage = string.IsNullOrWhiteSpace(item.ImageRelativePath) ? string.Empty : ResolveFurniturePath(item.ImageRelativePath);
             var newImage = oldImage;
             if (File.Exists(oldImage))
             {
@@ -1478,12 +1480,12 @@ public sealed class MainViewModel : ObservableObject
             if (!Path.GetFullPath(rename.OldTop).Equals(Path.GetFullPath(rename.NewTop), StringComparison.OrdinalIgnoreCase))
             {
                 File.Move(rename.OldTop, rename.NewTop); rename.TopMoved = true;
-                rename.Record.SourceRelativePath = MakeLibraryRelative(rename.NewTop);
+                rename.Record.SourceRelativePath = MakeFurnitureRelative(rename.NewTop);
             }
             if (!string.IsNullOrWhiteSpace(rename.OldImage) && File.Exists(rename.OldImage) && !Path.GetFullPath(rename.OldImage).Equals(Path.GetFullPath(rename.NewImage), StringComparison.OrdinalIgnoreCase))
             {
                 File.Move(rename.OldImage, rename.NewImage); rename.ImageMoved = true;
-                rename.Record.ImageRelativePath = MakeLibraryRelative(rename.NewImage);
+                rename.Record.ImageRelativePath = MakeFurnitureRelative(rename.NewImage);
             }
         }
     }
@@ -1501,7 +1503,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void DeleteAssociatedFurnitureFiles(FurnitureRecord item)
     {
-        foreach (var path in new[] { item.SourceRelativePath, item.ImageRelativePath }.Where(path => !string.IsNullOrWhiteSpace(path)).Select(ResolveLibraryPath).Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var path in new[] { item.SourceRelativePath, item.ImageRelativePath }.Where(path => !string.IsNullOrWhiteSpace(path)).Select(ResolveFurniturePath).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             try { if (File.Exists(path)) File.Delete(path); }
             catch (Exception exception) { AtlasDialog.Warning($"La fiche a été supprimée, mais le fichier « {Path.GetFileName(path)} » n’a pas pu être effacé.", "Fichier conservé", exception.Message); }
@@ -1526,17 +1528,23 @@ public sealed class MainViewModel : ObservableObject
 
     private string NavBackground(string page) => CurrentPage.Equals(page, StringComparison.OrdinalIgnoreCase) ? "#214E86" : "Transparent";
 
-    private string ResolveLibraryPath(string path)
+    private string EffectiveFurnitureRoot => string.IsNullOrWhiteSpace(Settings.FurnitureRoot) ? Settings.LibraryRoot : Settings.FurnitureRoot;
+
+    private string ResolveFurniturePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
-        return Path.IsPathRooted(path) ? path : Path.Combine(Settings.LibraryRoot, path);
+        if (Path.IsPathRooted(path)) return path;
+        var preferred = Path.Combine(EffectiveFurnitureRoot, path);
+        if (File.Exists(preferred) || string.IsNullOrWhiteSpace(Settings.LibraryRoot)) return preferred;
+        var legacy = Path.Combine(Settings.LibraryRoot, path);
+        return File.Exists(legacy) ? legacy : preferred;
     }
 
     private void LoadFurniturePreview()
     {
         FurniturePreview = null;
         if (SelectedFurniture is null) return;
-        var imagePath = ResolveLibraryPath(SelectedFurniture.ImageRelativePath);
+        var imagePath = ResolveFurniturePath(SelectedFurniture.ImageRelativePath);
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath)) return;
         try
         {
@@ -1549,19 +1557,22 @@ public sealed class MainViewModel : ObservableObject
     private void ChooseFurnitureTop()
     {
         if (SelectedFurniture is null) return;
+        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) ChooseFurnitureRoot();
+        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) return;
         var dialog = new OpenFileDialog { Title = $"Choisir le fichier TopSolid à enregistrer sous {SelectedFurniture.Reference}.top", Filter = "Fichiers TopSolid (*.top)|*.top|Tous les fichiers (*.*)|*.*", CheckFileExists = true };
-        if (Directory.Exists(Settings.LibraryRoot)) dialog.InitialDirectory = Settings.LibraryRoot;
+        if (Directory.Exists(Settings.FurnitureRoot)) dialog.InitialDirectory = Settings.FurnitureRoot;
         if (dialog.ShowDialog() != true) return;
         try
         {
             var sourceTop = dialog.FileName;
-            var targetTop = Path.Combine(Path.GetDirectoryName(sourceTop)!, $"{SelectedFurniture.Reference}.top");
+            Directory.CreateDirectory(Settings.FurnitureRoot);
+            var targetTop = Path.Combine(Settings.FurnitureRoot, $"{SelectedFurniture.Reference}.top");
             if (!Path.GetFullPath(sourceTop).Equals(Path.GetFullPath(targetTop), StringComparison.OrdinalIgnoreCase))
             {
                 if (File.Exists(targetTop)) throw new IOException($"Le fichier {SelectedFurniture.Reference}.top existe déjà dans ce dossier.");
                 File.Copy(sourceTop, targetTop, false);
             }
-            SelectedFurniture.SourceRelativePath = MakeLibraryRelative(targetTop);
+            SelectedFurniture.SourceRelativePath = MakeFurnitureRelative(targetTop);
             var sourceImage = new[] { sourceTop + ".png", Path.ChangeExtension(sourceTop, ".png") }.FirstOrDefault(File.Exists);
             string? targetImage = null;
             if (sourceImage is not null)
@@ -1569,7 +1580,7 @@ public sealed class MainViewModel : ObservableObject
                 targetImage = targetTop + ".png";
                 if (!Path.GetFullPath(sourceImage).Equals(Path.GetFullPath(targetImage), StringComparison.OrdinalIgnoreCase)) File.Copy(sourceImage, targetImage, false);
             }
-            SelectedFurniture.ImageRelativePath = targetImage is null ? string.Empty : MakeLibraryRelative(targetImage);
+            SelectedFurniture.ImageRelativePath = targetImage is null ? string.Empty : MakeFurnitureRelative(targetImage);
             StatusText = targetImage is null ? $"Copie créée : {SelectedFurniture.Reference}.top. Aucun aperçu trouvé." : $"Meuble et aperçu enregistrés sous la référence {SelectedFurniture.Reference}.";
         }
         catch (Exception exception)
@@ -1578,12 +1589,12 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string MakeLibraryRelative(string path)
+    private string MakeFurnitureRelative(string path)
     {
-        if (string.IsNullOrWhiteSpace(Settings.LibraryRoot)) return path;
+        if (string.IsNullOrWhiteSpace(EffectiveFurnitureRoot)) return path;
         try
         {
-            var relative = Path.GetRelativePath(Settings.LibraryRoot, path);
+            var relative = Path.GetRelativePath(EffectiveFurnitureRoot, path);
             return relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative) ? path : relative;
         }
         catch { return path; }
@@ -1594,7 +1605,7 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedFurniture is null) return;
         try
         {
-            var file = ResolveLibraryPath(SelectedFurniture.SourceRelativePath);
+            var file = ResolveFurniturePath(SelectedFurniture.SourceRelativePath);
             var folder = Path.GetDirectoryName(file);
             if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) { AtlasDialog.Warning("Le dossier du meuble est introuvable.", "Emplacement du meuble"); return; }
             Process.Start(new ProcessStartInfo("explorer.exe", folder) { UseShellExecute = true });
@@ -1670,6 +1681,19 @@ public sealed class MainViewModel : ObservableObject
     {
         var dialog = new OpenFolderDialog { Title = "Choisir la bibliothèque TopSolid", Multiselect = false }; if (Directory.Exists(Settings.LibraryRoot)) dialog.InitialDirectory = Settings.LibraryRoot;
         if (dialog.ShowDialog() == true) { Settings.LibraryRoot = dialog.FolderName; RebuildComponentCards(); RebuildClientCards(); }
+    }
+
+    private void ChooseFurnitureRoot()
+    {
+        var dialog = new OpenFolderDialog { Title = "Choisir le dossier central des meubles TopSolid", Multiselect = false };
+        if (Directory.Exists(Settings.FurnitureRoot)) dialog.InitialDirectory = Settings.FurnitureRoot;
+        else if (Directory.Exists(Settings.LibraryRoot)) dialog.InitialDirectory = Settings.LibraryRoot;
+        if (dialog.ShowDialog() != true) return;
+        Settings.FurnitureRoot = dialog.FolderName;
+        RebuildClientCards();
+        LoadFurniturePreview();
+        NotifySelectedFurnitureState();
+        StatusText = "Dossier central des meubles configuré.";
     }
 
     private void ChooseSharedRoot()
