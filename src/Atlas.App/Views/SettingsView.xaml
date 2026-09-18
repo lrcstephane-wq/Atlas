@@ -248,8 +248,17 @@
     <ScrollViewer x:Name="FurniturePanel" Visibility="Collapsed">
 <StackPanel>
 <TextBlock Text="Meubles et variantes" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Centralisez les fichiers clients sous leur référence Atlas unique." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
 <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-<TextBlock Text="Espace réservé aux référentiels de meubles, familles et variantes TOP." Style="{StaticResource Caption}"/>
+<StackPanel>
+<TextBlock Text="Dossier central des meubles TopSolid" Style="{StaticResource FieldLabel}"/>
+<Grid>
+<Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<TextBox Text="{Binding Settings.FurnitureRoot, UpdateSourceTrigger=PropertyChanged}"/>
+<Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseFurnitureRootCommand}" Margin="8,0,0,0"/>
+</Grid>
+<TextBlock Text="À l’ajout d’un meuble, Atlas ouvre ce dossier puis y crée une copie nommée avec sa référence à 9 chiffres. L’aperçu associé est conservé au même endroit." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+</StackPanel>
 </Border>
 </StackPanel>
 </ScrollViewer>
