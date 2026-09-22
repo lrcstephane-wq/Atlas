@@ -125,6 +125,10 @@ Assert(mainWindowXaml.Contains("WindowChrome") && !mainWindowXaml.Contains("Allo
 Assert(mainWindowXaml.Contains("StateChanged=\"Window_StateChanged\""), "La fenêtre principale doit adapter son cadre au mode agrandi.");
 var mainWindowCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWindow.xaml.cs"));
 Assert(mainWindowCode.Contains("WmGetMinMaxInfo") && mainWindowCode.Contains("MonitorFromWindow") && mainWindowCode.Contains("WorkArea"), "Le plein écran doit respecter la zone de travail du moniteur et sa barre des tâches.");
+var launchWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "LaunchWindow.xaml"));
+var appCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "App.xaml.cs"));
+Assert(launchWindowXaml.Contains("Administrateur") && launchWindowXaml.Contains("Utilisateur") && launchWindowXaml.Contains("OUVRIR HORIZON"), "Le lancement doit proposer explicitement les deux modes Atlas.");
+Assert(appCode.Contains("OpenAdministratorSessionAsync") && appCode.Contains("LogoutAdministratorAsync") && appCode.Contains("atlas-horizon-user"), "Atlas doit pouvoir ouvrir et fermer une session administrateur sans redémarrage.");
 Assert(catalogXaml.Contains("FilterFacetTemplate") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit intégrer les favoris et conserver des zones défilantes.");
 Assert(catalogXaml.Contains("MinWidth=\"330\"") && catalogXaml.Contains("MaxWidth=\"390\""), "Horizon doit protéger les dimensions du panneau produit.");
 Assert(mainWindowXaml.Contains("ClientUniverseFacets") && mainWindowXaml.Contains("UniformToFill"), "Le menu Horizon doit présenter les univers comme une galerie illustrée.");
@@ -135,6 +139,8 @@ Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
 Assert(catalogXaml.Contains("RÉFÉRENCE ATLAS") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer la référence et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
+Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsUserMode ? \"Catalog\""), "Le mode utilisateur doit rester verrouillé sur Horizon dans le modèle de navigation.");
+Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("IsAdministrativeMode"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
 var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");
 Assert(viewModelSource.Contains("ValidateFurnitureReference") && viewModelSource.Contains("exactement 9 chiffres") && viewModelSource.Contains("est déjà utilisée par"), "Une référence meuble modifiée doit rester numérique, unique et explicite en cas de conflit.");

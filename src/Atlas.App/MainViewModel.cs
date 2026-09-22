@@ -46,9 +46,10 @@ public sealed class MainViewModel : ObservableObject
     private readonly HashSet<string> _dirtyFurnitureIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _persistedFurnitureReferences = new(StringComparer.OrdinalIgnoreCase);
 
-    public MainViewModel(SharedCatalogStore store, UserAccountStore userStore, LocalBootstrap bootstrap, UserAccount currentUser)
+    public MainViewModel(SharedCatalogStore store, UserAccountStore userStore, LocalBootstrap bootstrap, UserAccount currentUser, bool userMode = false)
     {
-        _store = store; _userStore = userStore; _bootstrap = bootstrap; _sharedRoot = bootstrap.SharedRoot; CurrentUser = currentUser;
+        _store = store; _userStore = userStore; _bootstrap = bootstrap; _sharedRoot = bootstrap.SharedRoot; CurrentUser = currentUser; IsUserMode = userMode;
+        _currentPage = userMode ? "Catalog" : "Dashboard";
         _horizonPreferencesStore = new HorizonPreferencesStore(_sharedRoot, currentUser.Id);
         FurnitureSteps[0].IsActive = true;
         ComponentView = CollectionViewSource.GetDefaultView(ComponentCards); ComponentView.Filter = FilterComponent;
@@ -56,7 +57,7 @@ public sealed class MainViewModel : ObservableObject
         ClientFurnitureView = CollectionViewSource.GetDefaultView(ClientFurnitureCards); ClientFurnitureView.Filter = FilterClientFurniture;
         if (ClientFurnitureView is ListCollectionView clientListView) clientListView.CustomSort = new ClientFurnitureSearchComparer(() => ClientSearch);
 
-        NavigateCommand = new(page => CurrentPage = page?.ToString() ?? "Dashboard");
+        NavigateCommand = new(page => NavigateTo(page?.ToString()));
         ToggleNavigationCommand = new(_ => IsNavigationExpanded = !IsNavigationExpanded);
         SaveCommand = new(_ => _ = SaveAsync(), _ => CanEdit && !IsBusy);
         ReloadCommand = new(_ => _ = ReloadAsync(), _ => !IsBusy);
@@ -100,6 +101,9 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public UserAccount CurrentUser { get; }
+    public bool IsUserMode { get; }
+    public bool IsAdministrativeMode => !IsUserMode;
+    public string SessionLabel => IsUserMode ? "Mode Horizon" : "Session sécurisée";
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
     public bool IsAdministrator => CurrentUser.IsAdministrator;
@@ -170,7 +174,8 @@ public sealed class MainViewModel : ObservableObject
         get => _currentPage;
         set
         {
-            if (!SetProperty(ref _currentPage, value)) return;
+            var requestedPage = IsUserMode ? "Catalog" : value;
+            if (!SetProperty(ref _currentPage, requestedPage)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
             OnPropertyChanged(nameof(IsCatalogPage));
         }
@@ -186,8 +191,22 @@ public sealed class MainViewModel : ObservableObject
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
     public string UpdateLabel { get => _updateLabel; set => SetProperty(ref _updateLabel, value); }
     public bool IsBusy { get => _isBusy; private set { if (SetProperty(ref _isBusy, value)) RaiseCommandStates(); } }
-    public bool IsNavigationExpanded { get => _isNavigationExpanded; set { if (SetProperty(ref _isNavigationExpanded, value)) OnPropertyChanged(nameof(NavigationWidth)); } }
+    public bool IsNavigationExpanded
+    {
+        get => _isNavigationExpanded;
+        set
+        {
+            if (!SetProperty(ref _isNavigationExpanded, value)) return;
+            OnPropertyChanged(nameof(NavigationWidth));
+            OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
+            OnPropertyChanged(nameof(ShowUserSessionActions));
+            OnPropertyChanged(nameof(ShowAdministrativeSessionActions));
+        }
+    }
     public double NavigationWidth => IsNavigationExpanded ? 224 : 76;
+    public bool ShowAdministrativeNavigationLabels => IsAdministrativeMode && IsNavigationExpanded;
+    public bool ShowUserSessionActions => IsUserMode && IsNavigationExpanded;
+    public bool ShowAdministrativeSessionActions => IsAdministrativeMode && IsNavigationExpanded;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
     public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set => SetProperty(ref _showAdvancedClientFilters, value); }
     public bool IsFamilyMode => CreationMode == "Family";
@@ -1527,6 +1546,11 @@ public sealed class MainViewModel : ObservableObject
     }
 
     private string NavBackground(string page) => CurrentPage.Equals(page, StringComparison.OrdinalIgnoreCase) ? "#214E86" : "Transparent";
+
+    private void NavigateTo(string? page)
+    {
+        CurrentPage = IsUserMode ? "Catalog" : string.IsNullOrWhiteSpace(page) ? "Dashboard" : page;
+    }
 
     private string EffectiveFurnitureRoot => string.IsNullOrWhiteSpace(Settings.FurnitureRoot) ? Settings.LibraryRoot : Settings.FurnitureRoot;
 

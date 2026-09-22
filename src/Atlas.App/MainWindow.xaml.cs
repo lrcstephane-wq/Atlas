@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
     private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+    private async void AccessAdministrator_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).OpenAdministratorSessionAsync(this);
+    private async void Logout_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).LogoutAdministratorAsync(this);
     private void ToggleMaximize()
     {
         if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
