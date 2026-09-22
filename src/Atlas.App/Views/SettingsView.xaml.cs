@@ -288,6 +288,60 @@ public partial class SettingsView : UserControl
         UniverseStatus.Text = "Univers enregistrés et immédiatement disponibles dans Horizon.";
     }
 
+    private void FurnitureTypeList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        FurnitureTypeName.Text = FurnitureTypeList.SelectedItem?.ToString() ?? string.Empty;
+    }
+
+    private void FurnitureUsageList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        FurnitureUsageName.Text = FurnitureUsageList.SelectedItem?.ToString() ?? string.Empty;
+    }
+
+    private async void AddFurnitureType_OnClick(object sender, RoutedEventArgs e) => await UpdateFurnitureVocabularyAsync(vm => vm.AddFurnitureType(FurnitureTypeName.Text), "Type de meuble ajouté.");
+
+    private async void RenameFurnitureType_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (FurnitureTypeList.SelectedItem is not string selected) { FurnitureVocabularyStatus.Text = "Sélectionnez un type à renommer."; return; }
+        await UpdateFurnitureVocabularyAsync(vm => vm.RenameFurnitureType(selected, FurnitureTypeName.Text), "Type de meuble renommé sur les fiches concernées.");
+    }
+
+    private async void DeleteFurnitureType_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (FurnitureTypeList.SelectedItem is not string selected) { FurnitureVocabularyStatus.Text = "Sélectionnez un type à supprimer."; return; }
+        await UpdateFurnitureVocabularyAsync(vm => vm.RemoveFurnitureType(selected), "Type de meuble supprimé.");
+    }
+
+    private async void AddFurnitureUsage_OnClick(object sender, RoutedEventArgs e) => await UpdateFurnitureVocabularyAsync(vm => vm.AddFurnitureUsage(FurnitureUsageName.Text), "Usage spécifique ajouté.");
+
+    private async void RenameFurnitureUsage_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (FurnitureUsageList.SelectedItem is not string selected) { FurnitureVocabularyStatus.Text = "Sélectionnez un usage à renommer."; return; }
+        await UpdateFurnitureVocabularyAsync(vm => vm.RenameFurnitureUsage(selected, FurnitureUsageName.Text), "Usage spécifique renommé sur les fiches concernées.");
+    }
+
+    private async void DeleteFurnitureUsage_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (FurnitureUsageList.SelectedItem is not string selected) { FurnitureVocabularyStatus.Text = "Sélectionnez un usage à supprimer."; return; }
+        await UpdateFurnitureVocabularyAsync(vm => vm.RemoveFurnitureUsage(selected), "Usage spécifique supprimé.");
+    }
+
+    private async Task UpdateFurnitureVocabularyAsync(Action<MainViewModel> mutation, string successMessage)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        try
+        {
+            mutation(vm);
+            if (!await vm.SaveCatalogAsync()) return;
+            vm.RefreshFurnitureVocabularies();
+            FurnitureVocabularyStatus.Text = successMessage;
+        }
+        catch (Exception exception)
+        {
+            FurnitureVocabularyStatus.Text = exception.Message;
+        }
+    }
+
     private void UniverseList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (UniverseList.SelectedItem is not CatalogUniverseRecord item || DataContext is not MainViewModel vm)

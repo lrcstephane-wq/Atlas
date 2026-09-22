@@ -450,6 +450,8 @@ public sealed class AtlasCatalog
     public List<CapabilityTagRecord> CapabilityTags { get; set; } = [];
     public List<FurnitureRecord> Furniture { get; set; } = [];
     public List<FurnitureFamilyRecord> FurnitureFamilies { get; set; } = [];
+    public List<string> FurnitureTypes { get; set; } = [];
+    public List<string> FurnitureUsages { get; set; } = [];
     public List<CatalogUniverseRecord> UniverseDefinitions { get; set; } = [];
     // Conservé pour lire les catalogues historiques et les fiches qui référencent encore un univers par son libellé.
     public List<string> Universes { get; set; } =

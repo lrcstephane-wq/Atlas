@@ -22,6 +22,9 @@ Assert(demo.UniverseDefinitions.Count >= 2 && demo.UniverseDefinitions.All(item 
 demo.UniverseDefinitions[0].ImageRelativePath = Path.Combine("Images", "Universes", "cuisine.jpg");
 Assert(demo.UniverseDefinitions[0].ImageRelativePath.Contains("Universes"), "Un univers doit pouvoir référencer une image partagée.");
 Assert(demo.FurnitureFamilies.Any(family => family.Id == demo.Furniture[0].FamilyId), "Une variante doit pouvoir référencer sa famille.");
+demo.FurnitureTypes.Add("Meuble test");
+demo.FurnitureUsages.Add("Usage test");
+Assert(demo.FurnitureTypes.Contains("Meuble test") && demo.FurnitureUsages.Contains("Usage test"), "Les types de meubles et usages spécifiques doivent être persistables dans le catalogue.");
 
 var drawerTag = new CapabilityTagRecord { Id = "cap-tiroirs", Label = "Tiroirs", DefaultFamilyNames = ["Coulissants"] };
 var doorTag = new CapabilityTagRecord { Id = "cap-portes", Label = "Portes", DefaultFamilyNames = ["Charnières"] };
@@ -156,6 +159,10 @@ Assert(catalogXaml.Contains("Grid.Column=\"2\"") && catalogXaml.Contains("ItemsS
 var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
 Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
+Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("FurnitureUsageList") && settingsXaml.Contains("Renommer"), "Les paramètres doivent administrer les types de meubles et usages spécifiques.");
+var settingsCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml.cs"));
+Assert(settingsCode.Contains("AddFurnitureType_OnClick") && settingsCode.Contains("RenameFurnitureUsage_OnClick") && settingsCode.Contains("UpdateFurnitureVocabularyAsync"), "Les référentiels meubles doivent être ajoutables, renommables, supprimables et enregistrés.");
+Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Contains("DefaultFurnitureUsages") && viewModelSource.Contains("_catalog.FurnitureTypes = FurnitureTypes.ToList()"), "Les valeurs historiques doivent migrer vers des référentiels configurables et persistés.");
 var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));
 Assert(componentsXaml.Contains("Binding DetailedName"), "La Forge doit afficher le libellé complet des composants possédant un code C=.");
 Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");

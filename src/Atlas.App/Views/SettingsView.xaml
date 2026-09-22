@@ -260,6 +260,28 @@
 <TextBlock Text="À l’ajout d’un meuble, Atlas ouvre ce dossier puis y crée une copie nommée avec sa référence à 9 chiffres. L’aperçu associé est conservé au même endroit." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,10,0,0"/>
 </StackPanel>
 </Border>
+<Grid Margin="0,14,0,0">
+<Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
+<Border Style="{StaticResource Card}" Padding="14">
+<Grid>
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<StackPanel><TextBlock Text="Types de meubles" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="Liste proposée dans les fiches meubles." Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel>
+<ListBox x:Name="FurnitureTypeList" Grid.Row="1" ItemsSource="{Binding FurnitureTypes}" MinHeight="210" SelectionChanged="FurnitureTypeList_OnSelectionChanged"/>
+<TextBox x:Name="FurnitureTypeName" Grid.Row="2" Margin="0,10,0,8" ToolTip="Libellé du type de meuble"/>
+<StackPanel Grid.Row="3" Orientation="Horizontal"><Button Content="Ajouter" Click="AddFurnitureType_OnClick"/><Button Content="Renommer" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="RenameFurnitureType_OnClick"/><Button Content="Supprimer" Style="{StaticResource GhostButton}" Margin="7,0,0,0" Click="DeleteFurnitureType_OnClick"/></StackPanel>
+</Grid>
+</Border>
+<Border Grid.Column="2" Style="{StaticResource Card}" Padding="14">
+<Grid>
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<StackPanel><TextBlock Text="Usages spécifiques" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="Tags cumulables proposés dans la fiche meuble." Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel>
+<ListBox x:Name="FurnitureUsageList" Grid.Row="1" ItemsSource="{Binding FurnitureUsages}" MinHeight="210" SelectionChanged="FurnitureUsageList_OnSelectionChanged"/>
+<TextBox x:Name="FurnitureUsageName" Grid.Row="2" Margin="0,10,0,8" ToolTip="Libellé de l’usage spécifique"/>
+<StackPanel Grid.Row="3" Orientation="Horizontal"><Button Content="Ajouter" Click="AddFurnitureUsage_OnClick"/><Button Content="Renommer" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="RenameFurnitureUsage_OnClick"/><Button Content="Supprimer" Style="{StaticResource GhostButton}" Margin="7,0,0,0" Click="DeleteFurnitureUsage_OnClick"/></StackPanel>
+</Grid>
+</Border>
+</Grid>
+<TextBlock x:Name="FurnitureVocabularyStatus" Style="{StaticResource Caption}" Margin="0,10,0,0"/>
 </StackPanel>
 </ScrollViewer>
     <ScrollViewer x:Name="ValidationPanel" Visibility="Collapsed">

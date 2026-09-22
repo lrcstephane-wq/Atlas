@@ -19,6 +19,8 @@ public sealed class MainViewModel : ObservableObject
     public event EventHandler? TaxonomyChanged;
 
     private static readonly string[] DefaultUniverses = ["Cuisine", "Dressing", "Salle de bain", "Bibliothèque", "Séjour", "Bureau / Tertiaire", "Buanderie", "Agencement commercial", "Chambre", "Hôtellerie / Hébergement", "Restaurant / Bar"];
+    private static readonly string[] DefaultFurnitureTypes = ["Meuble bas", "Meuble haut", "Colonne", "Demi-colonne", "Niche", "Armoire", "Étagère", "Banc", "Bureau", "Console", "Comptoir", "Présentoir"];
+    private static readonly string[] DefaultFurnitureUsages = ["Sous-évier", "Vasque", "Four", "Micro-ondes", "Réfrigérateur", "Lave-vaisselle", "Lave-linge", "Sèche-linge", "Poubelle", "Penderie", "Chaussures", "TV / multimédia", "Imprimante", "Caisse", "Présentation / exposition", "Technique"];
     private readonly SharedCatalogStore _store;
     private readonly UserAccountStore _userStore;
     private readonly LocalBootstrap _bootstrap;
@@ -111,6 +113,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ComponentCardViewModel> ComponentCards { get; } = [];
     public ObservableCollection<FurnitureRecord> Furniture { get; } = [];
     public ObservableCollection<FurnitureFamilyRecord> FurnitureFamilies { get; } = [];
+    public ObservableCollection<string> FurnitureTypes { get; } = [];
+    public ObservableCollection<string> FurnitureUsages { get; } = [];
     public ObservableCollection<FurnitureCardViewModel> ClientFurnitureCards { get; } = [];
     public ObservableCollection<ComponentRecord> LinkedComponents { get; } = [];
     public ObservableCollection<FurnitureCompositionLineViewModel> CompositionLines { get; } = [];
@@ -150,8 +154,6 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<CatalogEnvironment> Environments { get; } = Enum.GetValues<CatalogEnvironment>();
     public IReadOnlyList<RecordStatus> Statuses { get; } = Enum.GetValues<RecordStatus>();
     public IReadOnlyList<string> RoleProfiles { get; } = ["Lecture seule", "Éditeur", "Éditeur + validateur", "Administrateur"];
-    public IReadOnlyList<string> FurnitureTypes { get; } = ["Meuble bas", "Meuble haut", "Colonne", "Demi-colonne", "Niche", "Armoire", "Étagère", "Banc", "Bureau", "Console", "Comptoir", "Présentoir"];
-    public IReadOnlyList<string> FurnitureUsages { get; } = ["Sous-évier", "Vasque", "Four", "Micro-ondes", "Réfrigérateur", "Lave-vaisselle", "Lave-linge", "Sèche-linge", "Poubelle", "Penderie", "Chaussures", "TV / multimédia", "Imprimante", "Caisse", "Présentation / exposition", "Technique"];
     public IReadOnlyList<string> FurnitureForms { get; } = ["Droit", "Angle", "Courbe", "Trapèze", "Pan coupé", "Sous rampant"];
     public IReadOnlyList<string> ConstructionPrinciples { get; } = ["Non applicable", "Montant filant", "Traverse filante"];
     public IReadOnlyList<string> BackPositions { get; } = ["Non applicable", "Sans dos", "Appliqué", "Rainuré", "Intérieur"];
@@ -438,7 +440,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void NormalizeCatalog()
     {
-        _catalog.Settings ??= new(); _catalog.Components ??= []; _catalog.Furniture ??= []; _catalog.FurnitureFamilies ??= []; _catalog.Universes ??= []; _catalog.UniverseDefinitions ??= [];
+        _catalog.Settings ??= new(); _catalog.Components ??= []; _catalog.Furniture ??= []; _catalog.FurnitureFamilies ??= []; _catalog.FurnitureTypes ??= []; _catalog.FurnitureUsages ??= []; _catalog.Universes ??= []; _catalog.UniverseDefinitions ??= [];
         _catalog.Settings.SearchSynonyms ??= [];
         if (!_catalog.Settings.SearchDictionaryInitialized)
         {
@@ -446,6 +448,12 @@ public sealed class MainViewModel : ObservableObject
             _catalog.Settings.SearchDictionaryInitialized = true;
         }
         if (_catalog.Universes.Count == 0) _catalog.Universes.AddRange(DefaultUniverses);
+        if (_catalog.FurnitureTypes.Count == 0) _catalog.FurnitureTypes.AddRange(DefaultFurnitureTypes);
+        if (_catalog.FurnitureUsages.Count == 0) _catalog.FurnitureUsages.AddRange(DefaultFurnitureUsages);
+        FurnitureTypes.Clear();
+        foreach (var type in _catalog.FurnitureTypes.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) FurnitureTypes.Add(type);
+        FurnitureUsages.Clear();
+        foreach (var usage in _catalog.FurnitureUsages.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) FurnitureUsages.Add(usage);
         if (_catalog.UniverseDefinitions.Count == 0)
         {
             _catalog.UniverseDefinitions.AddRange(_catalog.Universes.Select((name, index) => new CatalogUniverseRecord
@@ -469,7 +477,7 @@ public sealed class MainViewModel : ObservableObject
                 item.Usages.AddRange(item.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             item.ConceptionDate ??= DateTime.Today;
         }
-        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 8);
+        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 9);
     }
 
     private async Task<bool> SaveAsync()
@@ -488,6 +496,7 @@ public sealed class MainViewModel : ObservableObject
                 item.ModifiedUtc = now;
             }
             _catalog.Components = Components.ToList(); _catalog.Furniture = Furniture.ToList(); _catalog.FurnitureFamilies = FurnitureFamilies.ToList();
+            _catalog.FurnitureTypes = FurnitureTypes.ToList(); _catalog.FurnitureUsages = FurnitureUsages.ToList();
             NormalizeUniverseDefinitions();
             await _store.SaveAsync(_catalog, _catalog.Revision, CurrentUser.DisplayName); StatusText = $"Enregistré · révision {_catalog.Revision}"; NotifySummary();
             _persistedFurnitureReferences.Clear();
@@ -1108,6 +1117,101 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public Task<bool> SaveCatalogAsync() => SaveAsync();
+
+    public void AddFurnitureType(string value) => AddVocabularyValue(FurnitureTypes, value, "Ce type de meuble existe déjà.");
+
+    public void AddFurnitureUsage(string value)
+    {
+        AddVocabularyValue(FurnitureUsages, value, "Cet usage spécifique existe déjà.");
+        RebuildUsageOptions();
+    }
+
+    public void RenameFurnitureType(string previousValue, string newValue)
+    {
+        var normalized = NormalizeVocabularyRename(FurnitureTypes, previousValue, newValue, "Ce type de meuble existe déjà.");
+        foreach (var item in Furniture.Where(item => item.TypeMeuble.Equals(previousValue, StringComparison.OrdinalIgnoreCase)))
+        {
+            item.TypeMeuble = normalized;
+            _dirtyFurnitureIds.Add(item.Id);
+        }
+        foreach (var family in FurnitureFamilies.Where(item => item.TypeMeuble.Equals(previousValue, StringComparison.OrdinalIgnoreCase))) family.TypeMeuble = normalized;
+        RebuildClientCards();
+        RefreshClientFurnitureView();
+    }
+
+    public void RenameFurnitureUsage(string previousValue, string newValue)
+    {
+        var normalized = NormalizeVocabularyRename(FurnitureUsages, previousValue, newValue, "Cet usage spécifique existe déjà.");
+        foreach (var item in Furniture)
+        {
+            var existing = item.Usages.FirstOrDefault(value => value.Equals(previousValue, StringComparison.OrdinalIgnoreCase));
+            if (existing is null) continue;
+            item.Usages[item.Usages.IndexOf(existing)] = normalized;
+            item.Usages = item.Usages.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            item.UsageSpecifique = string.Join(", ", item.Usages);
+            _dirtyFurnitureIds.Add(item.Id);
+        }
+        foreach (var family in FurnitureFamilies)
+        {
+            var usages = family.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            var index = usages.FindIndex(value => value.Equals(previousValue, StringComparison.OrdinalIgnoreCase));
+            if (index < 0) continue;
+            usages[index] = normalized;
+            family.UsageSpecifique = string.Join(", ", usages.Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+        RebuildUsageOptions();
+        RebuildClientCards();
+        RefreshClientFurnitureView();
+    }
+
+    public void RemoveFurnitureType(string value)
+    {
+        var affected = Furniture.Count(item => item.TypeMeuble.Equals(value, StringComparison.OrdinalIgnoreCase)) + FurnitureFamilies.Count(item => item.TypeMeuble.Equals(value, StringComparison.OrdinalIgnoreCase));
+        if (affected > 0) throw new InvalidOperationException($"Ce type est encore utilisé par {affected} fiche(s) ou famille(s). Renommez-le ou réaffectez-les avant de le supprimer.");
+        RemoveVocabularyValue(FurnitureTypes, value);
+    }
+
+    public void RemoveFurnitureUsage(string value)
+    {
+        var affected = Furniture.Count(item => FurnitureUsagesFor(item).Contains(value, StringComparer.OrdinalIgnoreCase))
+            + FurnitureFamilies.Count(item => item.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(value, StringComparer.OrdinalIgnoreCase));
+        if (affected > 0) throw new InvalidOperationException($"Cet usage est encore utilisé par {affected} fiche(s) ou famille(s). Renommez-le ou retirez-le avant de le supprimer.");
+        RemoveVocabularyValue(FurnitureUsages, value);
+        RebuildUsageOptions();
+    }
+
+    public void RefreshFurnitureVocabularies()
+    {
+        RebuildUsageOptions();
+        RebuildClientFacets();
+        RefreshClientFurnitureView();
+        StatusText = "Types de meubles et usages spécifiques mis à jour.";
+    }
+
+    private static void AddVocabularyValue(ObservableCollection<string> collection, string value, string duplicateMessage)
+    {
+        var normalized = value.Trim();
+        if (string.IsNullOrWhiteSpace(normalized)) throw new InvalidOperationException("Le libellé ne peut pas être vide.");
+        if (collection.Contains(normalized, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException(duplicateMessage);
+        collection.Add(normalized);
+    }
+
+    private static string NormalizeVocabularyRename(ObservableCollection<string> collection, string previousValue, string newValue, string duplicateMessage)
+    {
+        var normalized = newValue.Trim();
+        if (string.IsNullOrWhiteSpace(normalized)) throw new InvalidOperationException("Le libellé ne peut pas être vide.");
+        if (collection.Any(value => !value.Equals(previousValue, StringComparison.OrdinalIgnoreCase) && value.Equals(normalized, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException(duplicateMessage);
+        var index = collection.IndexOf(previousValue);
+        if (index < 0) throw new InvalidOperationException("Sélection introuvable.");
+        collection[index] = normalized;
+        return normalized;
+    }
+
+    private static void RemoveVocabularyValue(ObservableCollection<string> collection, string value)
+    {
+        var existing = collection.FirstOrDefault(item => item.Equals(value, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null) collection.Remove(existing);
+    }
 
     private void RebuildFurnitureTagOptions()
     {
