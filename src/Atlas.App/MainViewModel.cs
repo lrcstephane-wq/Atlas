@@ -91,6 +91,7 @@ public sealed class MainViewModel : ObservableObject
         PreviousFurnitureStepCommand = new(_ => MoveFurnitureStep(-1), _ => FurnitureStepIndex > 0);
         NextFurnitureStepCommand = new(_ => MoveFurnitureStep(1), _ => FurnitureStepIndex < FurnitureSteps.Count - 1);
         ChooseFurnitureTopCommand = new(_ => ChooseFurnitureTop(), _ => CanEdit && SelectedFurniture is not null);
+        ChooseFurnitureImageCommand = new(_ => ChooseFurnitureImage(), _ => CanEdit && SelectedFurniture is not null);
         OpenFurnitureFolderCommand = new(_ => OpenFurnitureFolder(), _ => SelectedFurniture is not null && !string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath));
         AddUniverseCommand = new(_ => AddUniverse(), _ => CanEdit && !string.IsNullOrWhiteSpace(NewUniverseName));
         AddComponentCommand = new(_ => AddComponent(), _ => CanEdit && SelectedFurniture is not null && SelectedCompositionCandidate is not null);
@@ -118,6 +119,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<FurnitureCardViewModel> ClientFurnitureCards { get; } = [];
     public ObservableCollection<ComponentRecord> LinkedComponents { get; } = [];
     public ObservableCollection<FurnitureCompositionLineViewModel> CompositionLines { get; } = [];
+    public ObservableCollection<FurnitureCompositionLineViewModel> SelectedClientCompositionLines { get; } = [];
     public ObservableCollection<UserAccount> Users { get; } = [];
     public ObservableCollection<LibraryFilterViewModel> LibraryFilters { get; } = [];
     public ObservableCollection<FilterOptionViewModel> FamilyFilters { get; } = [];
@@ -337,6 +339,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (!SetProperty(ref _selectedClientFurnitureCard, value)) return;
             OnPropertyChanged(nameof(SelectedClientFurniture));
+            RefreshSelectedClientComposition();
             OnPropertyChanged(nameof(SelectedClientTags));
             OnPropertyChanged(nameof(SelectedClientUses));
             OnPropertyChanged(nameof(SelectedClientStructure));
@@ -346,6 +349,15 @@ public sealed class MainViewModel : ObservableObject
     public string SelectedClientTags => SelectedClientFurniture is null ? "Aucun tag" : string.Join(" · ", ComponentTaxonomyStore.Resolve(SelectedClientFurniture, Components, _taxonomy).Select(tag => tag.Label));
     public string SelectedClientUses => SelectedClientFurniture is null ? string.Empty : string.Join(" · ", FurnitureUsagesFor(SelectedClientFurniture));
     public string SelectedClientStructure => SelectedClientFurniture is null ? string.Empty : string.Join(" · ", new[] { SelectedClientFurniture.PrincipleConstruction, SelectedClientFurniture.TypeAssemblage, SelectedClientFurniture.PositionDos }.Where(value => !string.IsNullOrWhiteSpace(value) && !value.Equals("Non applicable", StringComparison.OrdinalIgnoreCase)));
+    public bool HasSelectedClientComposition => SelectedClientCompositionLines.Count > 0;
+    public string SelectedClientCompositionLabel
+    {
+        get
+        {
+            var count = SelectedClientCompositionLines.Sum(line => line.Quantity);
+            return count == 1 ? "1 composant Biblidéo" : $"{count} composants Biblidéo";
+        }
+    }
     public string InheritedTags => SelectedFurniture is null ? string.Empty : string.Join(" · ", ComponentTaxonomyStore.Resolve(SelectedFurniture, Components, _taxonomy).Select(x => x.Label));
     public string InheritedTagsByCategory => SelectedFurniture is null ? string.Empty : string.Join(Environment.NewLine, ComponentTaxonomyStore.Resolve(SelectedFurniture, Components, _taxonomy).GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "Autre" : x.Category).OrderBy(x => x.Key).Select(group => $"{group.Key} : {string.Join(", ", group.Select(x => x.Label).Distinct(StringComparer.OrdinalIgnoreCase))}"));
     public string InheritedFamilies => string.Join(" · ", LinkedComponents.Select(x => x.EffectiveFamilyName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase));
@@ -384,6 +396,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand PreviousFurnitureStepCommand { get; }
     public RelayCommand NextFurnitureStepCommand { get; }
     public RelayCommand ChooseFurnitureTopCommand { get; }
+    public RelayCommand ChooseFurnitureImageCommand { get; }
     public RelayCommand OpenFurnitureFolderCommand { get; }
     public RelayCommand AddUniverseCommand { get; }
     public RelayCommand AddComponentCommand { get; }
@@ -1455,7 +1468,23 @@ public sealed class MainViewModel : ObservableObject
             SyncLegacyComponentIds(SelectedFurniture);
         }
         RebuildFurnitureTagOptions(); OnPropertyChanged(nameof(InheritedTags)); OnPropertyChanged(nameof(InheritedTagsByCategory)); OnPropertyChanged(nameof(InheritedFamilies)); OnPropertyChanged(nameof(InheritedCompatibility)); OnPropertyChanged(nameof(CompositionTotalQuantity)); OnPropertyChanged(nameof(CharacteristicWarnings));
+        if (SelectedClientFurniture?.Id == SelectedFurniture?.Id) RefreshSelectedClientComposition();
         OnPropertyChanged(nameof(MarkedCompositionLineCount)); OnPropertyChanged(nameof(RemoveCompositionLabel)); RemoveMarkedCompositionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshSelectedClientComposition()
+    {
+        SelectedClientCompositionLines.Clear();
+        if (SelectedClientFurniture is not null)
+        {
+            foreach (var line in SelectedClientFurniture.ComponentLines ?? [])
+            {
+                var card = ComponentCards.FirstOrDefault(item => item.Id == line.ComponentId);
+                if (card is not null) SelectedClientCompositionLines.Add(new FurnitureCompositionLineViewModel(line, card));
+            }
+        }
+        OnPropertyChanged(nameof(HasSelectedClientComposition));
+        OnPropertyChanged(nameof(SelectedClientCompositionLabel));
     }
 
     public string CharacteristicWarnings
@@ -1717,6 +1746,44 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private void ChooseFurnitureImage()
+    {
+        if (SelectedFurniture is null) return;
+        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) ChooseFurnitureRoot();
+        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = $"Choisir le nouvel aperçu de {SelectedFurniture.DisplayName}",
+            Filter = "Images (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|Tous les fichiers (*.*)|*.*",
+            CheckFileExists = true
+        };
+        var currentImage = ResolveFurniturePath(SelectedFurniture.ImageRelativePath);
+        if (File.Exists(currentImage)) dialog.InitialDirectory = Path.GetDirectoryName(currentImage);
+        else if (Directory.Exists(Settings.FurnitureRoot)) dialog.InitialDirectory = Settings.FurnitureRoot;
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            Directory.CreateDirectory(Settings.FurnitureRoot);
+            var targetImage = Path.Combine(Settings.FurnitureRoot, $"{SelectedFurniture.Reference}.top.png");
+            if (!Path.GetFullPath(dialog.FileName).Equals(Path.GetFullPath(targetImage), StringComparison.OrdinalIgnoreCase))
+                File.Copy(dialog.FileName, targetImage, true);
+
+            SelectedFurniture.ImageRelativePath = MakeFurnitureRelative(targetImage);
+            MarkSelectedFurnitureDirty();
+            LoadFurniturePreview();
+            var selectedId = SelectedFurniture.Id;
+            RebuildClientCards();
+            SelectedClientFurnitureCard = ClientFurnitureCards.FirstOrDefault(card => card.Record.Id == selectedId) ?? SelectedClientFurnitureCard;
+            StatusText = $"L’image de « {SelectedFurniture.DisplayName} » a été actualisée. Enregistrez pour conserver la modification.";
+        }
+        catch (Exception exception)
+        {
+            AtlasDialog.Error(exception.Message, "Impossible d’actualiser l’image", "L’image actuelle a été conservée.");
+        }
+    }
+
     private string MakeFurnitureRelative(string path)
     {
         if (string.IsNullOrWhiteSpace(EffectiveFurnitureRoot)) return path;
@@ -1867,7 +1934,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand }) command.RaiseCanExecuteChanged();
     }
 
     private sealed class ClientFurnitureSearchComparer(Func<string> query) : System.Collections.IComparer
