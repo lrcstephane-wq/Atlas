@@ -39,7 +39,7 @@ public partial class SettingsView : UserControl
             foreach (var universe in vm.CatalogUniverseDefinitions.OrderBy(item => item.SortOrder)) _universes.Add(universe);
             foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
         }
-        if (DataContext is MainViewModel vm && (vm.IsUserMode || vm.IsLicenseRestricted))
+        if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted))
         {
             ActivateSettingsButton(LicenseSettingsButton);
             ShowSettingsPanel("LicensePanel");
