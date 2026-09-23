@@ -258,3 +258,158 @@
          <StackPanel>
           <TextBlock Text="Libellé" Style="{StaticResource FieldLabel}"/>
           <TextBox Text="{Binding SelectedItem.Label, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}"/>
+          <TextBlock Text="Catégorie" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/>
+          <ComboBox ItemsSource="{Binding DataContext.TagCategories, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding SelectedItem.Category, ElementName=TagList}"/>
+          <TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/>
+          <TextBox Text="{Binding SelectedItem.Description, ElementName=TagList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="90" TextWrapping="Wrap"/>
+          <CheckBox Content="Tag disponible dans les fiches composants" IsChecked="{Binding SelectedItem.IsActive, ElementName=TagList}" Margin="0,16,0,0"/>
+          <Border Background="#0E2D39" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,22,0,0">
+           <StackPanel>
+            <TextBlock Text="AFFECTATION" Style="{StaticResource Eyebrow}"/>
+            <TextBlock Text="Les tags sont ajoutés directement dans chaque fiche composant. La fiche meuble récupère ensuite automatiquement les tags de tous ses composants." TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
+           </StackPanel>
+          </Border>
+         </StackPanel>
+        </ScrollViewer>
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+         <Button Content="Supprimer ce tag" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="DeleteTag_OnClick"/>
+         <Button Content="Enregistrer les modifications" HorizontalAlignment="Right" Click="SaveTaxonomy_OnClick"/>
+        </Grid>
+       </Grid>
+      </Border>
+     </Grid>
+     <TextBlock Grid.Row="2" x:Name="TaxonomyStatus" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="0,12,0,0"/>
+    </Grid>
+
+    <ScrollViewer x:Name="CompatibilityPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Compatibilités" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace réservé aux règles de compatibilité et d’incompatibilité. Il sera activé après le MVP de présentation." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="FurniturePanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Meubles et variantes" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Centralisez les fichiers clients sous leur référence Atlas unique." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<StackPanel>
+<TextBlock Text="Dossier central des meubles TopSolid" Style="{StaticResource FieldLabel}"/>
+<Grid>
+<Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<TextBox Text="{Binding Settings.FurnitureRoot, UpdateSourceTrigger=PropertyChanged}"/>
+<Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseFurnitureRootCommand}" Margin="8,0,0,0"/>
+</Grid>
+<TextBlock Text="À l’ajout d’un meuble, Atlas ouvre ce dossier puis y crée une copie nommée avec sa référence à 9 chiffres. L’aperçu associé est conservé au même endroit." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+</StackPanel>
+</Border>
+<Grid Margin="0,14,0,0">
+<Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
+<Border Style="{StaticResource Card}" Padding="14">
+<Grid>
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<StackPanel><TextBlock Text="Types de meubles" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="Liste proposée dans les fiches meubles." Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel>
+<ListBox x:Name="FurnitureTypeList" Grid.Row="1" ItemsSource="{Binding FurnitureTypes}" MinHeight="210" SelectionChanged="FurnitureTypeList_OnSelectionChanged"/>
+<TextBox x:Name="FurnitureTypeName" Grid.Row="2" Margin="0,10,0,8" ToolTip="Libellé du type de meuble"/>
+<StackPanel Grid.Row="3" Orientation="Horizontal"><Button Content="Ajouter" Click="AddFurnitureType_OnClick"/><Button Content="Renommer" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="RenameFurnitureType_OnClick"/><Button Content="Supprimer" Style="{StaticResource GhostButton}" Margin="7,0,0,0" Click="DeleteFurnitureType_OnClick"/></StackPanel>
+</Grid>
+</Border>
+<Border Grid.Column="2" Style="{StaticResource Card}" Padding="14">
+<Grid>
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<StackPanel><TextBlock Text="Usages spécifiques" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="Tags cumulables proposés dans la fiche meuble." Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel>
+<ListBox x:Name="FurnitureUsageList" Grid.Row="1" ItemsSource="{Binding FurnitureUsages}" MinHeight="210" SelectionChanged="FurnitureUsageList_OnSelectionChanged"/>
+<TextBox x:Name="FurnitureUsageName" Grid.Row="2" Margin="0,10,0,8" ToolTip="Libellé de l’usage spécifique"/>
+<StackPanel Grid.Row="3" Orientation="Horizontal"><Button Content="Ajouter" Click="AddFurnitureUsage_OnClick"/><Button Content="Renommer" Style="{StaticResource SecondaryButton}" Margin="7,0,0,0" Click="RenameFurnitureUsage_OnClick"/><Button Content="Supprimer" Style="{StaticResource GhostButton}" Margin="7,0,0,0" Click="DeleteFurnitureUsage_OnClick"/></StackPanel>
+</Grid>
+</Border>
+</Grid>
+<TextBlock x:Name="FurnitureVocabularyStatus" Style="{StaticResource Caption}" Margin="0,10,0,0"/>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="ValidationPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Validation et publication" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace réservé aux workflows, contrôles de publication et dérogations." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="CapabilitiesPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Capacités paramétriques" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<StackPanel>
+<Border Background="#2B251B" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" CornerRadius="9" Padding="12">
+<TextBlock Text="Hors périmètre du MVP — conservé pour une prochaine version." Foreground="{StaticResource AmberBrush}"/>
+</Border>
+<TextBlock Text="Cet espace accueillera les capacités, leurs paramètres TopSolid, valeurs, unités, conditions et règles d’affichage client." Style="{StaticResource Caption}" Margin="0,14,0,0"/>
+</StackPanel>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <Grid x:Name="ClientPanel" Visibility="Collapsed">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <StackPanel><TextBlock Text="Univers illustrés" Style="{StaticResource SectionTitle}"/><TextBlock Text="Ces cartes forment l’entrée visuelle d’Horizon. Leur ordre, leur texte et leur image sont partagés avec tous les utilisateurs." Style="{StaticResource Caption}" Margin="0,5,0,0"/></StackPanel>
+     <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="360"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Border Style="{StaticResource Card}" Padding="0">
+       <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Border Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,0,0,1" CornerRadius="13,13,0,0" Padding="18,16"><Grid><StackPanel><TextBlock Text="COLLECTION" Style="{StaticResource Eyebrow}"/><TextBlock Text="Ordre d’affichage" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="↑" Style="{StaticResource IconButton}" Click="MoveUniverseUp_OnClick" ToolTip="Monter"/><Button Content="↓" Style="{StaticResource IconButton}" Click="MoveUniverseDown_OnClick" ToolTip="Descendre" Margin="6,0,0,0"/></StackPanel></Grid></Border>
+        <ListBox x:Name="UniverseList" Grid.Row="1" Margin="10" SelectionChanged="UniverseList_OnSelectionChanged">
+         <ListBox.ItemTemplate><DataTemplate><Border Background="#102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="10" Padding="13,11" Margin="0,0,0,7"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Width="28" Height="28" CornerRadius="8" Background="{StaticResource SelectionGradient}"><TextBlock Text="{Binding SortOrder, StringFormat='{}{0:00}'}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" FontWeight="Bold"/></Border><StackPanel Grid.Column="1" Margin="10,0"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Description}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/></StackPanel><Ellipse Grid.Column="2" Width="8" Height="8" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center"/></Grid></Border></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <Border Grid.Row="2" Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,13,13" Padding="14"><Grid><TextBox x:Name="NewUniverseSetting" Margin="0,0,94,0" ToolTip="Nom du nouvel univers"/><Button Content="Ajouter" HorizontalAlignment="Right" Width="84" Click="AddUniverseSetting_OnClick"/></Grid></Border>
+       </Grid>
+      </Border>
+      <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
+       <Grid><Grid.RowDefinitions><RowDefinition Height="260"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Border Background="{StaticResource PreviewBrush}" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,0,0,1" CornerRadius="13,13,0,0" ClipToBounds="True"><Grid><Rectangle Fill="{StaticResource HeroGradient}"/><Rectangle Fill="{StaticResource AtlasGridBrush}" Opacity=".5"/><Image x:Name="UniverseImagePreview" Stretch="UniformToFill"/><Border Background="#9A07131F" VerticalAlignment="Bottom" Padding="20,16"><StackPanel><TextBlock Text="{Binding SelectedItem.Name, ElementName=UniverseList}" FontSize="23" FontWeight="SemiBold"/><TextBlock Text="{Binding SelectedItem.Description, ElementName=UniverseList}" Foreground="#C0D1DF" Margin="0,4,0,0"/></StackPanel></Border></Grid></Border>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel Margin="22,20"><TextBlock Text="FICHE DE L’UNIVERS" Style="{StaticResource Eyebrow}"/><TextBlock Text="Nom affiché" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/><TextBox Text="{Binding SelectedItem.Name, ElementName=UniverseList, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Description courte" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/><TextBox Text="{Binding SelectedItem.Description, ElementName=UniverseList, UpdateSourceTrigger=PropertyChanged}"/><CheckBox Content="Visible dans Horizon" IsChecked="{Binding SelectedItem.IsActive, ElementName=UniverseList}" Margin="0,16,0,0"/><StackPanel Orientation="Horizontal" Margin="0,18,0,0"><Button Content="Choisir une image" Click="ChooseUniverseImage_OnClick"/><Button Content="Supprimer l’univers" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Click="DeleteUniverseSetting_OnClick"/></StackPanel><TextBlock Text="Formats conseillés : JPG ou PNG paysage, au moins 1200 × 700 px. Atlas recadre automatiquement l’image dans la carte." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel></ScrollViewer>
+        <Border Grid.Row="2" Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,13,13" Padding="15"><Grid><TextBlock x:Name="UniverseStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Enregistrer les univers" HorizontalAlignment="Right" Click="SaveUniverses_OnClick"/></Grid></Border>
+       </Grid>
+      </Border>
+     </Grid>
+    </Grid>
+    <ScrollViewer x:Name="ClientSearchPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Intelligence de recherche" Style="{StaticResource SectionTitle}"/>
+<TextBlock Text="Horizon corrige déjà les petites fautes. Ce dictionnaire lui apprend en plus le vocabulaire de votre métier." Style="{StaticResource Caption}" Margin="0,6,0,16"/>
+<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.45*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+ <Border Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid><StackPanel><TextBlock Text="DICTIONNAIRE MÉTIER" Style="{StaticResource Eyebrow}"/><TextBlock Text="Un concept principal et les mots équivalents que vos clients emploient." Style="{StaticResource Caption}" Margin="0,4,0,12"/></StackPanel><Button Content="+ Ajouter une ligne" HorizontalAlignment="Right" VerticalAlignment="Center" Click="AddSearchSynonym_OnClick"/></Grid>
+  <DataGrid x:Name="SearchSynonymGrid" Grid.Row="1" ItemsSource="{Binding Settings.SearchSynonyms}" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single" MinHeight="360" IsReadOnly="{Binding CanEdit, Converter={StaticResource InverseBool}}">
+   <DataGrid.Columns><DataGridTextColumn Header="Concept recherché" Binding="{Binding Canonical, UpdateSourceTrigger=PropertyChanged}" Width="0.75*"/><DataGridTextColumn Header="Synonymes séparés par des virgules" Binding="{Binding AliasesCsv, UpdateSourceTrigger=PropertyChanged}" Width="1.25*"/></DataGrid.Columns>
+  </DataGrid>
+  <Button Grid.Row="2" Content="Supprimer la ligne sélectionnée" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Click="DeleteSearchSynonym_OnClick"/>
+ </Grid></Border>
+ <Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel>
+  <TextBlock Text="COMMENT ÇA MARCHE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Atlas combine quatre niveaux, entièrement en local :" FontWeight="SemiBold" Margin="0,8,0,12"/>
+  <TextBlock Text="1  Accents et ponctuation ignorés" Margin="0,0,0,9"/><TextBlock Text="2  Lettres inversées et petites fautes tolérées" Margin="0,0,0,9"/><TextBlock Text="3  Synonymes métier appliqués" Margin="0,0,0,9"/><TextBlock Text="4  Résultats classés par pertinence" Margin="0,0,0,18"/>
+  <Border Background="#0E2D39" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="10" Padding="12"><TextBlock Text="Exemple : « meubel evrier » peut retrouver « meuble sous-évier ». Ajoutez ici « lavabo » comme synonyme de « sous évier » pour couvrir aussi le vocabulaire client." TextWrapping="Wrap" Foreground="{StaticResource InkBrush}"/></Border>
+ </StackPanel></Border>
+</Grid>
+<Grid Margin="0,14,0,0"><TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Enregistrer le dictionnaire" HorizontalAlignment="Right" Click="SaveSearchDictionary_OnClick"/></Grid>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="TopSolidPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Ouverture TopSolid" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace prévu pour l’ouverture et le glisser-déposer des fichiers .TOP, toujours considérés comme opaques." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+    <ScrollViewer x:Name="SystemPanel" Visibility="Collapsed">
+<StackPanel>
+<TextBlock Text="Sauvegardes et diagnostics" Style="{StaticResource SectionTitle}"/>
+<Border Style="{StaticResource Card}" Margin="0,16,0,0">
+<TextBlock Text="Espace prévu pour sauvegardes, import/export, journaux, santé du catalogue et restauration." Style="{StaticResource Caption}"/>
+</Border>
+</StackPanel>
+</ScrollViewer>
+   </Grid>
+  </Grid>
+ </Grid>
+</UserControl>
