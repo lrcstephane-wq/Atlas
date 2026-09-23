@@ -118,7 +118,7 @@ public sealed class AtlasLicenseService
     private static byte[] FromBase64Url(string value)
     {
         var normalized = value.Replace('-', '+').Replace('_', '/');
-        normalized += normalized.Length % 4 switch { 2 => "==", 3 => "=", _ => string.Empty };
+        normalized += (normalized.Length % 4) switch { 2 => "==", 3 => "=", _ => string.Empty };
         return Convert.FromBase64String(normalized);
     }
 
