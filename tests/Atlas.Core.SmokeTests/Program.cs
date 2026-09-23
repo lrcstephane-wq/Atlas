@@ -1,5 +1,6 @@
 using Atlas.Core.Models;
 using Atlas.Core.Services;
+using System.Security.Cryptography;
 
 static void Assert(bool condition, string message)
 {
@@ -120,6 +121,22 @@ var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
 Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 0, "Le secret ne doit jamais être stocké en clair.");
 
+using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+{
+    var privateKey = signingKey.ExportECPrivateKeyPem();
+    var publicKey = signingKey.ExportSubjectPublicKeyInfoPem();
+    var licensePath = Path.Combine(Path.GetTempPath(), $"atlas-license-{Guid.NewGuid():N}", "Licence.fautpastoucher");
+    var licenseService = new AtlasLicenseService(publicKey, licensePath);
+    var validUntil = new DateOnly(2027, 3, 31);
+    var licenseCode = AtlasLicenseService.Generate("Client trimestriel", validUntil, privateKey, "test-license");
+    var validLicense = licenseService.Validate(licenseCode, new DateOnly(2027, 3, 31));
+    Assert(validLicense.IsValid && validLicense.Customer == "Client trimestriel" && validLicense.ValidUntil == validUntil, "Une licence signée doit rester valide jusqu’à la date librement choisie incluse.");
+    Assert(licenseService.Validate(licenseCode, new DateOnly(2027, 4, 1)).State == AtlasLicenseState.Expired, "La licence doit expirer le lendemain de sa date de fin.");
+    Assert(licenseService.Validate(licenseCode + "X", new DateOnly(2027, 3, 1)).State == AtlasLicenseState.Invalid, "Un code modifié doit être refusé.");
+    Assert(licenseService.Install(licenseCode, new DateOnly(2027, 3, 1)).IsValid && File.Exists(licensePath), "Un code valide doit être écrit dans Licence.fautpastoucher.");
+    Directory.Delete(Path.GetDirectoryName(licensePath)!, true);
+}
+
 var appRoot = Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.App");
 var mainWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWindow.xaml"));
 var catalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CatalogView.xaml"));
@@ -142,7 +159,7 @@ Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
 Assert(catalogXaml.Contains("RÉFÉRENCE ATLAS") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer la référence et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
-Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsUserMode ? \"Catalog\""), "Le mode utilisateur doit rester verrouillé sur Horizon dans le modèle de navigation.");
+Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsUserMode || IsLicenseRestricted"), "Le mode utilisateur et les sessions sans licence doivent rester verrouillés sur Horizon.");
 Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("IsAdministrativeMode"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
 var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");
@@ -160,6 +177,9 @@ Assert(catalogXaml.Contains("COMPOSITION DU MEUBLE") && catalogXaml.Contains("Se
 Assert(viewModelSource.Contains("RefreshSelectedClientComposition") && viewModelSource.Contains("SelectedClientFurniture.ComponentLines"), "La composition Horizon doit provenir directement de la fiche meuble existante, sans seconde saisie.");
 Assert(furnitureXaml.Contains("Actualiser l’image…") && viewModelSource.Contains("ChooseFurnitureImageCommand") && viewModelSource.Contains("File.Copy(dialog.FileName, targetImage, true)"), "La fiche d’identité doit permettre de remplacer l’image du meuble indépendamment du fichier .TOP.");
 var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
+Assert(settingsXaml.Contains("LicensePanel") && settingsXaml.Contains("Vérifier et installer la licence") && settingsXaml.Contains("Date de fin de validité"), "Les paramètres doivent permettre au client d’installer son code et à l’administrateur de choisir librement l’échéance.");
+Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && mainWindowXaml.Contains("ShowLicensedUniverseNavigation"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
+Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && viewModelSource.Contains("IsAdministrator || IsLicenseValid"), "L’administrateur doit contourner la licence sans exposer la clé privée aux installations clientes.");
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
 Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
 Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("FurnitureUsageList") && settingsXaml.Contains("Renommer"), "Les paramètres doivent administrer les types de meubles et usages spécifiques.");

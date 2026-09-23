@@ -16,6 +16,7 @@ public partial class CatalogView : UserControl
     {
         if (sender is not FrameworkElement { DataContext: FurnitureCardViewModel card } || DataContext is not MainViewModel vm) return;
         vm.SelectedClientFurnitureCard = card;
+        if (!vm.HasFullHorizonAccess) card.IsChosen = false;
     }
 
     private void ClientFacetFavorite_OnClick(object sender, RoutedEventArgs e)
@@ -32,7 +33,7 @@ public partial class CatalogView : UserControl
 
     private void TopSolidDragCapsule_OnMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || DataContext is not MainViewModel vm || !vm.IsTopSolidBridgeReady) return;
+        if (e.LeftButton != MouseButtonState.Pressed || DataContext is not MainViewModel vm || !vm.HasFullHorizonAccess || !vm.IsTopSolidBridgeReady) return;
         var position = e.GetPosition(this);
         if (Math.Abs(position.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(position.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;

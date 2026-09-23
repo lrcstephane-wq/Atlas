@@ -39,7 +39,12 @@ public partial class SettingsView : UserControl
             foreach (var universe in vm.CatalogUniverseDefinitions.OrderBy(item => item.SortOrder)) _universes.Add(universe);
             foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
         }
-        ActivateSettingsButton(GeneralSettingsButton);
+        if (DataContext is MainViewModel vm && (vm.IsUserMode || vm.IsLicenseRestricted))
+        {
+            ActivateSettingsButton(LicenseSettingsButton);
+            ShowSettingsPanel("LicensePanel");
+        }
+        else ActivateSettingsButton(GeneralSettingsButton);
     }
 
     private async Task ReloadTaxonomyAsync()
@@ -107,8 +112,61 @@ public partial class SettingsView : UserControl
     {
         if (sender is not Button { Tag: string target } button) return;
         ActivateSettingsButton(button);
-        foreach (var panel in new FrameworkElement[] { GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
+        ShowSettingsPanel(target);
+    }
+
+    private void ShowSettingsPanel(string target)
+    {
+        foreach (var panel in new FrameworkElement[] { LicensePanel, GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
             panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void InstallLicense_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var result = vm.InstallLicense();
+        LicenseInstallStatus.Text = result.Message;
+        if (result.IsValid) AtlasDialog.Info($"Licence activée pour {result.Customer} jusqu’au {result.ValidUntil:dd/MM/yyyy} inclus.", "Licence Atlas");
+        else AtlasDialog.Warning(result.Message, "Licence non activée");
+    }
+
+    private void GenerateLicense_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        try
+        {
+            vm.GenerateLicense();
+            LicenseGeneratorStatus.Text = $"Code prêt pour {vm.NewLicenseCustomer.Trim()}, valable jusqu’au {vm.NewLicenseValidUntil:dd/MM/yyyy} inclus.";
+        }
+        catch (Exception exception)
+        {
+            LicenseGeneratorStatus.Text = exception.Message;
+            AtlasDialog.Warning(exception.Message, "Licence non générée");
+        }
+    }
+
+    private void CopyGeneratedLicense_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || string.IsNullOrWhiteSpace(vm.GeneratedLicenseCode)) return;
+        Clipboard.SetText(vm.GeneratedLicenseCode);
+        LicenseGeneratorStatus.Text = "Code copié dans le presse-papiers.";
+    }
+
+    private void InstallLicenseSigningKey_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var dialog = new OpenFileDialog { Title = "Installer la clé privée Idéo", Filter = "Clé privée PEM (*.pem)|*.pem|Tous les fichiers (*.*)|*.*", CheckFileExists = true };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            vm.InstallLicenseSigningKey(dialog.FileName);
+            LicenseGeneratorStatus.Text = "Clé privée Idéo installée. Le générateur est opérationnel.";
+        }
+        catch (Exception exception)
+        {
+            LicenseGeneratorStatus.Text = exception.Message;
+            AtlasDialog.Warning(exception.Message, "Clé refusée");
+        }
     }
 
     private void ActivateSettingsButton(Button button)

@@ -16,8 +16,11 @@
 <ColumnDefinition/>
 </Grid.ColumnDefinitions>
    <Border Style="{StaticResource Card}" Padding="8">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
 <StackPanel>
+     <TextBlock Text="ATLAS" Style="{StaticResource NavSection}"/>
+     <Button x:Name="LicenseSettingsButton" Content="Licence" Tag="LicensePanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     <StackPanel Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
      <TextBlock Text="GÉNÉRAL" Style="{StaticResource NavSection}"/>
      <Button x:Name="GeneralSettingsButton" Content="Espace de travail" Tag="GeneralPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Utilisateurs et droits" Tag="UsersPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
@@ -34,11 +37,52 @@
      <Button Content="Ouverture TopSolid" Tag="TopSolidPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}"/>
      <Button Content="Sauvegardes et diagnostics" Tag="SystemPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     </StackPanel>
     </StackPanel>
 </ScrollViewer>
    </Border>
 
    <Grid Grid.Column="2">
+    <ScrollViewer x:Name="LicensePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+     <StackPanel>
+      <TextBlock Text="Licence Atlas" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="La licence s’applique à un site client et peut être utilisée sur tous ses postes et réseaux." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+      <Border Style="{StaticResource Card}" BorderBrush="{Binding LicenseStatusColor}" BorderThickness="1">
+       <StackPanel>
+        <TextBlock Text="ÉTAT DE LA LICENCE" Style="{StaticResource Eyebrow}"/>
+        <TextBlock Text="{Binding LicenseStatusMessage}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,14"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Client / site" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding LicenseCustomer}" FontWeight="SemiBold"/></StackPanel>
+         <StackPanel Grid.Column="1"><TextBlock Text="Valide jusqu’au" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding LicenseValidUntil}" FontWeight="SemiBold"/></StackPanel>
+        </Grid>
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+       <StackPanel>
+        <TextBlock Text="INSTALLER UN CODE" Style="{StaticResource Eyebrow}"/>
+        <TextBlock Text="Collez exactement le code reçu par e-mail. Atlas l’enregistrera dans Licence.fautpastoucher après vérification." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,5,0,12"/>
+        <TextBox Text="{Binding LicenseCodeEntry, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="105" VerticalContentAlignment="Top"/>
+        <Button Content="Vérifier et installer la licence" HorizontalAlignment="Left" Margin="0,12,0,0" Click="InstallLicense_OnClick"/>
+        <TextBlock x:Name="LicenseInstallStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}" Margin="0,14,0,0" Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}">
+       <StackPanel>
+        <TextBlock Text="GÉNÉRATEUR IDÉO" Style="{StaticResource Eyebrow}"/>
+        <TextBlock Text="Crée un code signé pour un site client, valable jusqu’à la date choisie incluse." Style="{StaticResource Caption}" Margin="0,5,0,14"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Nom du client / site" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding NewLicenseCustomer, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+         <StackPanel Grid.Column="2"><TextBlock Text="Date de fin de validité" Style="{StaticResource FieldLabel}"/><DatePicker SelectedDate="{Binding NewLicenseValidUntil}" SelectedDateFormat="Long"/></StackPanel>
+        </Grid>
+        <Border Background="#102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0"><Grid><TextBlock Text="{Binding LicenseSigningKeyStatus}" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Installer la clé Idéo" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Click="InstallLicenseSigningKey_OnClick"/></Grid></Border>
+        <Button Content="Générer le code de licence" HorizontalAlignment="Left" Margin="0,13,0,0" Click="GenerateLicense_OnClick"/>
+        <TextBox Text="{Binding GeneratedLicenseCode}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="105" VerticalContentAlignment="Top" Margin="0,10,0,0"/>
+        <Button Content="Copier le code" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,9,0,0" Click="CopyGeneratedLicense_OnClick"/>
+        <TextBlock x:Name="LicenseGeneratorStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
+       </StackPanel>
+      </Border>
+     </StackPanel>
+    </ScrollViewer>
     <ScrollViewer x:Name="GeneralPanel" VerticalScrollBarVisibility="Auto">
 <StackPanel>
      <TextBlock Text="Espace de travail" Style="{StaticResource SectionTitle}"/>

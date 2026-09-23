@@ -48,18 +48,18 @@
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                             <StackPanel>
                                 <TextBlock Text="PILOTAGE" Style="{StaticResource NavSection}" Visibility="{Binding ShowAdministrativeNavigationLabels, Converter={StaticResource BoolVisibility}}"/>
-                                <Button Style="{StaticResource NavButton}" Background="{Binding DashboardNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" ToolTip="Vue d’ensemble" Visibility="{Binding IsAdministrativeMode, Converter={StaticResource BoolVisibility}}">
+                                <Button Style="{StaticResource NavButton}" Background="{Binding DashboardNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" ToolTip="Vue d’ensemble" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HomeIcon}" Style="{StaticResource NavPathIcon}"/><TextBlock Grid.Column="1" Text="Vue d’ensemble" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
                                 <TextBlock Text="FORGE" Style="{StaticResource NavSection}" Margin="24,25,0,8" Visibility="{Binding ShowAdministrativeNavigationLabels, Converter={StaticResource BoolVisibility}}"/>
-                                <Button Style="{StaticResource NavButton}" Background="{Binding ComponentsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Components" ToolTip="Bibliothèque de composants" Visibility="{Binding IsAdministrativeMode, Converter={StaticResource BoolVisibility}}">
+                                <Button Style="{StaticResource NavButton}" Background="{Binding ComponentsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Components" ToolTip="Bibliothèque de composants" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource ComponentsIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Composants" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
-                                <Button Style="{StaticResource NavButton}" Background="{Binding FurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Furniture" ToolTip="Meubles et compositions" Visibility="{Binding IsAdministrativeMode, Converter={StaticResource BoolVisibility}}">
+                                <Button Style="{StaticResource NavButton}" Background="{Binding FurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Furniture" ToolTip="Meubles et compositions" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource FurnitureIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource AmberBrush}"/><TextBlock Grid.Column="1" Text="Meubles &amp; variantes" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
-                                <Button Style="{StaticResource NavButton}" Background="{Binding FutureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Future" ToolTip="Compatibilités" Visibility="{Binding IsAdministrativeMode, Converter={StaticResource BoolVisibility}}">
+                                <Button Style="{StaticResource NavButton}" Background="{Binding FutureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Future" ToolTip="Compatibilités" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource LinksIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource RoseBrush}"/><TextBlock Grid.Column="1" Text="Compatibilités" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
@@ -70,7 +70,7 @@
 
                             </StackPanel>
                             <Border Grid.Row="1" Margin="14,5,12,5" Padding="7" CornerRadius="12" Background="#95121C25" BorderBrush="#445764" BorderThickness="1"
-                                    Visibility="{Binding IsCatalogPage, Converter={StaticResource BoolVisibility}}">
+                                    Visibility="{Binding ShowLicensedUniverseNavigation, Converter={StaticResource BoolVisibility}}">
                                 <Grid>
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                                     <Grid Margin="5,3,5,9" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
@@ -115,7 +115,7 @@
                             </Border>
                         </Grid>
 
-                        <StackPanel Grid.Row="2" Margin="0,4,0,0" Visibility="{Binding IsAdministrativeMode, Converter={StaticResource BoolVisibility}}">
+                        <StackPanel Grid.Row="2" Margin="0,4,0,0">
                             <TextBlock Text="SYSTÈME" Style="{StaticResource NavSection}" Margin="24,5,0,5" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/>
                             <Button Style="{StaticResource NavButton}" Background="{Binding SettingsNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Settings" ToolTip="Paramètres et comptes">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource NavPathIcon}"/><TextBlock Grid.Column="1" Text="Paramètres" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
@@ -146,7 +146,7 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Button Content="{Binding UpdateLabel}" Style="{StaticResource GhostButton}" Command="{Binding CheckUpdateCommand}" Margin="0,0,8,0" Padding="12,7"/>
-                            <Button Content="Enregistrer" Command="{Binding SaveCommand}" Margin="0,0,12,0" Padding="15,7" Visibility="{Binding IsAdministrativeMode, Converter={StaticResource BoolVisibility}}"/>
+                            <Button Content="Enregistrer" Command="{Binding SaveCommand}" Margin="0,0,12,0" Padding="15,7" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}"/>
                             <Button Content="—" Style="{StaticResource WindowButton}" Click="Minimize_Click"/>
                             <Button x:Name="MaximizeButton" Content="□" Style="{StaticResource WindowButton}" Click="Maximize_Click"/>
                             <Button Content="×" Style="{StaticResource WindowCloseButton}" Click="Close_Click"/>

@@ -26,6 +26,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly LocalBootstrap _bootstrap;
     private readonly LibraryScanner _scanner = new();
     private readonly ApplicationUpdateService _updater = new();
+    private readonly AtlasLicenseService _licenseService = new();
     private readonly HorizonPreferencesStore _horizonPreferencesStore;
     private HorizonPreferences _horizonPreferences = new();
     private AtlasCatalog _catalog = new();
@@ -44,6 +45,9 @@ public sealed class MainViewModel : ObservableObject
     private string _topSolidBridgeFolder = string.Empty;
     private IReadOnlyList<string> _topSolidBridgeFiles = Array.Empty<string>();
     private BitmapImage? _furniturePreview;
+    private AtlasLicenseInfo _licenseInfo;
+    private string _licenseCodeEntry = "", _generatedLicenseCode = "", _newLicenseCustomer = "";
+    private DateTime? _newLicenseValidUntil = DateTime.Today.AddYears(1);
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
     private readonly HashSet<string> _dirtyFurnitureIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _persistedFurnitureReferences = new(StringComparer.OrdinalIgnoreCase);
@@ -51,7 +55,8 @@ public sealed class MainViewModel : ObservableObject
     public MainViewModel(SharedCatalogStore store, UserAccountStore userStore, LocalBootstrap bootstrap, UserAccount currentUser, bool userMode = false)
     {
         _store = store; _userStore = userStore; _bootstrap = bootstrap; _sharedRoot = bootstrap.SharedRoot; CurrentUser = currentUser; IsUserMode = userMode;
-        _currentPage = userMode ? "Catalog" : "Dashboard";
+        _licenseInfo = _licenseService.Read();
+        _currentPage = userMode || IsLicenseRestricted ? "Catalog" : "Dashboard";
         _horizonPreferencesStore = new HorizonPreferencesStore(_sharedRoot, currentUser.Id);
         FurnitureSteps[0].IsActive = true;
         ComponentView = CollectionViewSource.GetDefaultView(ComponentCards); ComponentView.Filter = FilterComponent;
@@ -77,7 +82,7 @@ public sealed class MainViewModel : ObservableObject
         ClearClientFiltersCommand = new(_ => ClearClientFilters());
         ToggleClientFiltersCommand = new(_ => ShowAdvancedClientFilters = !ShowAdvancedClientFilters);
         ClearClientSelectionCommand = new(_ => ClearClientSelection(), _ => ClientSelectionCount > 0);
-        PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => ClientSelectionCount > 0 && !IsBusy);
+        PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => HasFullHorizonAccess && ClientSelectionCount > 0 && !IsBusy);
         OpenTopSolidBridgeFolderCommand = new(_ => OpenTopSolidBridgeFolder(), _ => IsTopSolidBridgeReady && Directory.Exists(TopSolidBridgeFolder));
         CreateFurnitureCommand = new(_ => CreateFurniture(), _ => CanEdit);
         DuplicateFurnitureCommand = new(_ => DuplicateFurniture(), _ => CanEdit && SelectedFurniture is not null && SelectedFurniture.Status != RecordStatus.Archivee);
@@ -106,10 +111,25 @@ public sealed class MainViewModel : ObservableObject
     public UserAccount CurrentUser { get; }
     public bool IsUserMode { get; }
     public bool IsAdministrativeMode => !IsUserMode;
-    public string SessionLabel => IsUserMode ? "Mode Horizon" : "Session sécurisée";
+    public bool CanUseAdministrativeInterfaces => IsAdministrativeMode && !IsLicenseRestricted;
+    public string SessionLabel => IsAdministrator ? "Session administrateur" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
     public bool IsAdministrator => CurrentUser.IsAdministrator;
+    public bool IsLicenseValid => _licenseInfo.IsValid;
+    public bool IsLicenseRestricted => !IsAdministrator && !IsLicenseValid;
+    public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
+    public bool ShowLicensedAdvancedClientFilters => HasFullHorizonAccess && ShowAdvancedClientFilters;
+    public string LicenseCustomer => string.IsNullOrWhiteSpace(_licenseInfo.Customer) ? "Non renseigné" : _licenseInfo.Customer;
+    public string LicenseValidUntil => _licenseInfo.ValidUntil is { } date ? date.ToString("dd/MM/yyyy") : "—";
+    public string LicenseStatusMessage => IsAdministrator && !IsLicenseValid ? $"{_licenseInfo.Message} L’administrateur conserve un accès complet." : _licenseInfo.Message;
+    public string LicenseStatusColor => IsLicenseValid ? "#2DD4BF" : _licenseInfo.State == AtlasLicenseState.Expired ? "#F59E0B" : "#FB7185";
+    public string LicenseCodeEntry { get => _licenseCodeEntry; set => SetProperty(ref _licenseCodeEntry, value); }
+    public string GeneratedLicenseCode { get => _generatedLicenseCode; private set => SetProperty(ref _generatedLicenseCode, value); }
+    public string NewLicenseCustomer { get => _newLicenseCustomer; set => SetProperty(ref _newLicenseCustomer, value); }
+    public DateTime? NewLicenseValidUntil { get => _newLicenseValidUntil; set => SetProperty(ref _newLicenseValidUntil, value); }
+    public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot));
+    public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible sur cet espace." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
     public ObservableCollection<ComponentRecord> Components { get; } = [];
     public ObservableCollection<ComponentCardViewModel> ComponentCards { get; } = [];
     public ObservableCollection<FurnitureRecord> Furniture { get; } = [];
@@ -178,13 +198,15 @@ public sealed class MainViewModel : ObservableObject
         get => _currentPage;
         set
         {
-            var requestedPage = IsUserMode ? "Catalog" : value;
+            var requestedPage = (IsUserMode || IsLicenseRestricted) && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase) ? "Catalog" : value;
             if (!SetProperty(ref _currentPage, requestedPage)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
             OnPropertyChanged(nameof(IsCatalogPage));
+            OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
         }
     }
     public bool IsCatalogPage => CurrentPage.Equals("Catalog", StringComparison.OrdinalIgnoreCase);
+    public bool ShowLicensedUniverseNavigation => IsCatalogPage && HasFullHorizonAccess;
     public string DashboardNavBackground => NavBackground("Dashboard");
     public string ComponentsNavBackground => NavBackground("Components");
     public string FurnitureNavBackground => NavBackground("Furniture");
@@ -208,11 +230,11 @@ public sealed class MainViewModel : ObservableObject
         }
     }
     public double NavigationWidth => IsNavigationExpanded ? 224 : 76;
-    public bool ShowAdministrativeNavigationLabels => IsAdministrativeMode && IsNavigationExpanded;
+    public bool ShowAdministrativeNavigationLabels => CanUseAdministrativeInterfaces && IsNavigationExpanded;
     public bool ShowUserSessionActions => IsUserMode && IsNavigationExpanded;
     public bool ShowAdministrativeSessionActions => IsAdministrativeMode && IsNavigationExpanded;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
-    public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set => SetProperty(ref _showAdvancedClientFilters, value); }
+    public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set { if (SetProperty(ref _showAdvancedClientFilters, value)) OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters)); } }
     public bool IsFamilyMode => CreationMode == "Family";
     public string EnvironmentLabel => Settings.Environment == CatalogEnvironment.NonConfigure ? "ENV. À CONFIGURER" : $"ENV. {Settings.Environment}";
     public int ComponentCount => Components.Count(item => !item.IsDemo);
@@ -413,6 +435,7 @@ public sealed class MainViewModel : ObservableObject
         catch { _horizonPreferences = new HorizonPreferences(); }
         await ReloadAsync(false);
         foreach (var user in await _userStore.LoadAsync()) Users.Add(user);
+        RefreshLicenseState();
     }
 
     public async Task CheckAutoUpdateAsync() { if (Settings.AutoUpdate) await CheckUpdateAsync(true); }
@@ -428,6 +451,73 @@ public sealed class MainViewModel : ObservableObject
             _ => UserPermissions.Read
         };
         var account = await _userStore.AddAsync(login, displayName, password, permissions); Users.Add(account);
+    }
+
+    public AtlasLicenseInfo InstallLicense()
+    {
+        _licenseInfo = _licenseService.Install(LicenseCodeEntry);
+        RefreshLicenseState();
+        if (_licenseInfo.IsValid)
+        {
+            LicenseCodeEntry = string.Empty;
+            StatusText = $"Licence de {_licenseInfo.Customer} activée jusqu’au {_licenseInfo.ValidUntil:dd/MM/yyyy}.";
+        }
+        return _licenseInfo;
+    }
+
+    public string GenerateLicense()
+    {
+        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut générer une licence.");
+        if (string.IsNullOrWhiteSpace(NewLicenseCustomer)) throw new InvalidOperationException("Renseignez le nom du client ou du site.");
+        if (NewLicenseValidUntil is null) throw new InvalidOperationException("Choisissez la date de fin de validité.");
+        var validUntil = DateOnly.FromDateTime(NewLicenseValidUntil.Value);
+        if (validUntil < DateOnly.FromDateTime(DateTime.Today)) throw new InvalidOperationException("La date de fin ne peut pas être antérieure à aujourd’hui.");
+        var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
+        if (!File.Exists(privateKeyPath)) throw new FileNotFoundException("La clé privée Idéo est absente de cet espace Atlas.", privateKeyPath);
+        GeneratedLicenseCode = AtlasLicenseService.Generate(NewLicenseCustomer, validUntil, File.ReadAllText(privateKeyPath));
+        StatusText = $"Licence générée pour {NewLicenseCustomer.Trim()} jusqu’au {validUntil:dd/MM/yyyy}.";
+        return GeneratedLicenseCode;
+    }
+
+    public void InstallLicenseSigningKey(string sourcePath)
+    {
+        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut installer la clé de signature.");
+        var privateKeyPem = File.ReadAllText(sourcePath);
+        var testCode = AtlasLicenseService.Generate("Contrôle clé Idéo", DateOnly.FromDateTime(DateTime.Today.AddDays(1)), privateKeyPem, "key-check");
+        if (!_licenseService.Validate(testCode).IsValid) throw new InvalidDataException("Cette clé privée ne correspond pas à la clé publique intégrée dans Atlas.");
+        var targetPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        File.Copy(sourcePath, targetPath, true);
+        OnPropertyChanged(nameof(HasLicenseSigningKey));
+        OnPropertyChanged(nameof(LicenseSigningKeyStatus));
+        StatusText = "Clé privée Idéo installée. Le générateur de licences est opérationnel.";
+    }
+
+    private void RefreshLicenseState()
+    {
+        OnPropertyChanged(nameof(IsLicenseValid));
+        OnPropertyChanged(nameof(IsLicenseRestricted));
+        OnPropertyChanged(nameof(HasFullHorizonAccess));
+        OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
+        OnPropertyChanged(nameof(CanUseAdministrativeInterfaces));
+        OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
+        OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters));
+        OnPropertyChanged(nameof(LicenseCustomer));
+        OnPropertyChanged(nameof(LicenseValidUntil));
+        OnPropertyChanged(nameof(LicenseStatusMessage));
+        OnPropertyChanged(nameof(LicenseStatusColor));
+        OnPropertyChanged(nameof(SessionLabel));
+        OnPropertyChanged(nameof(HasLicenseSigningKey));
+        OnPropertyChanged(nameof(LicenseSigningKeyStatus));
+        if (IsLicenseRestricted)
+        {
+            ShowAdvancedClientFilters = false;
+            ClearClientFilters();
+            ClearClientSelection();
+            InvalidateTopSolidBridge();
+            if (CurrentPage != "Settings") CurrentPage = "Catalog";
+        }
+        RaiseCommandStates();
     }
 
     private async Task ReloadAsync(bool showMessage = true)
@@ -786,6 +876,11 @@ public sealed class MainViewModel : ObservableObject
 
     private void PrepareTopSolidBridge()
     {
+        if (!HasFullHorizonAccess)
+        {
+            AtlasDialog.Warning("Une licence Atlas valide est nécessaire pour préparer un meuble dans TopSolid.", "Licence requise");
+            return;
+        }
         var selected = ClientFurnitureCards.Where(item => item.IsChosen).ToArray();
         if (selected.Length == 0)
         {
@@ -1682,7 +1777,9 @@ public sealed class MainViewModel : ObservableObject
 
     private void NavigateTo(string? page)
     {
-        CurrentPage = IsUserMode ? "Catalog" : string.IsNullOrWhiteSpace(page) ? "Dashboard" : page;
+        var requested = string.IsNullOrWhiteSpace(page) ? "Dashboard" : page;
+        var limitedSession = IsUserMode || IsLicenseRestricted;
+        CurrentPage = limitedSession && !requested.Equals("Catalog", StringComparison.OrdinalIgnoreCase) && !requested.Equals("Settings", StringComparison.OrdinalIgnoreCase) ? "Catalog" : requested;
     }
 
     private string EffectiveFurnitureRoot => string.IsNullOrWhiteSpace(Settings.FurnitureRoot) ? Settings.LibraryRoot : Settings.FurnitureRoot;
