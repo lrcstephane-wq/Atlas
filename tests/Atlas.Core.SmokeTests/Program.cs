@@ -160,7 +160,7 @@ Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Tex
 Assert(catalogXaml.Contains("RÉFÉRENCE ATLAS") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer la référence et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
 Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsUserMode || IsLicenseRestricted"), "Le mode utilisateur et les sessions sans licence doivent rester verrouillés sur Horizon.");
-Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("IsAdministrativeMode"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
+Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("CanUseAdministrativeInterfaces"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
 var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");
 Assert(viewModelSource.Contains("ValidateFurnitureReference") && viewModelSource.Contains("exactement 9 chiffres") && viewModelSource.Contains("est déjà utilisée par"), "Une référence meuble modifiée doit rester numérique, unique et explicite en cas de conflit.");
