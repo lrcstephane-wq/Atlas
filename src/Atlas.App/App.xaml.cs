@@ -37,6 +37,16 @@ public partial class App : Application
 
                 var login = new LoginWindow(_bootstrap);
                 if (login.ShowDialog() != true || login.AuthenticatedUser is null) continue;
+                if (launch.SelectedMode == AtlasEntryMode.Creator && !login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
+                {
+                    AtlasDialog.Warning("Ce compte ne possède pas le profil Créateur.", "Accès refusé");
+                    continue;
+                }
+                if (launch.SelectedMode == AtlasEntryMode.Administrator && login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
+                {
+                    AtlasDialog.Warning("Ce compte doit utiliser l’entrée Créateur.", "Accès refusé");
+                    continue;
+                }
                 await OpenSessionAsync(login.AuthenticatedUser, false);
                 return;
             }
@@ -54,6 +64,11 @@ public partial class App : Application
         {
             var login = new LoginWindow(_bootstrap) { Owner = currentWindow };
             if (login.ShowDialog() != true || login.AuthenticatedUser is null) return;
+            if (login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
+            {
+                AtlasDialog.Warning("Ce compte Créateur ne donne pas accès aux interfaces administratives.", "Accès refusé");
+                return;
+            }
             await OpenSessionAsync(login.AuthenticatedUser, false, currentWindow);
         }
         catch (Exception exception)

@@ -67,6 +67,9 @@
                                 <Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Horizon — expérience client Atlas">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HorizonIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
+                                <Button Style="{StaticResource NavButton}" Background="{Binding MyFurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="MyFurniture" ToolTip="Mes meubles" Visibility="{Binding CanManageCustomerFurniture, Converter={StaticResource BoolVisibility}}">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource FurnitureIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource AmberBrush}"/><TextBlock Grid.Column="1" Text="Mes meubles" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
+                                </Button>
 
                             </StackPanel>
                             <Border Grid.Row="1" Margin="14,5,12,5" Padding="7" CornerRadius="12" Background="#95121C25" BorderBrush="#445764" BorderThickness="1"
@@ -127,7 +130,7 @@
                                 <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource PrimaryGradient}"><TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/></Border>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding SessionLabel}" Style="{StaticResource Caption}"/></StackPanel>
                                 <Button Grid.Column="2" Content="↪" Style="{StaticResource IconButton}" ToolTip="Accès administrateur" Click="AccessAdministrator_Click" Visibility="{Binding ShowUserSessionActions, Converter={StaticResource BoolVisibility}}"/>
-                                <Button Grid.Column="2" Content="↩" Style="{StaticResource IconButton}" ToolTip="Se déconnecter du mode administrateur" Click="Logout_Click" Visibility="{Binding ShowAdministrativeSessionActions, Converter={StaticResource BoolVisibility}}"/>
+                                <Button Grid.Column="2" Content="↩" Style="{StaticResource IconButton}" ToolTip="Se déconnecter" Click="Logout_Click" Visibility="{Binding ShowAuthenticatedSessionActions, Converter={StaticResource BoolVisibility}}"/>
                             </Grid>
                         </Border>
                     </Grid>
@@ -161,6 +164,7 @@
                         <views:ComponentsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Components}"/>
                         <views:FurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Furniture}"/>
                         <views:CatalogView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Catalog}"/>
+                        <views:CustomerFurnitureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=MyFurniture}"/>
                         <views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}"/>
                         <views:FutureView Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibility}, ConverterParameter=Future}"/>
                     </Grid>

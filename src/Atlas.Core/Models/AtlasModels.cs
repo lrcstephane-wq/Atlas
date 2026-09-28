@@ -28,7 +28,8 @@ public enum UserPermissions
     Read = 1,
     Edit = 2,
     Validate = 4,
-    Administer = 8
+    Administer = 8,
+    ManageOwnFurniture = 16
 }
 
 public sealed class UserAccount
@@ -47,6 +48,7 @@ public sealed class UserAccount
     public bool CanEdit => Permissions.HasFlag(UserPermissions.Edit) || Permissions.HasFlag(UserPermissions.Administer);
     public bool CanValidate => Permissions.HasFlag(UserPermissions.Validate) || Permissions.HasFlag(UserPermissions.Administer);
     public bool IsAdministrator => Permissions.HasFlag(UserPermissions.Administer);
+    public bool IsCreator => Permissions.HasFlag(UserPermissions.ManageOwnFurniture);
 }
 
 public abstract class BindableModel : INotifyPropertyChanged
@@ -384,6 +386,44 @@ public sealed class FurnitureRecord : BindableModel
     public RecordStatus StatusBeforeArchive { get => _statusBeforeArchive; set => Set(ref _statusBeforeArchive, value); }
     public DateTimeOffset? ArchivedUtc { get; set; }
     public string ArchivedBy { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public bool IsCustomerFurniture { get; set; }
+
+    [JsonIgnore]
+    public List<string> PersonalTags { get; set; } = [];
+}
+
+public sealed class CustomerFurnitureCatalog
+{
+    public int SchemaVersion { get; set; } = 1;
+    public string FurnitureRoot { get; set; } = string.Empty;
+    public List<PersonalTagRecord> PersonalTags { get; set; } = [];
+    public List<CustomerFurnitureItem> Furniture { get; set; } = [];
+}
+
+public sealed class PersonalTagRecord : BindableModel
+{
+    private string _label = string.Empty;
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string Label { get => _label; set => Set(ref _label, value?.Trim() ?? string.Empty); }
+}
+
+public sealed class CustomerFurnitureItem : BindableModel
+{
+    private string _displayName = string.Empty;
+    private string _description = string.Empty;
+    private string _relativeTopPath = string.Empty;
+    private string _imageRelativePath = string.Empty;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string DisplayName { get => _displayName; set => Set(ref _displayName, value?.Trim() ?? string.Empty); }
+    public string Description { get => _description; set => Set(ref _description, value ?? string.Empty); }
+    public string RelativeTopPath { get => _relativeTopPath; set => Set(ref _relativeTopPath, value ?? string.Empty); }
+    public string ImageRelativePath { get => _imageRelativePath; set => Set(ref _imageRelativePath, value ?? string.Empty); }
+    public List<string> PersonalTagIds { get; set; } = [];
+    public DateTimeOffset FirstSeenUtc { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset LastSeenUtc { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class FurnitureComponentLine : BindableModel

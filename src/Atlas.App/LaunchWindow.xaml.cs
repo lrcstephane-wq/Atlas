@@ -6,6 +6,7 @@ public enum AtlasEntryMode
 {
     None,
     Administrator,
+    Creator,
     User
 }
 
@@ -24,6 +25,12 @@ public partial class LaunchWindow : Window
     private void User_OnClick(object sender, RoutedEventArgs e)
     {
         SelectedMode = AtlasEntryMode.User;
+        DialogResult = true;
+    }
+
+    private void Creator_OnClick(object sender, RoutedEventArgs e)
+    {
+        SelectedMode = AtlasEntryMode.Creator;
         DialogResult = true;
     }
 

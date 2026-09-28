@@ -20,6 +20,7 @@
 <StackPanel>
      <TextBlock Text="ATLAS" Style="{StaticResource NavSection}"/>
      <Button x:Name="LicenseSettingsButton" Content="Licence" Tag="LicensePanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     <Button x:Name="CustomerFurnitureSettingsButton" Content="Mes meubles et repères" Tag="CustomerFurnitureSettingsPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}" Visibility="{Binding CanManageCustomerFurniture, Converter={StaticResource BoolVisibility}}"/>
      <StackPanel Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
      <TextBlock Text="GÉNÉRAL" Style="{StaticResource NavSection}"/>
      <Button x:Name="GeneralSettingsButton" Content="Espace de travail" Tag="GeneralPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
@@ -81,6 +82,13 @@
         <TextBlock x:Name="LicenseGeneratorStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
        </StackPanel>
       </Border>
+     </StackPanel>
+    </ScrollViewer>
+    <ScrollViewer x:Name="CustomerFurnitureSettingsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+     <StackPanel>
+      <TextBlock Text="Mes meubles et repères" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="Collection privée du site client, conservée séparément du catalogue officiel Atlas." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+      <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="DOSSIER CLIENT" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding CustomerFurnitureRoot}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"/><TextBlock Text="{Binding CustomerFurnitureRootStatus}" Style="{StaticResource Caption}" Margin="0,5,0,12"/><Button Content="Gérer mes meubles et mes repères" Command="{Binding NavigateCommand}" CommandParameter="MyFurniture" HorizontalAlignment="Left"/></StackPanel></Border>
      </StackPanel>
     </ScrollViewer>
     <ScrollViewer x:Name="GeneralPanel" VerticalScrollBarVisibility="Auto">
@@ -152,7 +160,7 @@
 </StackPanel>
 <StackPanel Grid.Column="2">
 <TextBlock Text="Profil" Style="{StaticResource FieldLabel}"/>
-<ComboBox x:Name="NewRole" ItemsSource="{Binding RoleProfiles}" SelectedIndex="2"/>
+<ComboBox x:Name="NewRole" ItemsSource="{Binding RoleProfiles}" SelectedIndex="3"/>
 </StackPanel>
 </Grid>
        <TextBlock x:Name="UserError" Foreground="{StaticResource RoseBrush}" Margin="0,8,0,0"/>

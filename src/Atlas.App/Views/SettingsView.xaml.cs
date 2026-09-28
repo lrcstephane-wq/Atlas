@@ -44,6 +44,11 @@ public partial class SettingsView : UserControl
             ActivateSettingsButton(LicenseSettingsButton);
             ShowSettingsPanel("LicensePanel");
         }
+        else if (DataContext is MainViewModel { IsCreatorMode: true })
+        {
+            ActivateSettingsButton(CustomerFurnitureSettingsButton);
+            ShowSettingsPanel("CustomerFurnitureSettingsPanel");
+        }
         else ActivateSettingsButton(GeneralSettingsButton);
     }
 
@@ -117,7 +122,7 @@ public partial class SettingsView : UserControl
 
     private void ShowSettingsPanel(string target)
     {
-        foreach (var panel in new FrameworkElement[] { LicensePanel, GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
+        foreach (var panel in new FrameworkElement[] { LicensePanel, CustomerFurnitureSettingsPanel, GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
             panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
     }
 

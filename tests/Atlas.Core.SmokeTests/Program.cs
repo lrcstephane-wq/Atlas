@@ -120,6 +120,31 @@ finally
 var generatedSecret = Guid.NewGuid().ToString("N");
 var account = UserAccountStore.CreateAccount("test-user", "Utilisateur de test", generatedSecret, UserPermissions.Administer);
 Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 0, "Le secret ne doit jamais être stocké en clair.");
+var creatorAccount = UserAccountStore.CreateAccount("creator", "Créateur de test", generatedSecret, UserPermissions.Read | UserPermissions.ManageOwnFurniture);
+Assert(creatorAccount.IsCreator && !creatorAccount.IsAdministrator && !creatorAccount.CanEdit, "Le Créateur doit gérer ses meubles sans obtenir les droits de la Forge.");
+
+var customerTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-customer-{Guid.NewGuid():N}");
+try
+{
+    var shared = Path.Combine(customerTestRoot, "shared");
+    var furnitureRoot = Path.Combine(customerTestRoot, "furniture");
+    Directory.CreateDirectory(furnitureRoot);
+    await File.WriteAllTextAsync(Path.Combine(furnitureRoot, "Meuble_Michel.top"), "opaque");
+    await File.WriteAllTextAsync(Path.Combine(furnitureRoot, "Meuble_Michel.top.png"), "preview");
+    var customerStore = new CustomerFurnitureStore(shared);
+    var customerCatalog = new CustomerFurnitureCatalog { FurnitureRoot = furnitureRoot };
+    Assert(customerStore.Synchronize(customerCatalog) == 1 && customerCatalog.Furniture.Count == 1, "Un .TOP déposé doit rejoindre le catalogue client séparé.");
+    Assert(customerCatalog.Furniture[0].ImageRelativePath.EndsWith(".top.png", StringComparison.OrdinalIgnoreCase), "L’aperçu voisin du .TOP doit être détecté automatiquement.");
+    customerCatalog.PersonalTags.Add(new PersonalTagRecord { Id = "michel", Label = "Modèle Michel" });
+    customerCatalog.Furniture[0].PersonalTagIds.Add("michel");
+    await customerStore.SaveAsync(customerCatalog);
+    var reloadedCustomerCatalog = await customerStore.LoadAsync();
+    Assert(reloadedCustomerCatalog.Furniture.Single().PersonalTagIds.Contains("michel") && !customerStore.CatalogPath.Contains("catalog.atlas.json", StringComparison.OrdinalIgnoreCase), "Les repères et meubles client doivent rester hors de la base Atlas officielle.");
+}
+finally
+{
+    if (Directory.Exists(customerTestRoot)) Directory.Delete(customerTestRoot, true);
+}
 
 using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
 {
@@ -147,7 +172,7 @@ var mainWindowCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWind
 Assert(mainWindowCode.Contains("WmGetMinMaxInfo") && mainWindowCode.Contains("MonitorFromWindow") && mainWindowCode.Contains("WorkArea"), "Le plein écran doit respecter la zone de travail du moniteur et sa barre des tâches.");
 var launchWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "LaunchWindow.xaml"));
 var appCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "App.xaml.cs"));
-Assert(launchWindowXaml.Contains("Administrateur") && launchWindowXaml.Contains("Utilisateur") && launchWindowXaml.Contains("OUVRIR HORIZON"), "Le lancement doit proposer explicitement les deux modes Atlas.");
+Assert(launchWindowXaml.Contains("Administrateur") && launchWindowXaml.Contains("Créateur") && launchWindowXaml.Contains("Utilisateur") && launchWindowXaml.Contains("OUVRIR HORIZON"), "Le lancement doit proposer explicitement les trois modes Atlas.");
 Assert(appCode.Contains("OpenAdministratorSessionAsync") && appCode.Contains("LogoutAdministratorAsync") && appCode.Contains("atlas-horizon-user"), "Atlas doit pouvoir ouvrir et fermer une session administrateur sans redémarrage.");
 Assert(catalogXaml.Contains("FilterFacetTemplate") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit intégrer les favoris et conserver des zones défilantes.");
 Assert(catalogXaml.Contains("MinWidth=\"330\"") && catalogXaml.Contains("MaxWidth=\"390\""), "Horizon doit protéger les dimensions du panneau produit.");
@@ -157,9 +182,9 @@ Assert(!catalogXaml.Contains("MaxWidth=\"1820\""), "Horizon doit utiliser toute 
 Assert(mainWindowXaml.Contains("NavPathIcon") && !mainWindowXaml.Contains("Text=\"⚙\""), "Le menu principal doit utiliser des icônes vectorielles cohérentes.");
 Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains("<views:HorizonShell"), "Horizon doit rester intégré dans la coque Atlas commune.");
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
-Assert(catalogXaml.Contains("RÉFÉRENCE ATLAS") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer la référence et la grille doit rester dense.");
+Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
-Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsUserMode || IsLicenseRestricted"), "Le mode utilisateur et les sessions sans licence doivent rester verrouillés sur Horizon.");
+Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsCreatorMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsLicenseRestricted"), "Les modes utilisateur, Créateur et les sessions sans licence doivent conserver leurs périmètres propres.");
 Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("CanUseAdministrativeInterfaces"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
 var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");
@@ -186,6 +211,10 @@ Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("Furn
 var settingsCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml.cs"));
 Assert(settingsCode.Contains("AddFurnitureType_OnClick") && settingsCode.Contains("RenameFurnitureUsage_OnClick") && settingsCode.Contains("UpdateFurnitureVocabularyAsync"), "Les référentiels meubles doivent être ajoutables, renommables, supprimables et enregistrés.");
 Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Contains("DefaultFurnitureUsages") && viewModelSource.Contains("_catalog.FurnitureTypes = FurnitureTypes.ToList()"), "Les valeurs historiques doivent migrer vers des référentiels configurables et persistés.");
+var customerFurnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureView.xaml"));
+Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("CustomerFurnitureRoot") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions"), "Le Créateur doit disposer d’un espace Mes meubles limité au dossier client et aux repères personnels.");
+Assert(catalogXaml.Contains("ClientSourceFacets") && catalogXaml.Contains("ClientPersonalTagFacets") && catalogXaml.Contains("SourceLabel"), "Horizon doit distinguer la source et filtrer les repères personnels sans mélanger les tags Atlas.");
+Assert(viewModelSource.Contains("CustomerFurnitureStore") && viewModelSource.Contains("BuildCustomerFurnitureRecord") && viewModelSource.Contains("ManageOwnFurniture"), "Les meubles clients doivent être indexés séparément et réservés au profil Créateur.");
 var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));
 Assert(componentsXaml.Contains("Binding DetailedName"), "La Forge doit afficher le libellé complet des composants possédant un code C=.");
 Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");

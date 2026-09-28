@@ -1,7 +1,7 @@
 <Window x:Class="Atlas.App.LaunchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Bienvenue — Biblidéo Atlas" Width="980" Height="620"
+        Title="Bienvenue — Biblidéo Atlas" Width="1180" Height="620"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize" WindowStyle="None"
         AllowsTransparency="True" Background="Transparent">
     <Border Background="{StaticResource CanvasBrush}" BorderBrush="#345D78" BorderThickness="1" CornerRadius="18" Effect="{StaticResource PanelShadow}">
@@ -15,12 +15,12 @@
                 </StackPanel>
                 <Button Grid.Column="1" Content="×" Style="{StaticResource WindowCloseButton}" Click="Close_OnClick"/>
             </Grid>
-            <Grid Grid.Row="1" Margin="74,44,74,38">
+            <Grid Grid.Row="1" Margin="54,44,54,38">
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                 <TextBlock Text="Comment souhaitez-vous ouvrir Atlas ?" Style="{StaticResource PageTitle}" HorizontalAlignment="Center"/>
                 <TextBlock Grid.Row="1" Text="Chaque mode présente uniquement les outils nécessaires." Style="{StaticResource Caption}" FontSize="14" HorizontalAlignment="Center" Margin="0,8,0,30"/>
                 <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="24"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
                     <Button Height="230" Click="Administrator_OnClick" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="24">
                         <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <Border Width="58" Height="58" CornerRadius="29" Background="#163550" HorizontalAlignment="Left"><TextBlock Text="A" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
@@ -29,7 +29,15 @@
                             <TextBlock Grid.Row="3" Text="S'IDENTIFIER  →" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="11"/>
                         </Grid>
                     </Button>
-                    <Button Grid.Column="2" Height="230" Click="User_OnClick" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="24" Style="{StaticResource GhostButton}">
+                    <Button Grid.Column="2" Height="230" Click="Creator_OnClick" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="24" Style="{StaticResource GhostButton}">
+                        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Border Width="58" Height="58" CornerRadius="29" Background="#3A2D16" BorderBrush="#8B6B2C" BorderThickness="1" HorizontalAlignment="Left"><TextBlock Text="C" FontSize="23" FontWeight="Bold" Foreground="#F2C66D" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Grid.Row="1" Text="Créateur" FontSize="24" FontWeight="SemiBold" Margin="0,20,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Compte client sécurisé pour ajouter ses propres meubles et organiser ses repères personnels." Style="{StaticResource Caption}" FontSize="13" TextWrapping="Wrap" LineHeight="20" Margin="0,10,0,0"/>
+                            <TextBlock Grid.Row="3" Text="S'IDENTIFIER  →" Foreground="#F2C66D" FontWeight="Bold" FontSize="11"/>
+                        </Grid>
+                    </Button>
+                    <Button Grid.Column="4" Height="230" Click="User_OnClick" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="24" Style="{StaticResource GhostButton}">
                         <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <Border Width="58" Height="58" CornerRadius="29" Background="#183B35" BorderBrush="#2E7468" BorderThickness="1" HorizontalAlignment="Left"><TextBlock Text="H" FontSize="23" FontWeight="Bold" Foreground="#7FE0D0" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <TextBlock Grid.Row="1" Text="Utilisateur" FontSize="24" FontWeight="SemiBold" Margin="0,20,0,0"/>

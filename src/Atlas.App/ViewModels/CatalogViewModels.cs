@@ -122,6 +122,10 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
     public string Universes => string.Join(" · ", Record.Universes);
     public string Description => Record.Description;
     public string Forme => Record.Forme;
+    public string SourceLabel => Record.IsCustomerFurniture ? "MES MEUBLES" : "ATLAS";
+    public string CardBadge => Record.IsCustomerFurniture ? "Mes meubles" : Record.TypeMeuble;
+    public string ReferenceCaption => Record.IsCustomerFurniture ? "RÉFÉRENCE CLIENT" : "RÉFÉRENCE ATLAS";
+    public string SourcePath => ResolvePath(Record.SourceRelativePath);
     public bool IsChosen
     {
         get => _isChosen;
@@ -161,6 +165,45 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
             }
             catch { _thumbnail = null; }
             return _thumbnail;
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private string ResolvePath(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        if (Path.IsPathRooted(value)) return value;
+        var preferred = Path.Combine(_furnitureRoot, value);
+        if (File.Exists(preferred) || _fallbackRoot.Equals(_furnitureRoot, StringComparison.OrdinalIgnoreCase)) return preferred;
+        return Path.Combine(_fallbackRoot, value);
+    }
+}
+
+public sealed class CustomerPersonalTagOptionViewModel : INotifyPropertyChanged
+{
+    private bool _isSelected;
+    private readonly Action<CustomerPersonalTagOptionViewModel> _changed;
+
+    public CustomerPersonalTagOptionViewModel(PersonalTagRecord tag, bool isSelected, Action<CustomerPersonalTagOptionViewModel> changed)
+    {
+        Tag = tag;
+        _isSelected = isSelected;
+        _changed = changed;
+    }
+
+    public PersonalTagRecord Tag { get; }
+    public string Id => Tag.Id;
+    public string Label => Tag.Label;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new(nameof(IsSelected)));
+            _changed(this);
         }
     }
 
