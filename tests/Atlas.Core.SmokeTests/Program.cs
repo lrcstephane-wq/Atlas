@@ -156,6 +156,10 @@ using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
     var licenseCode = AtlasLicenseService.Generate("Client trimestriel", validUntil, privateKey, "test-license");
     var validLicense = licenseService.Validate(licenseCode, new DateOnly(2027, 3, 31));
     Assert(validLicense.IsValid && validLicense.Customer == "Client trimestriel" && validLicense.ValidUntil == validUntil, "Une licence signée doit rester valide jusqu’à la date librement choisie incluse.");
+    Assert(!validLicense.HasFeature(AtlasLicenseService.CreatorFeature), "Une ancienne licence sans option doit rester valide sans ouvrir le module Créateur.");
+    var creatorLicenseCode = AtlasLicenseService.Generate("Client Créateur", validUntil, privateKey, "creator-license", [AtlasLicenseService.CreatorFeature]);
+    var creatorLicense = licenseService.Validate(creatorLicenseCode, new DateOnly(2027, 3, 1));
+    Assert(creatorLicense.IsValid && creatorLicense.HasFeature(AtlasLicenseService.CreatorFeature), "L’option Créateur doit être incluse dans le contenu signé de la licence.");
     Assert(licenseService.Validate(licenseCode, new DateOnly(2027, 4, 1)).State == AtlasLicenseState.Expired, "La licence doit expirer le lendemain de sa date de fin.");
     Assert(licenseService.Validate(licenseCode + "X", new DateOnly(2027, 3, 1)).State == AtlasLicenseState.Invalid, "Un code modifié doit être refusé.");
     Assert(licenseService.Install(licenseCode, new DateOnly(2027, 3, 1)).IsValid && File.Exists(licensePath), "Un code valide doit être écrit dans Licence.fautpastoucher.");
@@ -203,6 +207,7 @@ Assert(viewModelSource.Contains("RefreshSelectedClientComposition") && viewModel
 Assert(furnitureXaml.Contains("Actualiser l’image…") && viewModelSource.Contains("ChooseFurnitureImageCommand") && viewModelSource.Contains("File.Copy(dialog.FileName, targetImage, true)"), "La fiche d’identité doit permettre de remplacer l’image du meuble indépendamment du fichier .TOP.");
 var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(settingsXaml.Contains("LicensePanel") && settingsXaml.Contains("Vérifier et installer la licence") && settingsXaml.Contains("Date de fin de validité"), "Les paramètres doivent permettre au client d’installer son code et à l’administrateur de choisir librement l’échéance.");
+Assert(settingsXaml.Contains("Autoriser le module Créateur") && settingsXaml.Contains("LicenseFeaturesLabel"), "Le générateur doit permettre d’inclure explicitement le module Créateur et d’afficher les options signées.");
 Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && mainWindowXaml.Contains("ShowLicensedUniverseNavigation"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
 Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && viewModelSource.Contains("IsAdministrator || IsLicenseValid"), "L’administrateur doit contourner la licence sans exposer la clé privée aux installations clientes.");
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
@@ -215,6 +220,7 @@ var customerFurnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "V
 Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("CustomerFurnitureRoot") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions"), "Le Créateur doit disposer d’un espace Mes meubles limité au dossier client et aux repères personnels.");
 Assert(catalogXaml.Contains("ClientSourceFacets") && catalogXaml.Contains("ClientPersonalTagFacets") && catalogXaml.Contains("SourceLabel"), "Horizon doit distinguer la source et filtrer les repères personnels sans mélanger les tags Atlas.");
 Assert(viewModelSource.Contains("CustomerFurnitureStore") && viewModelSource.Contains("BuildCustomerFurnitureRecord") && viewModelSource.Contains("ManageOwnFurniture"), "Les meubles clients doivent être indexés séparément et réservés au profil Créateur.");
+Assert(viewModelSource.Contains("IsCreatorFeatureLicensed") && viewModelSource.Contains("NewLicenseCreatorEnabled") && viewModelSource.Contains("features: features"), "L’accès Créateur doit exiger à la fois le profil utilisateur et l’option signée dans la licence.");
 var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));
 Assert(componentsXaml.Contains("Binding DetailedName"), "La Forge doit afficher le libellé complet des composants possédant un code C=.");
 Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");

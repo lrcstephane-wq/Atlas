@@ -39,7 +39,7 @@ public partial class SettingsView : UserControl
             foreach (var universe in vm.CatalogUniverseDefinitions.OrderBy(item => item.SortOrder)) _universes.Add(universe);
             foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
         }
-        if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted))
+        if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted || currentVm.IsCreatorMode && !currentVm.CanManageCustomerFurniture))
         {
             ActivateSettingsButton(LicenseSettingsButton);
             ShowSettingsPanel("LicensePanel");
@@ -141,7 +141,7 @@ public partial class SettingsView : UserControl
         try
         {
             vm.GenerateLicense();
-            LicenseGeneratorStatus.Text = $"Code prêt pour {vm.NewLicenseCustomer.Trim()}, valable jusqu’au {vm.NewLicenseValidUntil:dd/MM/yyyy} inclus.";
+            LicenseGeneratorStatus.Text = $"Code prêt pour {vm.NewLicenseCustomer.Trim()}, valable jusqu’au {vm.NewLicenseValidUntil:dd/MM/yyyy} inclus" + (vm.NewLicenseCreatorEnabled ? ", avec le module Créateur." : ", sans module complémentaire.");
         }
         catch (Exception exception)
         {

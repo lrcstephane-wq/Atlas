@@ -56,6 +56,7 @@
          <StackPanel><TextBlock Text="Client / site" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding LicenseCustomer}" FontWeight="SemiBold"/></StackPanel>
          <StackPanel Grid.Column="1"><TextBlock Text="Valide jusqu’au" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding LicenseValidUntil}" FontWeight="SemiBold"/></StackPanel>
         </Grid>
+        <Border Background="#102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0"><StackPanel><TextBlock Text="OPTIONS SIGNÉES" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding LicenseFeaturesLabel}" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel></Border>
        </StackPanel>
       </Border>
       <Border Style="{StaticResource Card}" Margin="0,14,0,0">
@@ -75,6 +76,7 @@
          <StackPanel><TextBlock Text="Nom du client / site" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding NewLicenseCustomer, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
          <StackPanel Grid.Column="2"><TextBlock Text="Date de fin de validité" Style="{StaticResource FieldLabel}"/><DatePicker SelectedDate="{Binding NewLicenseValidUntil}" SelectedDateFormat="Long"/></StackPanel>
         </Grid>
+        <CheckBox Content="Autoriser le module Créateur" IsChecked="{Binding NewLicenseCreatorEnabled}" Margin="0,14,0,0" ToolTip="Permet aux comptes Créateur d’ajouter et classer les meubles propres au client."/>
         <Border Background="#102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0"><Grid><TextBlock Text="{Binding LicenseSigningKeyStatus}" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Installer la clé Idéo" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Click="InstallLicenseSigningKey_OnClick"/></Grid></Border>
         <Button Content="Générer le code de licence" HorizontalAlignment="Left" Margin="0,13,0,0" Click="GenerateLicense_OnClick"/>
         <TextBox Text="{Binding GeneratedLicenseCode, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="105" VerticalContentAlignment="Top" Margin="0,10,0,0"/>

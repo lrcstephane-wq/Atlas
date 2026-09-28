@@ -21,10 +21,13 @@ public sealed record AtlasLicenseInfo(
     string Message)
 {
     public bool IsValid => State == AtlasLicenseState.Valid;
+    public IReadOnlySet<string> Features { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    public bool HasFeature(string feature) => Features.Contains(feature);
 }
 
 public sealed class AtlasLicenseService
 {
+    public const string CreatorFeature = "creator";
     private const string PublicKeyPem = """
         -----BEGIN PUBLIC KEY-----
         MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDpV+t9vu4eMTZL7zR9dCWuAXDNbZ
@@ -86,9 +89,13 @@ public sealed class AtlasLicenseService
             if (string.IsNullOrWhiteSpace(payload.Customer) || string.IsNullOrWhiteSpace(payload.LicenseId) || !DateOnly.TryParseExact(payload.ValidUntil, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var validUntil))
                 throw new InvalidDataException();
             var currentDate = today ?? DateOnly.FromDateTime(DateTime.Today);
+            var features = (payload.Features ?? [])
+                .Where(feature => !string.IsNullOrWhiteSpace(feature))
+                .Select(feature => feature.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             return currentDate > validUntil
-                ? new(AtlasLicenseState.Expired, payload.Customer.Trim(), validUntil, payload.LicenseId, $"La licence de {payload.Customer.Trim()} a expiré le {validUntil:dd/MM/yyyy}.")
-                : new(AtlasLicenseState.Valid, payload.Customer.Trim(), validUntil, payload.LicenseId, $"Licence valide jusqu’au {validUntil:dd/MM/yyyy} inclus.");
+                ? new AtlasLicenseInfo(AtlasLicenseState.Expired, payload.Customer.Trim(), validUntil, payload.LicenseId, $"La licence de {payload.Customer.Trim()} a expiré le {validUntil:dd/MM/yyyy}.") { Features = features }
+                : new AtlasLicenseInfo(AtlasLicenseState.Valid, payload.Customer.Trim(), validUntil, payload.LicenseId, $"Licence valide jusqu’au {validUntil:dd/MM/yyyy} inclus.") { Features = features };
         }
         catch
         {
@@ -96,7 +103,7 @@ public sealed class AtlasLicenseService
         }
     }
 
-    public static string Generate(string customer, DateOnly validUntil, string privateKeyPem, string? licenseId = null)
+    public static string Generate(string customer, DateOnly validUntil, string privateKeyPem, string? licenseId = null, IEnumerable<string>? features = null)
     {
         if (string.IsNullOrWhiteSpace(customer)) throw new ArgumentException("Le nom du client ou du site est obligatoire.", nameof(customer));
         if (string.IsNullOrWhiteSpace(privateKeyPem)) throw new ArgumentException("La clé privée de signature est absente.", nameof(privateKeyPem));
@@ -104,7 +111,13 @@ public sealed class AtlasLicenseService
         {
             Customer = customer.Trim(),
             ValidUntil = validUntil.ToString("yyyy-MM-dd"),
-            LicenseId = string.IsNullOrWhiteSpace(licenseId) ? Guid.NewGuid().ToString("N") : licenseId.Trim()
+            LicenseId = string.IsNullOrWhiteSpace(licenseId) ? Guid.NewGuid().ToString("N") : licenseId.Trim(),
+            Features = (features ?? [])
+                .Where(feature => !string.IsNullOrWhiteSpace(feature))
+                .Select(feature => feature.Trim().ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList()
         };
         var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
         using var signer = ECDsa.Create();
@@ -127,5 +140,6 @@ public sealed class AtlasLicenseService
         public string Customer { get; set; } = string.Empty;
         public string ValidUntil { get; set; } = string.Empty;
         public string LicenseId { get; set; } = string.Empty;
+        public List<string> Features { get; set; } = [];
     }
 }

@@ -51,6 +51,7 @@ public sealed class MainViewModel : ObservableObject
     private AtlasLicenseInfo _licenseInfo;
     private string _licenseCodeEntry = "", _generatedLicenseCode = "", _newLicenseCustomer = "";
     private string _newPersonalTagName = "";
+    private bool _newLicenseCreatorEnabled;
     private DateTime? _newLicenseValidUntil = DateTime.Today.AddYears(1);
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
     private readonly HashSet<string> _dirtyFurnitureIds = new(StringComparer.OrdinalIgnoreCase);
@@ -125,8 +126,9 @@ public sealed class MainViewModel : ObservableObject
     public bool IsCreatorMode => !IsUserMode && CurrentUser.IsCreator && !CurrentUser.IsAdministrator;
     public bool IsAdministrativeMode => !IsUserMode && !IsCreatorMode;
     public bool CanUseAdministrativeInterfaces => IsAdministrativeMode && !IsLicenseRestricted;
-    public bool CanManageCustomerFurniture => (IsCreatorMode || IsAdministrator) && HasFullHorizonAccess;
-    public string SessionLabel => IsAdministrator ? "Session administrateur" : IsCreatorMode ? "Mode Créateur" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
+    public bool IsCreatorFeatureLicensed => _licenseInfo.HasFeature(AtlasLicenseService.CreatorFeature);
+    public bool CanManageCustomerFurniture => IsAdministrator || (IsCreatorMode && IsLicenseValid && IsCreatorFeatureLicensed);
+    public string SessionLabel => IsAdministrator ? "Session administrateur" : IsCreatorMode && IsCreatorFeatureLicensed ? "Mode Créateur" : IsCreatorMode ? "Mode Horizon · option Créateur inactive" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
     public bool IsAdministrator => CurrentUser.IsAdministrator;
@@ -142,6 +144,8 @@ public sealed class MainViewModel : ObservableObject
     public string GeneratedLicenseCode { get => _generatedLicenseCode; private set => SetProperty(ref _generatedLicenseCode, value); }
     public string NewLicenseCustomer { get => _newLicenseCustomer; set => SetProperty(ref _newLicenseCustomer, value); }
     public DateTime? NewLicenseValidUntil { get => _newLicenseValidUntil; set => SetProperty(ref _newLicenseValidUntil, value); }
+    public bool NewLicenseCreatorEnabled { get => _newLicenseCreatorEnabled; set => SetProperty(ref _newLicenseCreatorEnabled, value); }
+    public string LicenseFeaturesLabel => IsCreatorFeatureLicensed ? "Module Créateur inclus" : "Aucun module complémentaire";
     public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot));
     public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible sur cet espace." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
     public ObservableCollection<ComponentRecord> Components { get; } = [];
@@ -220,6 +224,7 @@ public sealed class MainViewModel : ObservableObject
             var requestedPage = value;
             if (IsLicenseRestricted && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             else if (IsUserMode && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
+            else if (IsCreatorMode && string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase) && !CanManageCustomerFurniture) requestedPage = "Catalog";
             else if (IsCreatorMode && !string.Equals(value, "Catalog", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             if (!SetProperty(ref _currentPage, requestedPage)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(MyFurnitureNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
@@ -551,8 +556,9 @@ public sealed class MainViewModel : ObservableObject
         if (validUntil < DateOnly.FromDateTime(DateTime.Today)) throw new InvalidOperationException("La date de fin ne peut pas être antérieure à aujourd’hui.");
         var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
         if (!File.Exists(privateKeyPath)) throw new FileNotFoundException("La clé privée Idéo est absente de cet espace Atlas.", privateKeyPath);
-        GeneratedLicenseCode = AtlasLicenseService.Generate(NewLicenseCustomer, validUntil, File.ReadAllText(privateKeyPath));
-        StatusText = $"Licence générée pour {NewLicenseCustomer.Trim()} jusqu’au {validUntil:dd/MM/yyyy}.";
+        var features = NewLicenseCreatorEnabled ? new[] { AtlasLicenseService.CreatorFeature } : Array.Empty<string>();
+        GeneratedLicenseCode = AtlasLicenseService.Generate(NewLicenseCustomer, validUntil, File.ReadAllText(privateKeyPath), features: features);
+        StatusText = $"Licence générée pour {NewLicenseCustomer.Trim()} jusqu’au {validUntil:dd/MM/yyyy}" + (NewLicenseCreatorEnabled ? " avec le module Créateur." : ".");
         return GeneratedLicenseCode;
     }
 
@@ -578,6 +584,8 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
         OnPropertyChanged(nameof(CanUseAdministrativeInterfaces));
         OnPropertyChanged(nameof(CanManageCustomerFurniture));
+        OnPropertyChanged(nameof(IsCreatorFeatureLicensed));
+        OnPropertyChanged(nameof(LicenseFeaturesLabel));
         OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
         OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters));
         OnPropertyChanged(nameof(LicenseCustomer));
