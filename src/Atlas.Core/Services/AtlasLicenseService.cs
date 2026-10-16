@@ -10,6 +10,7 @@ public enum AtlasLicenseState
     Missing,
     Valid,
     Expired,
+    DeviceMismatch,
     Invalid
 }
 
@@ -18,6 +19,7 @@ public sealed record AtlasLicenseInfo(
     string Customer,
     DateOnly? ValidUntil,
     string LicenseId,
+    string DeviceId,
     string Message)
 {
     public bool IsValid => State == AtlasLicenseState.Valid;
@@ -38,26 +40,31 @@ public sealed class AtlasLicenseService
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly string _publicKeyPem;
     private readonly string _licenseFilePath;
+    private readonly string _deviceId;
 
-    public AtlasLicenseService(string? publicKeyPem = null, string? licenseFilePath = null)
+    public AtlasLicenseService(string? publicKeyPem = null, string? licenseFilePath = null, string? deviceId = null)
     {
         _publicKeyPem = string.IsNullOrWhiteSpace(publicKeyPem) ? PublicKeyPem : publicKeyPem;
         _licenseFilePath = string.IsNullOrWhiteSpace(licenseFilePath) ? LicenseFilePath : licenseFilePath;
+        _deviceId = string.IsNullOrWhiteSpace(deviceId) ? MachineIdentityService.CurrentDeviceId : deviceId;
     }
 
-    public static string LicenseFilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Ideo Solutions", "Atlas", "Licence.fautpastoucher");
+    public static string LicenseFilePath => AtlasPaths.LicenseFilePath;
 
     public static string SigningPrivateKeyPath(string sharedRoot) =>
-        Path.Combine(sharedRoot, "Configuration", "Atlas-Licence-ClePrivee.pem");
+        Path.Combine(AtlasPaths.ConfigurationRoot, "Atlas-Licence-ClePrivee.pem");
 
     public AtlasLicenseInfo Read(DateOnly? today = null)
     {
+        try { MigrateLegacyLicense(); }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
+        if (!File.Exists(_licenseFilePath) && File.Exists(AtlasPaths.LegacyLicenseFilePath))
+            return Validate(File.ReadAllText(AtlasPaths.LegacyLicenseFilePath), today);
         if (!File.Exists(_licenseFilePath))
-            return new(AtlasLicenseState.Missing, string.Empty, null, string.Empty, "Aucune licence Atlas n’est installée.");
+            return new(AtlasLicenseState.Missing, string.Empty, null, string.Empty, string.Empty, "Aucune licence Atlas n’est installée.");
         try { return Validate(File.ReadAllText(_licenseFilePath), today); }
-        catch { return new(AtlasLicenseState.Invalid, string.Empty, null, string.Empty, "Le fichier de licence est illisible."); }
+        catch { return new(AtlasLicenseState.Invalid, string.Empty, null, string.Empty, string.Empty, "Le fichier de licence est illisible."); }
     }
 
     public AtlasLicenseInfo Install(string code, DateOnly? today = null)
@@ -74,7 +81,7 @@ public sealed class AtlasLicenseService
     public AtlasLicenseInfo Validate(string code, DateOnly? today = null)
     {
         if (string.IsNullOrWhiteSpace(code))
-            return new(AtlasLicenseState.Missing, string.Empty, null, string.Empty, "Saisissez le code de licence reçu par e-mail.");
+            return new(AtlasLicenseState.Missing, string.Empty, null, string.Empty, string.Empty, "Saisissez le code de licence reçu par e-mail.");
         try
         {
             var parts = code.Trim().Split('.');
@@ -93,17 +100,22 @@ public sealed class AtlasLicenseService
                 .Where(feature => !string.IsNullOrWhiteSpace(feature))
                 .Select(feature => feature.Trim())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var licensedDevice = payload.DeviceId?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(licensedDevice) &&
+                !MachineIdentityService.Normalize(licensedDevice).Equals(MachineIdentityService.Normalize(_deviceId), StringComparison.Ordinal))
+                return new AtlasLicenseInfo(AtlasLicenseState.DeviceMismatch, payload.Customer.Trim(), validUntil, payload.LicenseId, licensedDevice,
+                    "Cette licence a été générée pour un autre poste.") { Features = features };
             return currentDate > validUntil
-                ? new AtlasLicenseInfo(AtlasLicenseState.Expired, payload.Customer.Trim(), validUntil, payload.LicenseId, $"La licence de {payload.Customer.Trim()} a expiré le {validUntil:dd/MM/yyyy}.") { Features = features }
-                : new AtlasLicenseInfo(AtlasLicenseState.Valid, payload.Customer.Trim(), validUntil, payload.LicenseId, $"Licence valide jusqu’au {validUntil:dd/MM/yyyy} inclus.") { Features = features };
+                ? new AtlasLicenseInfo(AtlasLicenseState.Expired, payload.Customer.Trim(), validUntil, payload.LicenseId, licensedDevice, $"La licence de {payload.Customer.Trim()} a expiré le {validUntil:dd/MM/yyyy}.") { Features = features }
+                : new AtlasLicenseInfo(AtlasLicenseState.Valid, payload.Customer.Trim(), validUntil, payload.LicenseId, licensedDevice, $"Licence valide jusqu’au {validUntil:dd/MM/yyyy} inclus.") { Features = features };
         }
         catch
         {
-            return new(AtlasLicenseState.Invalid, string.Empty, null, string.Empty, "Ce code de licence est invalide ou a été modifié.");
+            return new(AtlasLicenseState.Invalid, string.Empty, null, string.Empty, string.Empty, "Ce code de licence est invalide ou a été modifié.");
         }
     }
 
-    public static string Generate(string customer, DateOnly validUntil, string privateKeyPem, string? licenseId = null, IEnumerable<string>? features = null)
+    public static string Generate(string customer, DateOnly validUntil, string privateKeyPem, string? licenseId = null, IEnumerable<string>? features = null, string? deviceId = null)
     {
         if (string.IsNullOrWhiteSpace(customer)) throw new ArgumentException("Le nom du client ou du site est obligatoire.", nameof(customer));
         if (string.IsNullOrWhiteSpace(privateKeyPem)) throw new ArgumentException("La clé privée de signature est absente.", nameof(privateKeyPem));
@@ -112,6 +124,7 @@ public sealed class AtlasLicenseService
             Customer = customer.Trim(),
             ValidUntil = validUntil.ToString("yyyy-MM-dd"),
             LicenseId = string.IsNullOrWhiteSpace(licenseId) ? Guid.NewGuid().ToString("N") : licenseId.Trim(),
+            DeviceId = deviceId?.Trim() ?? string.Empty,
             Features = (features ?? [])
                 .Where(feature => !string.IsNullOrWhiteSpace(feature))
                 .Select(feature => feature.Trim().ToLowerInvariant())
@@ -135,11 +148,19 @@ public sealed class AtlasLicenseService
         return Convert.FromBase64String(normalized);
     }
 
+    private void MigrateLegacyLicense()
+    {
+        if (!_licenseFilePath.Equals(LicenseFilePath, StringComparison.OrdinalIgnoreCase) || File.Exists(_licenseFilePath) || !File.Exists(AtlasPaths.LegacyLicenseFilePath)) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(_licenseFilePath)!);
+        File.Copy(AtlasPaths.LegacyLicenseFilePath, _licenseFilePath, false);
+    }
+
     private sealed class LicensePayload
     {
         public string Customer { get; set; } = string.Empty;
         public string ValidUntil { get; set; } = string.Empty;
         public string LicenseId { get; set; } = string.Empty;
+        public string DeviceId { get; set; } = string.Empty;
         public List<string> Features { get; set; } = [];
     }
 }

@@ -38,7 +38,11 @@ jobs:
       - name: Créer le pack complet et la mise à jour différentielle
         shell: pwsh
         run: |
-          Compress-Archive -Path publish/portable/* -DestinationPath publish/Atlas-full-win-x64.zip
+          New-Item -ItemType Directory -Path publish/full/Application -Force | Out-Null
+          Copy-Item publish/portable/* publish/full/Application -Recurse -Force
+          Copy-Item deployment/Installer-Atlas.ps1 publish/full/Installer-Atlas.ps1 -Force
+          Copy-Item deployment/Installer-Atlas.cmd publish/full/Installer-Atlas.cmd -Force
+          Compress-Archive -Path publish/full/* -DestinationPath publish/Atlas-full-win-x64.zip
           New-Item -ItemType Directory -Path publish/update | Out-Null
           $changed = @("Atlas.exe", "Atlas.dll", "Atlas.Core.dll", "Atlas.deps.json", "Atlas.runtimeconfig.json")
           foreach ($file in $changed) { Copy-Item "publish/portable/$file" "publish/update/$file" -Force }

@@ -25,6 +25,7 @@ public sealed class SharedCatalogStore
     public async Task<AtlasCatalog> LoadAsync(CancellationToken cancellationToken = default)
     {
         EnsureFolders();
+        await AtlasWorkspaceService.EnsureAsync(SharedRoot, cancellationToken: cancellationToken);
         if (!File.Exists(CatalogPath)) return DemoCatalogFactory.Create();
         await using var stream = File.Open(CatalogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         return await JsonSerializer.DeserializeAsync<AtlasCatalog>(stream, JsonOptions, cancellationToken)
@@ -57,21 +58,31 @@ public sealed class SharedCatalogStore
             $"{DateTimeOffset.Now:O}\t{catalog.ModifiedBy}\t{Environment.MachineName}\tSAVE\tr{catalog.Revision}{Environment.NewLine}", cancellationToken);
     }
 
-    public static string LocalBootstrapPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ideo Solutions", "Atlas", "bootstrap.json");
+    public static string LocalBootstrapPath => AtlasPaths.BootstrapPath;
 
     public static async Task<LocalBootstrap> LoadBootstrapAsync()
     {
-        if (!File.Exists(LocalBootstrapPath)) return new LocalBootstrap();
-        await using var stream = File.OpenRead(LocalBootstrapPath);
-        return await JsonSerializer.DeserializeAsync<LocalBootstrap>(stream, JsonOptions) ?? new LocalBootstrap();
+        var path = LocalBootstrapPath;
+        if (!File.Exists(path) && File.Exists(AtlasPaths.LegacyBootstrapPath)) path = AtlasPaths.LegacyBootstrapPath;
+        if (!File.Exists(path)) return new LocalBootstrap { SharedRoot = AtlasPaths.DefaultWorkspaceRoot };
+        await using var stream = File.OpenRead(path);
+        var bootstrap = await JsonSerializer.DeserializeAsync<LocalBootstrap>(stream, JsonOptions) ?? new LocalBootstrap();
+        if (string.IsNullOrWhiteSpace(bootstrap.SharedRoot)) bootstrap.SharedRoot = AtlasPaths.DefaultWorkspaceRoot;
+        if (!path.Equals(LocalBootstrapPath, StringComparison.OrdinalIgnoreCase))
+        {
+            try { await SaveBootstrapAsync(bootstrap); }
+            catch (UnauthorizedAccessException) { }
+            catch (IOException) { }
+        }
+        return bootstrap;
     }
 
     public static async Task SaveBootstrapAsync(LocalBootstrap bootstrap)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(LocalBootstrapPath)!);
-        await using var stream = File.Create(LocalBootstrapPath);
-        await JsonSerializer.SerializeAsync(stream, bootstrap, JsonOptions);
+        var temporary = LocalBootstrapPath + $".{Guid.NewGuid():N}.tmp";
+        await using (var stream = File.Create(temporary)) await JsonSerializer.SerializeAsync(stream, bootstrap, JsonOptions);
+        File.Move(temporary, LocalBootstrapPath, true);
     }
 
     private void EnsureFolders()

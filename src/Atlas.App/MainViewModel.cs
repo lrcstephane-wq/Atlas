@@ -49,7 +49,7 @@ public sealed class MainViewModel : ObservableObject
     private IReadOnlyList<string> _topSolidBridgeFiles = Array.Empty<string>();
     private BitmapImage? _furniturePreview;
     private AtlasLicenseInfo _licenseInfo;
-    private string _licenseCodeEntry = "", _generatedLicenseCode = "", _newLicenseCustomer = "";
+    private string _licenseCodeEntry = "", _generatedLicenseCode = "", _newLicenseCustomer = "", _newLicenseDeviceId = "";
     private string _newPersonalTagName = "";
     private bool _newLicenseCreatorEnabled;
     private DateTime? _newLicenseValidUntil = DateTime.Today.AddYears(1);
@@ -77,6 +77,9 @@ public sealed class MainViewModel : ObservableObject
         ScanCommand = new(_ => _ = ScanAsync(), _ => CanEdit && !IsBusy);
         ChooseLibraryCommand = new(_ => ChooseLibrary(), _ => CanEdit);
         ChooseFurnitureRootCommand = new(_ => ChooseFurnitureRoot(), _ => CanEdit);
+        ChooseLocalLibraryOverrideCommand = new(_ => ChooseLocalLibraryOverride(), _ => IsAdministrator);
+        ChooseLocalFurnitureOverrideCommand = new(_ => ChooseLocalFurnitureOverride(), _ => IsAdministrator);
+        ClearLocalPathOverridesCommand = new(_ => ClearLocalPathOverrides(), _ => IsAdministrator);
         ChooseCustomerFurnitureRootCommand = new(_ => ChooseCustomerFurnitureRoot(), _ => CanManageCustomerFurniture);
         SynchronizeCustomerFurnitureCommand = new(_ => _ = SynchronizeCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && !IsBusy);
         SaveCustomerFurnitureCommand = new(_ => _ = SaveCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && !IsBusy);
@@ -86,6 +89,7 @@ public sealed class MainViewModel : ObservableObject
         DeletePersonalTagCommand = new(tag => DeletePersonalTag(tag as PersonalTagRecord), _ => CanManageCustomerFurniture);
         ChooseSharedRootCommand = new(_ => ChooseSharedRoot(), _ => IsAdministrator);
         SaveBootstrapCommand = new(_ => _ = SaveBootstrapAsync(), _ => IsAdministrator);
+        MoveWorkspaceCommand = new(_ => _ = MoveWorkspaceAsync(), _ => IsAdministrator && !IsBusy);
         ValidateComponentCommand = new(_ => ValidateComponent(), _ => CanValidate && SelectedComponent is not null);
         SetComponentLayoutCommand = new(value => IsComponentMosaic = value?.ToString() != "List");
         SetFamilyFilterCommand = new(value => ActiveFamilyFilter = value?.ToString() ?? "Toutes");
@@ -138,16 +142,19 @@ public sealed class MainViewModel : ObservableObject
     public bool ShowLicensedAdvancedClientFilters => HasFullHorizonAccess && ShowAdvancedClientFilters;
     public string LicenseCustomer => string.IsNullOrWhiteSpace(_licenseInfo.Customer) ? "Non renseigné" : _licenseInfo.Customer;
     public string LicenseValidUntil => _licenseInfo.ValidUntil is { } date ? date.ToString("dd/MM/yyyy") : "—";
+    public string DeviceId => MachineIdentityService.CurrentDeviceId;
+    public string LicensedDeviceId => string.IsNullOrWhiteSpace(_licenseInfo.DeviceId) ? "Ancienne licence non liée à un poste" : _licenseInfo.DeviceId;
     public string LicenseStatusMessage => IsAdministrator && !IsLicenseValid ? $"{_licenseInfo.Message} L’administrateur conserve un accès complet." : _licenseInfo.Message;
     public string LicenseStatusColor => IsLicenseValid ? "#2DD4BF" : _licenseInfo.State == AtlasLicenseState.Expired ? "#F59E0B" : "#FB7185";
     public string LicenseCodeEntry { get => _licenseCodeEntry; set => SetProperty(ref _licenseCodeEntry, value); }
     public string GeneratedLicenseCode { get => _generatedLicenseCode; private set => SetProperty(ref _generatedLicenseCode, value); }
     public string NewLicenseCustomer { get => _newLicenseCustomer; set => SetProperty(ref _newLicenseCustomer, value); }
+    public string NewLicenseDeviceId { get => _newLicenseDeviceId; set => SetProperty(ref _newLicenseDeviceId, value); }
     public DateTime? NewLicenseValidUntil { get => _newLicenseValidUntil; set => SetProperty(ref _newLicenseValidUntil, value); }
     public bool NewLicenseCreatorEnabled { get => _newLicenseCreatorEnabled; set => SetProperty(ref _newLicenseCreatorEnabled, value); }
     public string LicenseFeaturesLabel => IsCreatorFeatureLicensed ? "Module Créateur inclus" : "Aucun module complémentaire";
-    public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot));
-    public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible sur cet espace." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
+    public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot)) || File.Exists(LegacyLicenseSigningKeyPath);
+    public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible uniquement sur ce poste administrateur." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
     public ObservableCollection<ComponentRecord> Components { get; } = [];
     public ObservableCollection<ComponentCardViewModel> ComponentCards { get; } = [];
     public ObservableCollection<FurnitureRecord> Furniture { get; } = [];
@@ -215,6 +222,17 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<CatalogUniverseRecord> CatalogUniverseDefinitions => _catalog.UniverseDefinitions;
 
     public WorkspaceSettings Settings => _catalog.Settings;
+    public string EffectiveLibraryRoot => string.IsNullOrWhiteSpace(_bootstrap.LibraryRootOverride) ? Settings.LibraryRoot : _bootstrap.LibraryRootOverride;
+    public string EffectiveFurnitureRoot
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_bootstrap.FurnitureRootOverride)) return _bootstrap.FurnitureRootOverride;
+            return string.IsNullOrWhiteSpace(Settings.FurnitureRoot) ? EffectiveLibraryRoot : Settings.FurnitureRoot;
+        }
+    }
+    public string LocalLibraryRootOverride { get => _bootstrap.LibraryRootOverride; set { _bootstrap.LibraryRootOverride = value?.Trim() ?? string.Empty; OnPropertyChanged(); OnPropertyChanged(nameof(EffectiveLibraryRoot)); OnPropertyChanged(nameof(EffectiveFurnitureRoot)); } }
+    public string LocalFurnitureRootOverride { get => _bootstrap.FurnitureRootOverride; set { _bootstrap.FurnitureRootOverride = value?.Trim() ?? string.Empty; OnPropertyChanged(); OnPropertyChanged(nameof(EffectiveFurnitureRoot)); } }
     public string Version => _updater.CurrentVersion;
     public string CurrentPage
     {
@@ -456,6 +474,9 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ScanCommand { get; }
     public RelayCommand ChooseLibraryCommand { get; }
     public RelayCommand ChooseFurnitureRootCommand { get; }
+    public RelayCommand ChooseLocalLibraryOverrideCommand { get; }
+    public RelayCommand ChooseLocalFurnitureOverrideCommand { get; }
+    public RelayCommand ClearLocalPathOverridesCommand { get; }
     public RelayCommand ChooseCustomerFurnitureRootCommand { get; }
     public RelayCommand SynchronizeCustomerFurnitureCommand { get; }
     public RelayCommand SaveCustomerFurnitureCommand { get; }
@@ -465,6 +486,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand DeletePersonalTagCommand { get; }
     public RelayCommand ChooseSharedRootCommand { get; }
     public RelayCommand SaveBootstrapCommand { get; }
+    public RelayCommand MoveWorkspaceCommand { get; }
     public RelayCommand ValidateComponentCommand { get; }
     public RelayCommand SetComponentLayoutCommand { get; }
     public RelayCommand SetFamilyFilterCommand { get; }
@@ -551,14 +573,22 @@ public sealed class MainViewModel : ObservableObject
     {
         if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut générer une licence.");
         if (string.IsNullOrWhiteSpace(NewLicenseCustomer)) throw new InvalidOperationException("Renseignez le nom du client ou du site.");
+        if (string.IsNullOrWhiteSpace(NewLicenseDeviceId)) throw new InvalidOperationException("Collez l’identifiant du poste transmis par le client.");
+        if (!MachineIdentityService.Normalize(NewLicenseDeviceId).StartsWith("ATL", StringComparison.Ordinal) || MachineIdentityService.Normalize(NewLicenseDeviceId).Length != 23)
+            throw new InvalidOperationException("L’identifiant du poste n’a pas le format Atlas attendu.");
         if (NewLicenseValidUntil is null) throw new InvalidOperationException("Choisissez la date de fin de validité.");
         var validUntil = DateOnly.FromDateTime(NewLicenseValidUntil.Value);
         if (validUntil < DateOnly.FromDateTime(DateTime.Today)) throw new InvalidOperationException("La date de fin ne peut pas être antérieure à aujourd’hui.");
         var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
+        if (!File.Exists(privateKeyPath) && File.Exists(LegacyLicenseSigningKeyPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(privateKeyPath)!);
+            File.Copy(LegacyLicenseSigningKeyPath, privateKeyPath, false);
+        }
         if (!File.Exists(privateKeyPath)) throw new FileNotFoundException("La clé privée Idéo est absente de cet espace Atlas.", privateKeyPath);
         var features = NewLicenseCreatorEnabled ? new[] { AtlasLicenseService.CreatorFeature } : Array.Empty<string>();
-        GeneratedLicenseCode = AtlasLicenseService.Generate(NewLicenseCustomer, validUntil, File.ReadAllText(privateKeyPath), features: features);
-        StatusText = $"Licence générée pour {NewLicenseCustomer.Trim()} jusqu’au {validUntil:dd/MM/yyyy}" + (NewLicenseCreatorEnabled ? " avec le module Créateur." : ".");
+        GeneratedLicenseCode = AtlasLicenseService.Generate(NewLicenseCustomer, validUntil, File.ReadAllText(privateKeyPath), features: features, deviceId: NewLicenseDeviceId);
+        StatusText = $"Licence générée pour {NewLicenseCustomer.Trim()} et le poste {NewLicenseDeviceId.Trim()} jusqu’au {validUntil:dd/MM/yyyy}" + (NewLicenseCreatorEnabled ? " avec le module Créateur." : ".");
         return GeneratedLicenseCode;
     }
 
@@ -590,6 +620,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters));
         OnPropertyChanged(nameof(LicenseCustomer));
         OnPropertyChanged(nameof(LicenseValidUntil));
+        OnPropertyChanged(nameof(LicensedDeviceId));
         OnPropertyChanged(nameof(LicenseStatusMessage));
         OnPropertyChanged(nameof(LicenseStatusColor));
         OnPropertyChanged(nameof(SessionLabel));
@@ -701,12 +732,12 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task ScanAsync()
     {
-        if (string.IsNullOrWhiteSpace(Settings.LibraryRoot)) ChooseLibrary();
-        if (string.IsNullOrWhiteSpace(Settings.LibraryRoot)) return;
+        if (string.IsNullOrWhiteSpace(EffectiveLibraryRoot)) ChooseLibrary();
+        if (string.IsNullOrWhiteSpace(EffectiveLibraryRoot)) return;
         IsBusy = true; StatusText = "Analyse de la bibliothèque…";
         try
         {
-            var scan = await _scanner.ScanAsync(Settings.LibraryRoot);
+            var scan = await _scanner.ScanAsync(EffectiveLibraryRoot);
             foreach (var existing in Components.Where(item => !item.IsDemo)) existing.IsMissing = true;
             if (scan.Components.Count > 0) { foreach (var item in Components.Where(x => x.IsDemo).ToArray()) Components.Remove(item); foreach (var item in Furniture.Where(x => x.IsDemo).ToArray()) Furniture.Remove(item); }
             foreach (var item in scan.Components)
@@ -738,7 +769,7 @@ public sealed class MainViewModel : ObservableObject
     private void RebuildComponentCards()
     {
         ComponentCards.Clear();
-        foreach (var record in Components) { var card = new ComponentCardViewModel(record, Settings.LibraryRoot); card.PropertyChanged += ComponentCardOnPropertyChanged; ComponentCards.Add(card); }
+        foreach (var record in Components) { var card = new ComponentCardViewModel(record, EffectiveLibraryRoot); card.PropertyChanged += ComponentCardOnPropertyChanged; ComponentCards.Add(card); }
         RebuildComponentFilters(); ComponentView.Refresh();
     }
 
@@ -780,7 +811,7 @@ public sealed class MainViewModel : ObservableObject
         ClientFurnitureCards.Clear();
         foreach (var item in Furniture)
         {
-            var card = new FurnitureCardViewModel(item, EffectiveFurnitureRoot, Settings.LibraryRoot);
+            var card = new FurnitureCardViewModel(item, EffectiveFurnitureRoot, EffectiveLibraryRoot);
             card.PropertyChanged += ClientFurnitureCardOnPropertyChanged;
             ClientFurnitureCards.Add(card);
         }
@@ -1879,15 +1910,13 @@ public sealed class MainViewModel : ObservableObject
         CurrentPage = requested;
     }
 
-    private string EffectiveFurnitureRoot => string.IsNullOrWhiteSpace(Settings.FurnitureRoot) ? Settings.LibraryRoot : Settings.FurnitureRoot;
-
     private string ResolveFurniturePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
         if (Path.IsPathRooted(path)) return path;
         var preferred = Path.Combine(EffectiveFurnitureRoot, path);
-        if (File.Exists(preferred) || string.IsNullOrWhiteSpace(Settings.LibraryRoot)) return preferred;
-        var legacy = Path.Combine(Settings.LibraryRoot, path);
+        if (File.Exists(preferred) || string.IsNullOrWhiteSpace(EffectiveLibraryRoot)) return preferred;
+        var legacy = Path.Combine(EffectiveLibraryRoot, path);
         return File.Exists(legacy) ? legacy : preferred;
     }
 
@@ -1908,16 +1937,16 @@ public sealed class MainViewModel : ObservableObject
     private void ChooseFurnitureTop()
     {
         if (SelectedFurniture is null) return;
-        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) ChooseFurnitureRoot();
-        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) return;
+        if (string.IsNullOrWhiteSpace(EffectiveFurnitureRoot)) ChooseFurnitureRoot();
+        if (string.IsNullOrWhiteSpace(EffectiveFurnitureRoot)) return;
         var dialog = new OpenFileDialog { Title = $"Choisir le fichier TopSolid à enregistrer sous {SelectedFurniture.Reference}.top", Filter = "Fichiers TopSolid (*.top)|*.top|Tous les fichiers (*.*)|*.*", CheckFileExists = true };
-        if (Directory.Exists(Settings.FurnitureRoot)) dialog.InitialDirectory = Settings.FurnitureRoot;
+        if (Directory.Exists(EffectiveFurnitureRoot)) dialog.InitialDirectory = EffectiveFurnitureRoot;
         if (dialog.ShowDialog() != true) return;
         try
         {
             var sourceTop = dialog.FileName;
-            Directory.CreateDirectory(Settings.FurnitureRoot);
-            var targetTop = Path.Combine(Settings.FurnitureRoot, $"{SelectedFurniture.Reference}.top");
+            Directory.CreateDirectory(EffectiveFurnitureRoot);
+            var targetTop = Path.Combine(EffectiveFurnitureRoot, $"{SelectedFurniture.Reference}.top");
             if (!Path.GetFullPath(sourceTop).Equals(Path.GetFullPath(targetTop), StringComparison.OrdinalIgnoreCase))
             {
                 if (File.Exists(targetTop)) throw new IOException($"Le fichier {SelectedFurniture.Reference}.top existe déjà dans ce dossier.");
@@ -1943,8 +1972,8 @@ public sealed class MainViewModel : ObservableObject
     private void ChooseFurnitureImage()
     {
         if (SelectedFurniture is null) return;
-        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) ChooseFurnitureRoot();
-        if (string.IsNullOrWhiteSpace(Settings.FurnitureRoot)) return;
+        if (string.IsNullOrWhiteSpace(EffectiveFurnitureRoot)) ChooseFurnitureRoot();
+        if (string.IsNullOrWhiteSpace(EffectiveFurnitureRoot)) return;
 
         var dialog = new OpenFileDialog
         {
@@ -1954,13 +1983,13 @@ public sealed class MainViewModel : ObservableObject
         };
         var currentImage = ResolveFurniturePath(SelectedFurniture.ImageRelativePath);
         if (File.Exists(currentImage)) dialog.InitialDirectory = Path.GetDirectoryName(currentImage);
-        else if (Directory.Exists(Settings.FurnitureRoot)) dialog.InitialDirectory = Settings.FurnitureRoot;
+        else if (Directory.Exists(EffectiveFurnitureRoot)) dialog.InitialDirectory = EffectiveFurnitureRoot;
         if (dialog.ShowDialog() != true) return;
 
         try
         {
-            Directory.CreateDirectory(Settings.FurnitureRoot);
-            var targetImage = Path.Combine(Settings.FurnitureRoot, $"{SelectedFurniture.Reference}.top.png");
+            Directory.CreateDirectory(EffectiveFurnitureRoot);
+            var targetImage = Path.Combine(EffectiveFurnitureRoot, $"{SelectedFurniture.Reference}.top.png");
             if (!Path.GetFullPath(dialog.FileName).Equals(Path.GetFullPath(targetImage), StringComparison.OrdinalIgnoreCase))
                 File.Copy(dialog.FileName, targetImage, true);
 
@@ -2229,15 +2258,15 @@ public sealed class MainViewModel : ObservableObject
 
     private void ChooseLibrary()
     {
-        var dialog = new OpenFolderDialog { Title = "Choisir la bibliothèque TopSolid", Multiselect = false }; if (Directory.Exists(Settings.LibraryRoot)) dialog.InitialDirectory = Settings.LibraryRoot;
+        var dialog = new OpenFolderDialog { Title = "Choisir la bibliothèque TopSolid commune au site", Multiselect = false }; if (Directory.Exists(EffectiveLibraryRoot)) dialog.InitialDirectory = EffectiveLibraryRoot;
         if (dialog.ShowDialog() == true) { Settings.LibraryRoot = dialog.FolderName; RebuildComponentCards(); RebuildClientCards(); }
     }
 
     private void ChooseFurnitureRoot()
     {
         var dialog = new OpenFolderDialog { Title = "Choisir le dossier central des meubles TopSolid", Multiselect = false };
-        if (Directory.Exists(Settings.FurnitureRoot)) dialog.InitialDirectory = Settings.FurnitureRoot;
-        else if (Directory.Exists(Settings.LibraryRoot)) dialog.InitialDirectory = Settings.LibraryRoot;
+        if (Directory.Exists(EffectiveFurnitureRoot)) dialog.InitialDirectory = EffectiveFurnitureRoot;
+        else if (Directory.Exists(EffectiveLibraryRoot)) dialog.InitialDirectory = EffectiveLibraryRoot;
         if (dialog.ShowDialog() != true) return;
         Settings.FurnitureRoot = dialog.FolderName;
         RebuildClientCards();
@@ -2246,14 +2275,65 @@ public sealed class MainViewModel : ObservableObject
         StatusText = "Dossier central des meubles configuré.";
     }
 
+    private void ChooseLocalLibraryOverride()
+    {
+        var dialog = new OpenFolderDialog { Title = "Choisir la bibliothèque utilisée uniquement sur ce poste", Multiselect = false };
+        if (Directory.Exists(EffectiveLibraryRoot)) dialog.InitialDirectory = EffectiveLibraryRoot;
+        if (dialog.ShowDialog() != true) return;
+        LocalLibraryRootOverride = dialog.FolderName;
+        RebuildComponentCards(); RebuildClientCards();
+    }
+
+    private void ChooseLocalFurnitureOverride()
+    {
+        var dialog = new OpenFolderDialog { Title = "Choisir le dossier des meubles utilisé uniquement sur ce poste", Multiselect = false };
+        if (Directory.Exists(EffectiveFurnitureRoot)) dialog.InitialDirectory = EffectiveFurnitureRoot;
+        if (dialog.ShowDialog() != true) return;
+        LocalFurnitureRootOverride = dialog.FolderName;
+        RebuildClientCards(); LoadFurniturePreview();
+    }
+
+    private void ClearLocalPathOverrides()
+    {
+        LocalLibraryRootOverride = string.Empty;
+        LocalFurnitureRootOverride = string.Empty;
+        RebuildComponentCards(); RebuildClientCards(); LoadFurniturePreview();
+        StatusText = "Ce poste utilise maintenant les chemins communs du site.";
+    }
+
     private void ChooseSharedRoot()
     {
         var dialog = new OpenFolderDialog { Title = "Choisir le dossier partagé Atlas", Multiselect = false }; if (Directory.Exists(SharedRoot)) dialog.InitialDirectory = SharedRoot;
         if (dialog.ShowDialog() == true) SharedRoot = dialog.FolderName;
     }
 
-    private async Task SaveBootstrapAsync() { _bootstrap.SharedRoot = SharedRoot; await SharedCatalogStore.SaveBootstrapAsync(_bootstrap); AtlasDialog.Info("Le nouvel emplacement sera utilisé au prochain lancement.", "Dossier partagé"); }
+    private async Task SaveBootstrapAsync()
+    {
+        if (!AtlasWorkspaceService.IsWorkspace(SharedRoot)) throw new InvalidDataException("Le dossier choisi ne contient pas un espace Atlas existant. Utilisez « Déplacer l’espace Atlas » pour créer une copie à un nouvel emplacement.");
+        _bootstrap.SharedRoot = SharedRoot;
+        await SharedCatalogStore.SaveBootstrapAsync(_bootstrap);
+        AtlasDialog.Info("L’espace et les réglages propres à ce poste seront utilisés au prochain lancement.", "Configuration enregistrée");
+    }
+
+    private async Task MoveWorkspaceAsync()
+    {
+        var dialog = new OpenFolderDialog { Title = "Choisir le nouvel emplacement vide de l’espace Atlas", Multiselect = false };
+        if (dialog.ShowDialog() != true) return;
+        if (!AtlasDialog.Confirm("Copier et vérifier l’intégralité de l’espace Atlas vers ce nouvel emplacement ?", "Déplacer l’espace Atlas", "L’ancien dossier sera conservé comme sauvegarde. Les autres postes devront ensuite sélectionner le nouvel emplacement.")) return;
+        IsBusy = true;
+        try
+        {
+            await AtlasWorkspaceService.CopyAndVerifyAsync(_store.SharedRoot, dialog.FolderName);
+            SharedRoot = dialog.FolderName;
+            _bootstrap.SharedRoot = dialog.FolderName;
+            await SharedCatalogStore.SaveBootstrapAsync(_bootstrap);
+            AtlasDialog.Info("La copie a été vérifiée. Redémarrez Atlas, puis configurez les autres postes avec ce nouvel emplacement.", "Espace Atlas déplacé");
+        }
+        catch (Exception exception) { ShowError(exception); }
+        finally { IsBusy = false; }
+    }
     private void OpenSharedRoot() { try { Process.Start(new ProcessStartInfo("explorer.exe", _store.SharedRoot) { UseShellExecute = true }); } catch (Exception exception) { ShowError(exception); } }
+    private string LegacyLicenseSigningKeyPath => Path.Combine(_store.SharedRoot, "Configuration", "Atlas-Licence-ClePrivee.pem");
 
     private async Task CheckUpdateAsync(bool silent)
     {
@@ -2289,7 +2369,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand, ChooseCustomerFurnitureRootCommand, SynchronizeCustomerFurnitureCommand, SaveCustomerFurnitureCommand, ChooseCustomerFurnitureImageCommand, OpenCustomerFurnitureFolderCommand, AddPersonalTagCommand, DeletePersonalTagCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand, ChooseCustomerFurnitureRootCommand, SynchronizeCustomerFurnitureCommand, SaveCustomerFurnitureCommand, ChooseCustomerFurnitureImageCommand, OpenCustomerFurnitureFolderCommand, AddPersonalTagCommand, DeletePersonalTagCommand, MoveWorkspaceCommand }) command.RaiseCanExecuteChanged();
     }
 
     private sealed class ClientFurnitureSearchComparer(Func<string> query) : System.Collections.IComparer

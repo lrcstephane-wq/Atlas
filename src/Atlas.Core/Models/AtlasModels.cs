@@ -95,8 +95,20 @@ public sealed class SearchSynonymRecord : BindableModel
 public sealed class LocalBootstrap : BindableModel
 {
     private string _sharedRoot = string.Empty;
+    private string _libraryRootOverride = string.Empty;
+    private string _furnitureRootOverride = string.Empty;
 
     public string SharedRoot { get => _sharedRoot; set => Set(ref _sharedRoot, value); }
+    public string LibraryRootOverride { get => _libraryRootOverride; set => Set(ref _libraryRootOverride, value); }
+    public string FurnitureRootOverride { get => _furnitureRootOverride; set => Set(ref _furnitureRootOverride, value); }
+}
+
+public sealed class AtlasWorkspaceManifest
+{
+    public int SchemaVersion { get; set; } = 1;
+    public string WorkspaceId { get; set; } = Guid.NewGuid().ToString("N");
+    public string DisplayName { get; set; } = "Espace Atlas";
+    public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class CapabilityTagRecord : BindableModel

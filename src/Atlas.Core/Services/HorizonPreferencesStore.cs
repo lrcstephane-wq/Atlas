@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Atlas.Core.Services;
 
@@ -7,10 +9,10 @@ public sealed class HorizonPreferences
     public HashSet<string> FavoriteFacetKeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
-public sealed class HorizonPreferencesStore(string sharedRoot, string userId)
+public sealed class HorizonPreferencesStore(string workspaceRoot, string userId)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
-    private string FilePath => Path.Combine(sharedRoot, "Configuration", "Horizon", $"{SafeFileName(userId)}.json");
+    private string FilePath => Path.Combine(AtlasPaths.HorizonPreferencesRoot, WorkspaceKey(workspaceRoot), $"{SafeFileName(userId)}.json");
 
     public async Task<HorizonPreferences> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -32,4 +34,21 @@ public sealed class HorizonPreferencesStore(string sharedRoot, string userId)
     }
 
     private static string SafeFileName(string value) => string.Concat((string.IsNullOrWhiteSpace(value) ? "default" : value).Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
+
+    private static string WorkspaceKey(string root)
+    {
+        try
+        {
+            var manifestPath = AtlasWorkspaceService.ManifestPath(root);
+            if (File.Exists(manifestPath))
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+                if (document.RootElement.TryGetProperty("WorkspaceId", out var id) && !string.IsNullOrWhiteSpace(id.GetString()))
+                    return SafeFileName(id.GetString()!);
+            }
+        }
+        catch { }
+        var normalized = Path.GetFullPath(string.IsNullOrWhiteSpace(root) ? "." : root).ToUpperInvariant();
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..16].ToLowerInvariant();
+    }
 }

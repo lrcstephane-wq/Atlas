@@ -26,9 +26,9 @@ public partial class App : Application
 
                 if (launch.SelectedMode == AtlasEntryMode.User)
                 {
-                    if (string.IsNullOrWhiteSpace(_bootstrap.SharedRoot))
+                    if (string.IsNullOrWhiteSpace(_bootstrap.SharedRoot) || !AtlasWorkspaceService.IsWorkspace(_bootstrap.SharedRoot))
                     {
-                        AtlasDialog.Warning("L’espace partagé Atlas doit d’abord être configuré par un administrateur.", "Horizon indisponible");
+                        AtlasDialog.Warning("L’espace Atlas doit d’abord être créé ou sélectionné par un administrateur.", "Horizon indisponible");
                         continue;
                     }
                     await OpenUserSessionAsync();

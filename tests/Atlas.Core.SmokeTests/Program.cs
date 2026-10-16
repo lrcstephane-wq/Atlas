@@ -123,6 +123,23 @@ Assert(account.PasswordHash != generatedSecret && account.PasswordSalt.Length > 
 var creatorAccount = UserAccountStore.CreateAccount("creator", "Créateur de test", generatedSecret, UserPermissions.Read | UserPermissions.ManageOwnFurniture);
 Assert(creatorAccount.IsCreator && !creatorAccount.IsAdministrator && !creatorAccount.CanEdit, "Le Créateur doit gérer ses meubles sans obtenir les droits de la Forge.");
 
+var workspaceTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-workspace-{Guid.NewGuid():N}");
+try
+{
+    var sourceWorkspace = Path.Combine(workspaceTestRoot, "source");
+    var targetWorkspace = Path.Combine(workspaceTestRoot, "target");
+    var manifest = await AtlasWorkspaceService.EnsureAsync(sourceWorkspace, "Site test");
+    var accountStore = new UserAccountStore(sourceWorkspace);
+    await accountStore.AddAsync("admin", "Administrateur", generatedSecret, UserPermissions.Administer);
+    Assert((await accountStore.LoadAsync()).Single().IsAdministrator, "Les comptes partagés doivent suivre l’espace Atlas lors de son déplacement.");
+    await AtlasWorkspaceService.CopyAndVerifyAsync(sourceWorkspace, targetWorkspace);
+    Assert(AtlasWorkspaceService.IsWorkspace(targetWorkspace) && File.Exists(Path.Combine(targetWorkspace, "Configuration", "users.atlas.json")), "Le déplacement doit conserver l’identité de l’espace et ses comptes.");
+}
+finally
+{
+    if (Directory.Exists(workspaceTestRoot)) Directory.Delete(workspaceTestRoot, true);
+}
+
 var customerTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-customer-{Guid.NewGuid():N}");
 try
 {
@@ -151,7 +168,9 @@ using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
     var privateKey = signingKey.ExportECPrivateKeyPem();
     var publicKey = signingKey.ExportSubjectPublicKeyInfoPem();
     var licensePath = Path.Combine(Path.GetTempPath(), $"atlas-license-{Guid.NewGuid():N}", "Licence.fautpastoucher");
-    var licenseService = new AtlasLicenseService(publicKey, licensePath);
+    const string deviceA = "ATL-1111-2222-3333-4444-5555";
+    const string deviceB = "ATL-AAAA-BBBB-CCCC-DDDD-EEEE";
+    var licenseService = new AtlasLicenseService(publicKey, licensePath, deviceA);
     var validUntil = new DateOnly(2027, 3, 31);
     var licenseCode = AtlasLicenseService.Generate("Client trimestriel", validUntil, privateKey, "test-license");
     var validLicense = licenseService.Validate(licenseCode, new DateOnly(2027, 3, 31));
@@ -160,6 +179,9 @@ using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
     var creatorLicenseCode = AtlasLicenseService.Generate("Client Créateur", validUntil, privateKey, "creator-license", [AtlasLicenseService.CreatorFeature]);
     var creatorLicense = licenseService.Validate(creatorLicenseCode, new DateOnly(2027, 3, 1));
     Assert(creatorLicense.IsValid && creatorLicense.HasFeature(AtlasLicenseService.CreatorFeature), "L’option Créateur doit être incluse dans le contenu signé de la licence.");
+    var deviceLicenseCode = AtlasLicenseService.Generate("Client par poste", validUntil, privateKey, "device-license", [AtlasLicenseService.CreatorFeature], deviceA);
+    Assert(licenseService.Validate(deviceLicenseCode, new DateOnly(2027, 3, 1)).IsValid, "Une licence liée au poste prévu doit être acceptée.");
+    Assert(new AtlasLicenseService(publicKey, licensePath, deviceB).Validate(deviceLicenseCode, new DateOnly(2027, 3, 1)).State == AtlasLicenseState.DeviceMismatch, "Une licence copiée sur un autre poste doit être refusée.");
     Assert(licenseService.Validate(licenseCode, new DateOnly(2027, 4, 1)).State == AtlasLicenseState.Expired, "La licence doit expirer le lendemain de sa date de fin.");
     Assert(licenseService.Validate(licenseCode + "X", new DateOnly(2027, 3, 1)).State == AtlasLicenseState.Invalid, "Un code modifié doit être refusé.");
     Assert(licenseService.Install(licenseCode, new DateOnly(2027, 3, 1)).IsValid && File.Exists(licensePath), "Un code valide doit être écrit dans Licence.fautpastoucher.");
@@ -208,6 +230,10 @@ Assert(furnitureXaml.Contains("Actualiser l’image…") && viewModelSource.Cont
 var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(settingsXaml.Contains("LicensePanel") && settingsXaml.Contains("Vérifier et installer la licence") && settingsXaml.Contains("Date de fin de validité"), "Les paramètres doivent permettre au client d’installer son code et à l’administrateur de choisir librement l’échéance.");
 Assert(settingsXaml.Contains("Autoriser le module Créateur") && settingsXaml.Contains("LicenseFeaturesLabel"), "Le générateur doit permettre d’inclure explicitement le module Créateur et d’afficher les options signées.");
+Assert(settingsXaml.Contains("IDENTIFIANT DE CE POSTE") && settingsXaml.Contains("NewLicenseDeviceId") && viewModelSource.Contains("deviceId: NewLicenseDeviceId"), "La licence doit être générée pour l’identifiant transmis par un poste précis.");
+Assert(settingsXaml.Contains("Déplacer l’espace Atlas") && settingsXaml.Contains("LocalLibraryRootOverride") && viewModelSource.Contains("AtlasWorkspaceService.CopyAndVerifyAsync"), "L’espace Atlas doit être déplaçable et les chemins communs surchargeables localement.");
+var installerScript = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "deployment", "Installer-Atlas.ps1"));
+Assert(installerScript.Contains("C:\\Ideo_Atlas") && installerScript.Contains("Ideo Solutions\\Atlas") && installerScript.Contains("Application"), "L’installation complète doit créer l’arborescence Atlas et le dossier machine de la licence.");
 Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && mainWindowXaml.Contains("ShowLicensedUniverseNavigation"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
 Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && viewModelSource.Contains("IsAdministrator || IsLicenseValid"), "L’administrateur doit contourner la licence sans exposer la clé privée aux installations clientes.");
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");

@@ -34,10 +34,12 @@ public partial class LoginWindow : Window
         }
         try
         {
+            if (!AtlasWorkspaceService.IsWorkspace(SharedRoot) && IsLegacyWorkspace(SharedRoot))
+                await AtlasWorkspaceService.EnsureAsync(SharedRoot);
             var accounts = await new UserAccountStore(SharedRoot).LoadAsync();
             _firstRun = accounts.Count == 0;
-            TitleText.Text = _firstRun ? "Créer l’administrateur" : "Connexion";
-            HelpText.Text = _firstRun ? "Premier lancement : créez le compte qui administrera Atlas." : "Accédez à l’espace partagé Atlas.";
+            TitleText.Text = _firstRun ? "Créer l’espace Atlas" : "Connexion";
+            HelpText.Text = _firstRun ? "Confirmez l’emplacement puis créez le premier compte administrateur." : "Connexion à l’espace Atlas existant.";
             DisplayNameLabel.Visibility = DisplayNameBox.Visibility = _firstRun ? Visibility.Visible : Visibility.Collapsed;
             SubmitButton.Content = _firstRun ? "Créer et ouvrir Atlas" : "Se connecter";
         }
@@ -51,6 +53,14 @@ public partial class LoginWindow : Window
         try
         {
             if (string.IsNullOrWhiteSpace(SharedRoot)) throw new InvalidOperationException("Le dossier partagé Atlas est obligatoire.");
+            if (_firstRun)
+            {
+                if (!AtlasWorkspaceService.IsWorkspace(SharedRoot) && Directory.Exists(SharedRoot) && Directory.EnumerateFileSystemEntries(SharedRoot).Any())
+                    throw new InvalidOperationException("Ce dossier n’est pas vide et ne contient pas un espace Atlas reconnu.");
+                await AtlasWorkspaceService.EnsureAsync(SharedRoot, $"Atlas · {DisplayNameBox.Text.Trim()}");
+            }
+            else if (!AtlasWorkspaceService.IsWorkspace(SharedRoot))
+                throw new InvalidDataException("Le dossier choisi n’est pas un espace Atlas reconnu.");
             _bootstrap.SharedRoot = SharedRoot;
             await SharedCatalogStore.SaveBootstrapAsync(_bootstrap);
             var userStore = new UserAccountStore(SharedRoot);
@@ -89,4 +99,8 @@ public partial class LoginWindow : Window
     }
 
     private void Close_OnClick(object sender, RoutedEventArgs e) => Close();
+
+    private static bool IsLegacyWorkspace(string root) =>
+        File.Exists(Path.Combine(root, "Configuration", "users.atlas.json")) ||
+        File.Exists(Path.Combine(root, "Data", "catalog.atlas.json"));
 }

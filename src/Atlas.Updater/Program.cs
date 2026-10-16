@@ -7,7 +7,7 @@ static string? Value(string[] arguments, string name)
     return index >= 0 && index + 1 < arguments.Length ? arguments[index + 1] : null;
 }
 
-var logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Biblideo", "Atlas", "Updates");
+var logDirectory = @"C:\Ideo_Atlas\MisesAJour";
 Directory.CreateDirectory(logDirectory);
 var logPath = Path.Combine(logDirectory, "updater.log");
 

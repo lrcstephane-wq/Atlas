@@ -47,7 +47,7 @@
     <ScrollViewer x:Name="LicensePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
      <StackPanel>
       <TextBlock Text="Licence Atlas" Style="{StaticResource SectionTitle}"/>
-      <TextBlock Text="La licence s’applique à un site client et peut être utilisée sur tous ses postes et réseaux." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+      <TextBlock Text="La licence est signée pour un poste précis et reste utilisable hors connexion jusqu’à sa date d’échéance." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
       <Border Style="{StaticResource Card}" BorderBrush="{Binding LicenseStatusColor}" BorderThickness="1">
        <StackPanel>
         <TextBlock Text="ÉTAT DE LA LICENCE" Style="{StaticResource Eyebrow}"/>
@@ -56,6 +56,8 @@
          <StackPanel><TextBlock Text="Client / site" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding LicenseCustomer}" FontWeight="SemiBold"/></StackPanel>
          <StackPanel Grid.Column="1"><TextBlock Text="Valide jusqu’au" Style="{StaticResource FieldLabel}"/><TextBlock Text="{Binding LicenseValidUntil}" FontWeight="SemiBold"/></StackPanel>
         </Grid>
+        <Grid Margin="0,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="IDENTIFIANT DE CE POSTE" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding DeviceId}" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel><Button Grid.Column="1" Content="Copier" Style="{StaticResource SecondaryButton}" Click="CopyDeviceId_OnClick" Margin="12,0,0,0"/></Grid>
+        <TextBlock Text="{Binding LicensedDeviceId, StringFormat=Poste inscrit dans la licence : {0}}" Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"/>
         <Border Background="#102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0"><StackPanel><TextBlock Text="OPTIONS SIGNÉES" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding LicenseFeaturesLabel}" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel></Border>
        </StackPanel>
       </Border>
@@ -76,6 +78,8 @@
          <StackPanel><TextBlock Text="Nom du client / site" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding NewLicenseCustomer, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
          <StackPanel Grid.Column="2"><TextBlock Text="Date de fin de validité" Style="{StaticResource FieldLabel}"/><DatePicker SelectedDate="{Binding NewLicenseValidUntil}" SelectedDateFormat="Long"/></StackPanel>
         </Grid>
+        <TextBlock Text="Identifiant du poste client" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/>
+        <TextBox Text="{Binding NewLicenseDeviceId, UpdateSourceTrigger=PropertyChanged}" ToolTip="Code ATL transmis depuis Paramètres › Licence sur le poste du client"/>
         <CheckBox Content="Autoriser le module Créateur" IsChecked="{Binding NewLicenseCreatorEnabled}" Margin="0,14,0,0" ToolTip="Permet aux comptes Créateur d’ajouter et classer les meubles propres au client."/>
         <Border Background="#102536" BorderBrush="#294B63" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0"><Grid><TextBlock Text="{Binding LicenseSigningKeyStatus}" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Installer la clé Idéo" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Click="InstallLicenseSigningKey_OnClick"/></Grid></Border>
         <Button Content="Générer le code de licence" HorizontalAlignment="Left" Margin="0,13,0,0" Click="GenerateLicense_OnClick"/>
@@ -96,13 +100,13 @@
     <ScrollViewer x:Name="GeneralPanel" VerticalScrollBarVisibility="Auto">
 <StackPanel>
      <TextBlock Text="Espace de travail" Style="{StaticResource SectionTitle}"/>
-<TextBlock Text="Emplacements partagés et comportement général de l’application." Style="{StaticResource Caption}" Margin="0,5,0,16"/>
+<TextBlock Text="Chaque poste possède son installation. Le catalogue et les paramètres métier peuvent être conservés localement ou dans un espace commun." Style="{StaticResource Caption}" Margin="0,5,0,16" TextWrapping="Wrap"/>
      <Border Style="{StaticResource Card}">
 <StackPanel>
       <TextBlock Text="Environnement du catalogue" Style="{StaticResource FieldLabel}"/>
 <ComboBox ItemsSource="{Binding Environments}" SelectedItem="{Binding Settings.Environment}" Margin="0,0,0,14" IsEnabled="{Binding IsAdministrator}"/>
       <CheckBox Content="Rechercher automatiquement les mises à jour au lancement" IsChecked="{Binding Settings.AutoUpdate}" Margin="0,0,0,18"/>
-      <TextBlock Text="Dossier partagé Atlas" Style="{StaticResource FieldLabel}"/>
+      <TextBlock Text="Espace de données Atlas" Style="{StaticResource FieldLabel}"/>
 <Grid>
 <Grid.ColumnDefinitions>
 <ColumnDefinition/>
@@ -112,11 +116,20 @@
 <Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseSharedRootCommand}" Margin="8,0,0,0"/>
 </Grid>
       <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-<Button Content="Appliquer au prochain lancement" Command="{Binding SaveBootstrapCommand}"/>
+<Button Content="Enregistrer pour ce poste" Command="{Binding SaveBootstrapCommand}"/>
 <Button Content="Ouvrir le dossier" Style="{StaticResource SecondaryButton}" Command="{Binding OpenSharedRootCommand}" Margin="8,0,0,0"/>
 </StackPanel>
+      <Button Content="Déplacer l’espace Atlas" Style="{StaticResource GhostButton}" Command="{Binding MoveWorkspaceCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+      <TextBlock Text="Le déplacement crée une copie vérifiée et conserve l’ancien dossier comme sauvegarde. Les autres postes devront sélectionner le nouvel emplacement." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,7,0,0"/>
      </StackPanel>
 </Border>
+     <Border Style="{StaticResource Card}" Margin="0,14,0,0"><StackPanel>
+      <TextBlock Text="CHEMINS PROPRES À CE POSTE" Style="{StaticResource Eyebrow}"/>
+      <TextBlock Text="Laissez ces champs vides pour utiliser les chemins communs du site." Style="{StaticResource Caption}" Margin="0,5,0,14"/>
+      <TextBlock Text="Bibliothèque TopSolid locale" Style="{StaticResource FieldLabel}"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox Text="{Binding LocalLibraryRootOverride, UpdateSourceTrigger=PropertyChanged}"/><Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseLocalLibraryOverrideCommand}" Margin="8,0,0,0"/></Grid>
+      <TextBlock Text="Dossier des meubles local" Style="{StaticResource FieldLabel}" Margin="0,12,0,0"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox Text="{Binding LocalFurnitureRootOverride, UpdateSourceTrigger=PropertyChanged}"/><Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseLocalFurnitureOverrideCommand}" Margin="8,0,0,0"/></Grid>
+      <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><Button Content="Enregistrer" Command="{Binding SaveBootstrapCommand}"/><Button Content="Utiliser les chemins communs" Style="{StaticResource GhostButton}" Command="{Binding ClearLocalPathOverridesCommand}" Margin="8,0,0,0"/></StackPanel>
+     </StackPanel></Border>
     </StackPanel>
 </ScrollViewer>
 
@@ -185,9 +198,10 @@
 <ColumnDefinition/>
 <ColumnDefinition Width="Auto"/>
 </Grid.ColumnDefinitions>
-<TextBox Text="{Binding Settings.LibraryRoot, UpdateSourceTrigger=PropertyChanged}"/>
+<TextBox Text="{Binding Settings.LibraryRoot, UpdateSourceTrigger=PropertyChanged}" ToolTip="Chemin commun au site. Une surcharge locale peut être définie dans Espace de travail."/>
 <Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseLibraryCommand}" Margin="8,0,0,0"/>
 </Grid>
+<TextBlock Text="{Binding EffectiveLibraryRoot, StringFormat=Chemin utilisé sur ce poste : {0}}" Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"/>
 <Button Content="Indexer maintenant" Command="{Binding ScanCommand}" HorizontalAlignment="Left" Margin="0,14,0,0"/>
 </StackPanel>
 </Border>
@@ -311,6 +325,7 @@
 <TextBox Text="{Binding Settings.FurnitureRoot, UpdateSourceTrigger=PropertyChanged}"/>
 <Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseFurnitureRootCommand}" Margin="8,0,0,0"/>
 </Grid>
+<TextBlock Text="{Binding EffectiveFurnitureRoot, StringFormat=Chemin utilisé sur ce poste : {0}}" Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"/>
 <TextBlock Text="À l’ajout d’un meuble, Atlas ouvre ce dossier puis y crée une copie nommée avec sa référence à 9 chiffres. L’aperçu associé est conservé au même endroit." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,10,0,0"/>
 </StackPanel>
 </Border>

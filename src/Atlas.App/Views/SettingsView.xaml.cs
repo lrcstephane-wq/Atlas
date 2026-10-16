@@ -157,6 +157,13 @@ public partial class SettingsView : UserControl
         LicenseGeneratorStatus.Text = "Code copié dans le presse-papiers.";
     }
 
+    private void CopyDeviceId_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        Clipboard.SetText(vm.DeviceId);
+        LicenseInstallStatus.Text = "Identifiant du poste copié. Envoyez-le à Idéo Solutions pour générer la licence.";
+    }
+
     private void InstallLicenseSigningKey_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

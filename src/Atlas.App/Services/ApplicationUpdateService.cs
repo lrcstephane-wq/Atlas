@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Atlas.Core.Services;
 
 namespace Atlas.App.Services;
 
@@ -49,7 +50,7 @@ public sealed class ApplicationUpdateService
         var updater = Path.Combine(AppContext.BaseDirectory, "Atlas.Updater.exe");
         if (!File.Exists(updater)) return false;
 
-        var updateDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Biblideo", "Atlas", "Updates");
+        var updateDirectory = AtlasPaths.UpdatesRoot;
         Directory.CreateDirectory(updateDirectory);
         var archive = Path.Combine(updateDirectory, $"Atlas-{AvailableVersion}.zip");
         using (var response = await _httpClient.GetAsync(_availableAsset.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
@@ -82,7 +83,7 @@ public sealed class ApplicationUpdateService
         }
 
         var launch = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Atlas.exe");
-        var start = new ProcessStartInfo(updater) { UseShellExecute = false };
+        var start = new ProcessStartInfo(updater) { UseShellExecute = true, Verb = "runas" };
         start.ArgumentList.Add("--pid"); start.ArgumentList.Add(Environment.ProcessId.ToString());
         start.ArgumentList.Add("--archive"); start.ArgumentList.Add(archive);
         start.ArgumentList.Add("--target"); start.ArgumentList.Add(AppContext.BaseDirectory);
