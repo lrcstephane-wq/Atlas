@@ -98,7 +98,7 @@ public static class SearchDictionaryService
                 Label = old.Canonical.Trim(),
                 Category = "Importé",
                 Target = SearchConceptTarget.GenericText,
-                CustomAliasesCsv = old.AliasesCsv,
+                CustomAliasesCsv = old.AliasesCsv ?? string.Empty,
                 IsOfficial = false,
                 IsStrict = false
             });
