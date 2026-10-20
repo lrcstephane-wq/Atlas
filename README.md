@@ -27,12 +27,15 @@ La V0.3 pose deux espaces :
 - menu de paramètres structuré par module, les capacités paramétriques restant explicitement hors MVP ;
 - validation humaine et justification obligatoire en cas de forçage ;
 - recherche et virtualisation pour les volumes importants ;
+- dictionnaire métier versionné : expressions régionales, fautes, quantités exactes, usages, marques et critères structurels ;
+- compléments de vocabulaire propres à chaque site, conservés automatiquement lors des mises à jour du socle Idéo ;
+- interprétation visible des recherches naturelles et historique partagé des demandes sans résultat ;
 - détection, téléchargement, contrôle SHA-256 et installation automatique des futures mises à jour via les GitHub Releases ;
 - distribution principale sous forme de dossier autonome archivé en ZIP, sans compression interne ni auto-extraction de l’exécutable, afin d’éviter les comportements de packaging assimilables à un logiciel malveillant.
 
 ## Installation Windows
 
-Pour une première installation, télécharger `Atlas-full-win-x64.zip`, extraire entièrement le dossier puis lancer `Atlas.exe`. Ensuite, le bouton de mise à jour télécharge uniquement `Atlas-update.zip`, un petit pack différentiel signé par GitHub, remplace les fichiers applicatifs modifiés puis relance Atlas automatiquement. L’alias `Atlas-win-x64.zip` assure la compatibilité avec la V0.3.
+Pour une première installation, télécharger `Atlas-full-win-x64.zip`, extraire entièrement le dossier puis lancer `Installer-Atlas.cmd`. Atlas est installé dans `C:\Ideo_Atlas\Application`. Ensuite, le bouton de mise à jour télécharge uniquement `Atlas-update.zip`, remplace les fichiers applicatifs modifiés puis relance Atlas automatiquement.
 
 L’exécutable reste non signé pendant la phase de développement : Windows peut donc encore afficher un avertissement d’éditeur inconnu. Une détection antivirus de type cheval de Troie ne doit en revanche jamais être ignorée ni autorisée manuellement.
 
@@ -43,6 +46,7 @@ Atlas crée automatiquement :
 ```text
 <dossier partagé Atlas>
 ├── Configuration
+│   └── search-dictionary.atlas.json
 ├── Data
 ├── Backups
 ├── Images
@@ -50,7 +54,7 @@ Atlas crée automatiquement :
 └── Logs
 ```
 
-Le chemin est modifiable. Un petit fichier local dans `%LOCALAPPDATA%\Ideo Solutions\Atlas` mémorise seulement l’emplacement partagé utilisé par le poste.
+Le chemin est modifiable. Le poste mémorise son emplacement dans `C:\Ideo_Atlas\Configuration\poste.json`. Le dictionnaire officiel est fusionné à chaque mise à jour avec les expressions propres au site, sans les écraser.
 
 ## Compilation
 

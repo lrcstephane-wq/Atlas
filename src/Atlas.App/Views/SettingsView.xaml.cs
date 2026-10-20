@@ -38,6 +38,7 @@ public partial class SettingsView : UserControl
         {
             foreach (var universe in vm.CatalogUniverseDefinitions.OrderBy(item => item.SortOrder)) _universes.Add(universe);
             foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
+            SearchConceptGrid.SelectedItem = vm.SearchConcepts.FirstOrDefault();
         }
         if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted || currentVm.IsCreatorMode && !currentVm.CanManageCustomerFurniture))
         {
@@ -60,49 +61,63 @@ public partial class SettingsView : UserControl
         TaxonomyStatus.Text = $"{_tags.Count} tag(s) disponible(s).";
     }
 
-    private void AddSearchSynonym_OnClick(object sender, RoutedEventArgs e)
+    private void AddSearchConcept_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel { CanEdit: true } vm) return;
-        var item = new SearchSynonymRecord { Canonical = "Nouveau concept" };
-        vm.Settings.SearchSynonyms.Add(item);
-        SearchSynonymGrid.Items.Refresh();
-        SearchSynonymGrid.SelectedItem = item;
-        SearchSynonymGrid.ScrollIntoView(item);
-        SearchDictionaryStatus.Text = "Nouvelle ligne ajoutée. Renseignez ses synonymes puis enregistrez.";
+        vm.AddSearchConcept();
+        SearchConceptGrid.SelectedItem = vm.SearchConcepts.Last();
+        SearchConceptGrid.ScrollIntoView(SearchConceptGrid.SelectedItem);
+        SearchDictionaryStatus.Text = "Nouveau concept client ajouté. Définissez sa cible et ses expressions.";
     }
 
-    private void DeleteSearchSynonym_OnClick(object sender, RoutedEventArgs e)
+    private void DeleteSearchConcept_OnClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainViewModel { CanEdit: true } vm || SearchSynonymGrid.SelectedItem is not SearchSynonymRecord item) return;
-        vm.Settings.SearchSynonyms.Remove(item);
-        SearchSynonymGrid.Items.Refresh();
-        SearchDictionaryStatus.Text = "Ligne retirée. Enregistrez pour confirmer.";
+        if (DataContext is not MainViewModel { CanEdit: true } vm || SearchConceptGrid.SelectedItem is not SearchConceptRecord item) return;
+        if (!vm.DeleteSearchConcept(item))
+        {
+            SearchDictionaryStatus.Text = "Un concept officiel Atlas ne peut pas être supprimé. Vous pouvez le désactiver.";
+            return;
+        }
+        SearchDictionaryStatus.Text = "Concept client retiré. Enregistrez pour confirmer.";
     }
 
     private async void SaveSearchDictionary_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel { CanEdit: true } vm) return;
-        SearchSynonymGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        SearchSynonymGrid.CommitEdit(DataGridEditingUnit.Row, true);
-        foreach (var item in vm.Settings.SearchSynonyms)
+        foreach (var item in vm.SearchConcepts)
         {
-            item.Canonical = (item.Canonical ?? string.Empty).Trim();
-            item.AliasesCsv = (item.AliasesCsv ?? string.Empty).Trim();
+            item.Label = (item.Label ?? string.Empty).Trim();
+            item.Category = (item.Category ?? string.Empty).Trim();
+            item.TargetValue = (item.TargetValue ?? string.Empty).Trim();
+            item.CustomAliasesCsv = (item.CustomAliasesCsv ?? string.Empty).Trim();
         }
-        if (vm.Settings.SearchSynonyms.Any(item => string.IsNullOrWhiteSpace(item.Canonical)))
+        if (vm.SearchConcepts.Any(item => string.IsNullOrWhiteSpace(item.Label)))
         {
-            SearchDictionaryStatus.Text = "Chaque ligne doit avoir un concept principal.";
+            SearchDictionaryStatus.Text = "Chaque concept doit avoir un nom.";
             return;
         }
-        var duplicate = vm.Settings.SearchSynonyms.GroupBy(item => item.Canonical, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
+        var duplicate = vm.SearchConcepts.GroupBy(item => item.Label, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
         if (duplicate is not null)
         {
             SearchDictionaryStatus.Text = $"Concept en double : {duplicate.Key}.";
             return;
         }
-        if (!await vm.SaveCatalogAsync()) return;
-        vm.RefreshHorizonSearchSettings();
-        SearchDictionaryStatus.Text = "Dictionnaire enregistré et immédiatement actif dans Horizon.";
+        if (await vm.SaveSearchDictionaryAsync()) SearchDictionaryStatus.Text = "Dictionnaire enregistré et immédiatement actif dans Horizon.";
+    }
+
+    private void TestSearchDictionary_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var intent = vm.InterpretSearch(SearchDictionaryTestBox.Text);
+        var correction = string.IsNullOrWhiteSpace(intent.CorrectedQuery) ? string.Empty : $"\nRequête normalisée : {intent.CorrectedQuery}";
+        SearchDictionaryTestResult.Text = $"Atlas comprend : {intent.Summary}{correction}";
+    }
+
+    private async void ClearUnknownSearches_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        await vm.ClearUnknownSearchQueriesAsync();
+        SearchDictionaryStatus.Text = "Historique des recherches sans résultat vidé.";
     }
 
     private void RefreshCollections()

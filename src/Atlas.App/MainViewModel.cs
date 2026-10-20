@@ -29,7 +29,11 @@ public sealed class MainViewModel : ObservableObject
     private readonly AtlasLicenseService _licenseService = new();
     private readonly CustomerFurnitureStore _customerFurnitureStore;
     private readonly HorizonPreferencesStore _horizonPreferencesStore;
+    private readonly SearchDictionaryStore _searchDictionaryStore;
     private HorizonPreferences _horizonPreferences = new();
+    private SearchDictionaryDocument _searchDictionary = new();
+    private SearchIntent _activeSearchIntent = new();
+    private CancellationTokenSource? _searchObservationCancellation;
     private AtlasCatalog _catalog = new();
     private CustomerFurnitureCatalog _customerCatalog = new();
     private ComponentTaxonomy _taxonomy = new();
@@ -64,6 +68,7 @@ public sealed class MainViewModel : ObservableObject
         _licenseInfo = _licenseService.Read();
         _currentPage = userMode || IsCreatorMode || IsLicenseRestricted ? "Catalog" : "Dashboard";
         _horizonPreferencesStore = new HorizonPreferencesStore(_sharedRoot, currentUser.Id);
+        _searchDictionaryStore = new SearchDictionaryStore(_sharedRoot);
         FurnitureSteps[0].IsActive = true;
         ComponentView = CollectionViewSource.GetDefaultView(ComponentCards); ComponentView.Filter = FilterComponent;
         FurnitureView = CollectionViewSource.GetDefaultView(Furniture); FurnitureView.Filter = FilterFurniture;
@@ -186,6 +191,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<CatalogFacetViewModel> ClientAssemblyFacets { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientBackFacets { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientFavoriteFacets { get; } = [];
+    public ObservableCollection<SearchConceptRecord> SearchConcepts { get; } = [];
+    public ObservableCollection<SearchUnknownQueryRecord> SearchUnknownQueries { get; } = [];
     public ObservableCollection<FurnitureStepViewModel> FurnitureSteps { get; } =
     [
         new("Identity", "01", "Identité"),
@@ -213,6 +220,9 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<string> TagCategories { get; } = ["Fonction", "Marque", "Gamme", "Implantation", "Technologie", "Système", "Autre"];
     public IReadOnlyList<string> DoorTypes { get; } = ["Applique", "Semi-applique", "Encastrée"];
     public IReadOnlyList<string> DrawerTypes { get; } = ["Applique", "Encastré"];
+    public IReadOnlyList<KeyValuePair<SearchConceptTarget, string>> SearchConceptTargetOptions { get; } = Enum.GetValues<SearchConceptTarget>()
+        .Select(target => new KeyValuePair<SearchConceptTarget, string>(target, new SearchConceptRecord { Target = target }.TargetLabel)).ToList();
+    public IReadOnlyList<string> SearchConceptCategories { get; } = ["Éléments", "Usages", "Types", "Formes", "Construction", "Assemblages", "Tags", "Expressions", "Autre"];
     public IReadOnlyList<string> CatalogUniverses => _catalog.UniverseDefinitions
         .Where(item => item.IsActive)
         .OrderBy(item => item.SortOrder)
@@ -643,6 +653,8 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             _catalog = await _store.LoadAsync(); _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot); NormalizeCatalog();
+            _searchDictionary = await _searchDictionaryStore.LoadAsync(_catalog.Settings.SearchSynonyms);
+            ReloadSearchDictionaryCollections();
             Components.Clear(); foreach (var item in _catalog.Components) Components.Add(item);
             Furniture.Clear(); foreach (var item in _catalog.Furniture) Furniture.Add(item);
             _persistedFurnitureReferences.Clear();
@@ -1125,6 +1137,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ClientFilterButtonLabel));
         if (SelectedClientFurnitureCard is null || !ClientFurnitureView.Cast<FurnitureCardViewModel>().Contains(SelectedClientFurnitureCard))
             SelectedClientFurnitureCard = ClientFurnitureView.Cast<FurnitureCardViewModel>().FirstOrDefault();
+        ScheduleUnknownSearchObservation();
     }
 
     private void UpdateClientSearchScores()
@@ -1133,18 +1146,80 @@ public sealed class MainViewModel : ObservableObject
         {
             foreach (var card in ClientFurnitureCards) card.SearchScore = 0d;
             ClientSearchInterpretation = string.Empty;
+            _activeSearchIntent = new SearchIntent();
         }
         else
         {
-            foreach (var card in ClientFurnitureCards)
-                card.SearchScore = CatalogSearchEngine.Score(ClientSearch, SearchFieldsFor(card.Record), Settings.SearchSynonyms);
-            var corrected = CatalogSearchEngine.CorrectQuery(ClientSearch, ClientSearchVocabulary(), Settings.SearchSynonyms);
-            var normalized = CatalogSearchEngine.Normalize(ClientSearch);
-            ClientSearchInterpretation = corrected.Equals(normalized, StringComparison.Ordinal) ? string.Empty : $"Atlas a compris : {corrected}";
+            var dynamicTags = _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label)
+                .Concat(PersonalTags.Select(tag => tag.Label)).Distinct(StringComparer.OrdinalIgnoreCase);
+            _activeSearchIntent = SearchDictionaryService.Interpret(ClientSearch, SearchConcepts, dynamicTags);
+            foreach (var card in ClientFurnitureCards) card.SearchScore = EvaluateClientSearch(card.Record, _activeSearchIntent);
+            ClientSearchInterpretation = $"Atlas a compris : {_activeSearchIntent.Summary}";
         }
         OnPropertyChanged(nameof(ClientSearchInterpretation));
         OnPropertyChanged(nameof(HasClientSearchInterpretation));
     }
+
+    private double EvaluateClientSearch(FurnitureRecord furniture, SearchIntent intent)
+    {
+        var softMatches = 0;
+        foreach (var constraint in intent.Constraints)
+        {
+            var matches = MatchesSearchConstraint(furniture, constraint);
+            if (constraint.IsStrict && !matches) return 0d;
+            if (matches) softMatches++;
+        }
+        var textScore = string.IsNullOrWhiteSpace(intent.RemainingQuery)
+            ? 1d
+            : CatalogSearchEngine.Score(intent.RemainingQuery, SearchFieldsFor(furniture));
+        if (!string.IsNullOrWhiteSpace(intent.RemainingQuery) && textScore < 0.58d) return 0d;
+        var constraintScore = intent.Constraints.Count == 0 ? 0d : (double)softMatches / intent.Constraints.Count;
+        return Math.Min(1.22d, 0.62d + textScore * 0.35d + constraintScore * 0.25d);
+    }
+
+    private bool MatchesSearchConstraint(FurnitureRecord furniture, SearchConstraint constraint)
+    {
+        var tags = ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label)
+            .Concat(furniture.PersonalTags ?? []).ToArray();
+        var usages = FurnitureUsagesFor(furniture).ToArray();
+        return constraint.Target switch
+        {
+            SearchConceptTarget.DoorCount => SearchDictionaryService.QuantityMatches(furniture.NombrePortes, constraint),
+            SearchConceptTarget.DrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirs, constraint),
+            SearchConceptTarget.InnerDrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirsAnglaise, constraint),
+            SearchConceptTarget.FlapCount => SearchDictionaryService.QuantityMatches(furniture.NombreAbattants, constraint),
+            SearchConceptTarget.LiftUpCount => SearchDictionaryService.QuantityMatches(furniture.NombreRelevants, constraint),
+            SearchConceptTarget.ShelfCount => SearchDictionaryService.QuantityMatches(furniture.NombreRayons, constraint),
+            SearchConceptTarget.OpenNicheCount => SearchDictionaryService.QuantityMatches(furniture.NombreNichesOuvertes, constraint),
+            SearchConceptTarget.Hanging => furniture.Penderie,
+            SearchConceptTarget.HorizontalSeparation => furniture.SeparationHorizontale,
+            SearchConceptTarget.VerticalSeparation => furniture.SeparationVerticale,
+            SearchConceptTarget.FurnitureType => FurnitureTypeMatches(furniture.TypeMeuble, constraint.Value),
+            SearchConceptTarget.FurnitureUsage => usages.Any(value => ValueMatches(value, constraint.Value)) || SearchFieldsContain(furniture, constraint.Value),
+            SearchConceptTarget.FurnitureTag => tags.Any(value => ValueMatches(value, constraint.Value)),
+            SearchConceptTarget.FurnitureForm => ValueMatches(furniture.Forme, constraint.Value),
+            SearchConceptTarget.Construction => ValueMatches(furniture.PrincipleConstruction, constraint.Value),
+            SearchConceptTarget.Assembly => ValueMatches(furniture.TypeAssemblage, constraint.Value),
+            SearchConceptTarget.BackPosition => ValueMatches(furniture.PositionDos, constraint.Value),
+            SearchConceptTarget.GenericText => SearchFieldsContain(furniture, constraint.Value),
+            _ => false
+        };
+    }
+
+    private static bool ValueMatches(string? actual, string expected) =>
+        CatalogSearchEngine.Normalize(actual).Equals(CatalogSearchEngine.Normalize(expected), StringComparison.Ordinal) ||
+        CatalogSearchEngine.Normalize(actual).Contains(CatalogSearchEngine.Normalize(expected), StringComparison.Ordinal);
+
+    private static bool FurnitureTypeMatches(string? actual, string expected)
+    {
+        if (ValueMatches(actual, expected)) return true;
+        var actualValue = CatalogSearchEngine.Normalize(actual);
+        var expectedValue = CatalogSearchEngine.Normalize(expected);
+        return (expectedValue is "colonne" or "armoire") && (actualValue is "colonne" or "demi colonne" or "armoire");
+    }
+
+    private bool SearchFieldsContain(FurnitureRecord furniture, string value) =>
+        CatalogSearchEngine.Score(value, SearchFieldsFor(furniture)) >= 0.74d;
 
     private IEnumerable<CatalogSearchField> SearchFieldsFor(FurnitureRecord furniture)
     {
@@ -1191,6 +1266,93 @@ public sealed class MainViewModel : ObservableObject
     {
         RebuildClientFacets();
         RefreshClientFurnitureView();
+    }
+
+    public SearchIntent InterpretSearch(string query) => SearchDictionaryService.Interpret(query, SearchConcepts,
+        _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label).Concat(PersonalTags.Select(tag => tag.Label)));
+
+    public async Task<bool> SaveSearchDictionaryAsync()
+    {
+        try
+        {
+            _searchDictionary.Concepts = SearchConcepts.ToList();
+            _searchDictionary.UnknownQueries = SearchUnknownQueries.ToList();
+            SearchDictionaryService.MergeOfficial(_searchDictionary);
+            await _searchDictionaryStore.SaveAsync(_searchDictionary);
+            ReloadSearchDictionaryCollections();
+            RefreshHorizonSearchSettings();
+            return true;
+        }
+        catch (Exception exception) { ShowError(exception); return false; }
+    }
+
+    public void AddSearchConcept()
+    {
+        SearchConcepts.Add(new SearchConceptRecord
+        {
+            Label = "Nouveau concept", Category = "Autre", Target = SearchConceptTarget.GenericText,
+            IsOfficial = false, IsActive = true, IsStrict = false
+        });
+    }
+
+    public bool DeleteSearchConcept(SearchConceptRecord concept)
+    {
+        if (concept.IsOfficial) return false;
+        return SearchConcepts.Remove(concept);
+    }
+
+    public async Task ClearUnknownSearchQueriesAsync()
+    {
+        SearchUnknownQueries.Clear();
+        _searchDictionary.UnknownQueries.Clear();
+        await _searchDictionaryStore.SaveAsync(_searchDictionary);
+    }
+
+    private void ReloadSearchDictionaryCollections()
+    {
+        SearchConcepts.Clear();
+        foreach (var concept in _searchDictionary.Concepts.OrderBy(item => item.Category, StringComparer.CurrentCultureIgnoreCase)
+                     .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)) SearchConcepts.Add(concept);
+        SearchUnknownQueries.Clear();
+        foreach (var query in _searchDictionary.UnknownQueries.OrderByDescending(item => item.Count).ThenByDescending(item => item.LastSeenUtc))
+            SearchUnknownQueries.Add(query);
+        OnPropertyChanged(nameof(SearchConcepts));
+        OnPropertyChanged(nameof(SearchUnknownQueries));
+    }
+
+    private void ScheduleUnknownSearchObservation()
+    {
+        _searchObservationCancellation?.Cancel();
+        if (string.IsNullOrWhiteSpace(ClientSearch) || ClientSearch.Trim().Length < 3 || ClientResultCount > 0) return;
+        var query = ClientSearch.Trim();
+        var cancellation = _searchObservationCancellation = new CancellationTokenSource();
+        _ = RecordUnknownSearchAfterDelayAsync(query, cancellation.Token);
+    }
+
+    private async Task RecordUnknownSearchAfterDelayAsync(string query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(900, cancellationToken);
+            if (!query.Equals(ClientSearch.Trim(), StringComparison.Ordinal) || ClientResultCount > 0) return;
+            var normalized = CatalogSearchEngine.Normalize(query);
+            var existing = SearchUnknownQueries.FirstOrDefault(item => item.NormalizedQuery.Equals(normalized, StringComparison.Ordinal));
+            if (existing is null)
+            {
+                existing = new SearchUnknownQueryRecord { Query = query, NormalizedQuery = normalized };
+                SearchUnknownQueries.Insert(0, existing);
+            }
+            else
+            {
+                existing.Count++;
+                existing.Query = query;
+                existing.LastSeenUtc = DateTimeOffset.UtcNow;
+            }
+            _searchDictionary.UnknownQueries = SearchUnknownQueries.ToList();
+            await _searchDictionaryStore.SaveAsync(_searchDictionary, cancellationToken);
+        }
+        catch (OperationCanceledException) { }
+        catch { }
     }
 
     private void NormalizeUniverseDefinitions()

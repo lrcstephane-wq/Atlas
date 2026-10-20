@@ -397,27 +397,60 @@
       </Border>
      </Grid>
     </Grid>
-    <ScrollViewer x:Name="ClientSearchPanel" Visibility="Collapsed">
-<StackPanel>
-<TextBlock Text="Intelligence de recherche" Style="{StaticResource SectionTitle}"/>
-<TextBlock Text="Horizon corrige déjà les petites fautes. Ce dictionnaire lui apprend en plus le vocabulaire de votre métier." Style="{StaticResource Caption}" Margin="0,6,0,16"/>
-<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.45*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
- <Border Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Grid><StackPanel><TextBlock Text="DICTIONNAIRE MÉTIER" Style="{StaticResource Eyebrow}"/><TextBlock Text="Un concept principal et les mots équivalents que vos clients emploient." Style="{StaticResource Caption}" Margin="0,4,0,12"/></StackPanel><Button Content="+ Ajouter une ligne" HorizontalAlignment="Right" VerticalAlignment="Center" Click="AddSearchSynonym_OnClick"/></Grid>
-  <DataGrid x:Name="SearchSynonymGrid" Grid.Row="1" ItemsSource="{Binding Settings.SearchSynonyms}" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single" MinHeight="360" IsReadOnly="{Binding CanEdit, Converter={StaticResource InverseBool}}">
-   <DataGrid.Columns><DataGridTextColumn Header="Concept recherché" Binding="{Binding Canonical, UpdateSourceTrigger=PropertyChanged}" Width="0.75*"/><DataGridTextColumn Header="Synonymes séparés par des virgules" Binding="{Binding AliasesCsv, UpdateSourceTrigger=PropertyChanged}" Width="1.25*"/></DataGrid.Columns>
-  </DataGrid>
-  <Button Grid.Row="2" Content="Supprimer la ligne sélectionnée" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Click="DeleteSearchSynonym_OnClick"/>
- </Grid></Border>
- <Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel>
-  <TextBlock Text="COMMENT ÇA MARCHE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Atlas combine quatre niveaux, entièrement en local :" FontWeight="SemiBold" Margin="0,8,0,12"/>
-  <TextBlock Text="1  Accents et ponctuation ignorés" Margin="0,0,0,9"/><TextBlock Text="2  Lettres inversées et petites fautes tolérées" Margin="0,0,0,9"/><TextBlock Text="3  Synonymes métier appliqués" Margin="0,0,0,9"/><TextBlock Text="4  Résultats classés par pertinence" Margin="0,0,0,18"/>
-  <Border Background="#0E2D39" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="10" Padding="12"><TextBlock Text="Exemple : « meubel evrier » peut retrouver « meuble sous-évier ». Ajoutez ici « lavabo » comme synonyme de « sous évier » pour couvrir aussi le vocabulaire client." TextWrapping="Wrap" Foreground="{StaticResource InkBrush}"/></Border>
- </StackPanel></Border>
-</Grid>
-<Grid Margin="0,14,0,0"><TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/><Button Content="Enregistrer le dictionnaire" HorizontalAlignment="Right" Click="SaveSearchDictionary_OnClick"/></Grid>
-</StackPanel>
-</ScrollViewer>
+    <ScrollViewer x:Name="ClientSearchPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+     <StackPanel>
+      <TextBlock Text="Recherche et filtres" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="Le dictionnaire traduit le vocabulaire libre des utilisateurs en critères réels des fiches Atlas." Style="{StaticResource Caption}" Margin="0,6,0,16"/>
+
+      <Grid Height="500"><Grid.ColumnDefinitions><ColumnDefinition Width="1.2*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Border Style="{StaticResource Card}" Padding="0">
+        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+         <Border Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,0,0,1" CornerRadius="13,13,0,0" Padding="17,14"><Grid><StackPanel><TextBlock Text="CONCEPTS MÉTIER" Style="{StaticResource Eyebrow}"/><TextBlock Text="Socle Atlas et compléments propres au client" Style="{StaticResource Caption}" Margin="0,3,0,0"/></StackPanel><Button Content="+ Nouveau concept" HorizontalAlignment="Right" Click="AddSearchConcept_OnClick"/></Grid></Border>
+         <DataGrid x:Name="SearchConceptGrid" Grid.Row="1" ItemsSource="{Binding SearchConcepts}" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single" IsReadOnly="True" Margin="10">
+          <DataGrid.Columns>
+           <DataGridCheckBoxColumn Header="Actif" Binding="{Binding IsActive}" Width="54"/>
+           <DataGridTextColumn Header="Concept" Binding="{Binding Label}" Width="1.25*"/>
+           <DataGridTextColumn Header="Catégorie" Binding="{Binding Category}" Width="*"/>
+           <DataGridTextColumn Header="Cible Atlas" Binding="{Binding TargetLabel}" Width="1.15*"/>
+           <DataGridTextColumn Header="Origine" Binding="{Binding OriginLabel}" Width="70"/>
+          </DataGrid.Columns>
+         </DataGrid>
+         <Border Grid.Row="2" Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,13,13" Padding="12"><Button Content="Supprimer le concept client" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="DeleteSearchConcept_OnClick"/></Border>
+        </Grid>
+       </Border>
+
+       <Border Grid.Column="2" Style="{StaticResource Card}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel DataContext="{Binding SelectedItem, ElementName=SearchConceptGrid}">
+         <Grid><StackPanel><TextBlock Text="FICHE DU CONCEPT" Style="{StaticResource Eyebrow}"/><TextBlock Text="{Binding OriginLabel, StringFormat='Origine : {0}'}" Style="{StaticResource Caption}" Margin="0,3,0,0"/></StackPanel><CheckBox Content="Actif" IsChecked="{Binding IsActive}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid>
+         <TextBlock Text="Nom du concept" Style="{StaticResource FieldLabel}" Margin="0,15,0,0"/><TextBox Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsOfficial, Converter={StaticResource InverseBool}}"/>
+         <TextBlock Text="Catégorie" Style="{StaticResource FieldLabel}" Margin="0,11,0,0"/><ComboBox ItemsSource="{Binding DataContext.SearchConceptCategories, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding Category}" IsEnabled="{Binding IsOfficial, Converter={StaticResource InverseBool}}"/>
+         <TextBlock Text="Champ Atlas ciblé" Style="{StaticResource FieldLabel}" Margin="0,11,0,0"/><ComboBox ItemsSource="{Binding DataContext.SearchConceptTargetOptions, RelativeSource={RelativeSource AncestorType=UserControl}}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding Target}" IsEnabled="{Binding IsOfficial, Converter={StaticResource InverseBool}}"/>
+         <TextBlock Text="Valeur recherchée" Style="{StaticResource FieldLabel}" Margin="0,11,0,0"/><TextBox Text="{Binding TargetValue, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsOfficial, Converter={StaticResource InverseBool}}" ToolTip="Laissez vide pour les éléments quantifiables."/>
+         <CheckBox Content="Critère obligatoire" IsChecked="{Binding IsStrict}" IsEnabled="{Binding IsOfficial, Converter={StaticResource InverseBool}}" Margin="0,12,0,0"/>
+         <TextBlock Text="Expressions officielles" Style="{StaticResource FieldLabel}" Margin="0,13,0,0"/><TextBox Text="{Binding OfficialAliasesCsv}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="45"/>
+         <TextBlock Text="Expressions ajoutées par le client" Style="{StaticResource FieldLabel}" Margin="0,11,0,0"/><TextBox Text="{Binding CustomAliasesCsv, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="62" ToolTip="Séparez les expressions par des virgules."/>
+         <TextBlock Text="Les expressions officielles sont mises à jour par Idéo. Les expressions client sont conservées lors de chaque mise à jour." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+        </StackPanel></ScrollViewer>
+       </Border>
+      </Grid>
+
+      <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Border Style="{StaticResource Card}"><StackPanel>
+        <TextBlock Text="TESTER UNE RECHERCHE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Vérifiez l’interprétation avant de quitter les paramètres." Style="{StaticResource Caption}" Margin="0,4,0,12"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SearchDictionaryTestBox" ToolTip="Exemple : meuble bas 4 tiroirs Hettich"/><Button Grid.Column="1" Content="Interpréter" Margin="8,0,0,0" Click="TestSearchDictionary_OnClick"/></Grid>
+        <Border Background="#0E2D39" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" CornerRadius="9" Padding="12" Margin="0,10,0,0"><TextBlock x:Name="SearchDictionaryTestResult" Text="Saisissez une demande client." TextWrapping="Wrap"/></Border>
+       </StackPanel></Border>
+       <Border Grid.Column="2" Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="180"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel><TextBlock Text="RECHERCHES SANS RÉSULTAT" Style="{StaticResource Eyebrow}"/><TextBlock Text="Demandes réelles à analyser pour enrichir le dictionnaire" Style="{StaticResource Caption}" Margin="0,4,0,10"/></StackPanel>
+        <DataGrid Grid.Row="1" ItemsSource="{Binding SearchUnknownQueries}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"><DataGrid.Columns><DataGridTextColumn Header="Recherche" Binding="{Binding Query}" Width="*"/><DataGridTextColumn Header="Nb" Binding="{Binding Count}" Width="45"/><DataGridTextColumn Header="Dernière fois" Binding="{Binding LastSeenLabel}" Width="115"/></DataGrid.Columns></DataGrid>
+        <Button Grid.Row="2" Content="Vider l’historique" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,10,0,0" Click="ClearUnknownSearches_OnClick"/>
+       </Grid></Border>
+      </Grid>
+
+      <Border Background="#101F2F" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="1" CornerRadius="10" Padding="13" Margin="0,14,0,0"><Grid><StackPanel><TextBlock Text="MISE À JOUR DU DICTIONNAIRE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Le socle officiel suit les mises à jour Atlas. Les ajouts de ce site restent stockés dans son espace partagé et ne sont jamais écrasés." Style="{StaticResource Caption}" Margin="0,4,160,0" TextWrapping="Wrap"/></StackPanel><Button Content="Enregistrer le dictionnaire" HorizontalAlignment="Right" VerticalAlignment="Center" Click="SaveSearchDictionary_OnClick"/></Grid></Border>
+      <TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" Margin="3,9,0,4"/>
+     </StackPanel>
+    </ScrollViewer>
     <ScrollViewer x:Name="TopSolidPanel" Visibility="Collapsed">
 <StackPanel>
 <TextBlock Text="Ouverture TopSolid" Style="{StaticResource SectionTitle}"/>
