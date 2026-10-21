@@ -313,5 +313,7 @@ Assert(viewModelSource.Contains("IsCreatorFeatureLicensed") && viewModelSource.C
 var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));
 Assert(componentsXaml.Contains("Binding DetailedName"), "La Forge doit afficher le libellé complet des composants possédant un code C=.");
 Assert(themeXaml.Contains("BasedOn=\"{StaticResource {x:Type TextBlock}}\""), "Les titres explicites doivent hériter de la couleur de texte du thème sombre.");
+Assert(themeXaml.Contains("ContentSource=\"Header\"") && themeXaml.Contains("TargetType=\"TabItem\""),
+    "Le gabarit des onglets doit afficher explicitement leur libellé Header.");
 
 Console.WriteLine("Atlas.Core : contrôles métier réussis.");
