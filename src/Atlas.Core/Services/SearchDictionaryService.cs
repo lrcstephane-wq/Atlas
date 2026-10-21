@@ -192,7 +192,7 @@ public static class SearchDictionaryService
 
         var terms = active.Select(concept => (Concept: concept, Value: concept.Label))
             .Concat(synonyms.Select(item => (Concept: active.FirstOrDefault(concept => concept.Id.Equals(item.ConceptId, StringComparison.OrdinalIgnoreCase)), Value: item.Term))
-                .Where(item => item.Concept is not null).Select(item => (item.Concept!, item.Value)))
+                .Where(item => item.Concept is not null).Select(item => (Concept: item.Concept!, Value: item.Value)))
             .Where(item => !string.IsNullOrWhiteSpace(item.Value))
             .Select(item => (item.Concept, Tokens: CatalogSearchEngine.Normalize(item.Value).Split(' ', StringSplitOptions.RemoveEmptyEntries)))
             .OrderByDescending(item => item.Tokens.Length).ToArray();
