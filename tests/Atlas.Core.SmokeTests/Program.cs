@@ -82,28 +82,38 @@ Assert(CatalogSearchEngine.CorrectQuery("meubel evrier", ["meuble", "evier", "cu
 
 var structuredDictionary = new SearchDictionaryDocument();
 SearchDictionaryService.MergeOfficial(structuredDictionary, searchDictionary);
-Assert(structuredDictionary.OfficialVersion == SearchDictionaryService.OfficialVersion && structuredDictionary.Concepts.Count >= 35,
+Assert(structuredDictionary.OfficialVersion == SearchDictionaryService.OfficialVersion && structuredDictionary.SchemaVersion == 2
+       && structuredDictionary.Concepts.Count >= 65 && structuredDictionary.Synonyms.Count >= 80
+       && structuredDictionary.Expressions.Count >= 40 && structuredDictionary.IgnoredTerms.Count >= 40,
     "Le socle officiel du dictionnaire doit être versionné et suffisamment riche.");
-var sinkDoorIntent = SearchDictionaryService.Interpret("meuble porte sous evier", structuredDictionary.Concepts);
+var sinkDoorIntent = SearchDictionaryService.Interpret("meuble porte sous evier", structuredDictionary);
 Assert(sinkDoorIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DoorCount && item.Mode == SearchConstraintMode.Minimum && item.Quantity == 1),
     "Une porte sans quantité doit signifier au moins une porte.");
 Assert(sinkDoorIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Sous-évier"),
     "Sous évier doit être traduit en usage métier obligatoire.");
-var storageIntent = SearchDictionaryService.Interpret("armoire de ragement avec penderie", structuredDictionary.Concepts);
+var storageIntent = SearchDictionaryService.Interpret("armoire de ragement avec penderie", structuredDictionary);
 Assert(storageIntent.CorrectedQuery.Contains("rangement") && storageIntent.Constraints.Any(item => item.Target == SearchConceptTarget.ShelfCount)
        && storageIntent.Constraints.Any(item => item.Target == SearchConceptTarget.Hanging),
     "Une formulation régionale avec faute doit reconnaître rayons et penderie.");
-var twoDoorsIntent = SearchDictionaryService.Interpret("meuble bas 2 portes", structuredDictionary.Concepts);
+var twoDoorsIntent = SearchDictionaryService.Interpret("meuble bas 2 portes", structuredDictionary);
 Assert(twoDoorsIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DoorCount && item.Mode == SearchConstraintMode.Exact && item.Quantity == 2),
     "Une quantité explicite doit être interprétée comme une quantité exacte.");
-var hettichIntent = SearchDictionaryService.Interpret("je veux un meuble bas 4 tiroirs mais que du hettich", structuredDictionary.Concepts, ["Hettich"]);
-Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DrawerCount && item.Quantity == 4)
-       && hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich"),
+var hettichIntent = SearchDictionaryService.Interpret("je veux un meuble bas 4 tiroirs mais que du hettich", structuredDictionary, ["Hettich"]);
+Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DrawerCount && item.Quantity == 4),
+    "La quantité de tiroirs doit rester exacte dans une demande avec une marque.");
+Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich"),
     "Une marque active doit devenir un tag obligatoire à côté de la quantité demandée.");
-var applianceIntent = SearchDictionaryService.Interpret("me faut un meuble micro onde avec un relevant au dessus sotn", structuredDictionary.Concepts);
+var applianceIntent = SearchDictionaryService.Interpret("me faut un meuble micro onde avec un relevant au dessus sotn", structuredDictionary);
 Assert(applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Micro-ondes")
        && applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.LiftUpCount),
     "Micro-ondes et hayon/relevant doivent rester compréhensibles dans une phrase naturelle bruitée.");
+var liftIntent = SearchDictionaryService.Interpret("meuble haut avec porte relevable", structuredDictionary);
+Assert(liftIntent.Constraints.Any(item => item.Target == SearchConceptTarget.LiftUpCount)
+       && liftIntent.Constraints.All(item => item.Target != SearchConceptTarget.DoorCount),
+    "Une expression longue doit primer : porte relevable ne doit pas compter une porte battante.");
+var excludedBrandIntent = SearchDictionaryService.Interpret("tiroirs Blum mais pas Hettich", structuredDictionary, ["Blum", "Hettich"]);
+Assert(excludedBrandIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich" && item.Mode == SearchConstraintMode.Exclude),
+    "Une négation doit pouvoir exclure une marque ou un tag.");
 var dictionaryTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-dictionary-{Guid.NewGuid():N}");
 try
 {
@@ -111,12 +121,18 @@ try
     var dictionary = await dictionaryStore.LoadAsync();
     var shelfConcept = dictionary.Concepts.Single(item => item.Id == "element-rayon");
     shelfConcept.CustomAliasesCsv = "claie, planche réglable";
+    dictionary.Synonyms.Add(new SearchSynonymEntry { ConceptId = shelfConcept.Id, Term = "rayonnette", IsOfficial = false });
+    dictionary.Expressions.Add(new SearchExpressionRecord { Phrase = "rangement maison", ConceptIdsCsv = shelfConcept.Id, IsOfficial = false });
+    dictionary.IgnoredTerms.Add(new SearchIgnoredTermRecord { Term = "vite fait", IsOfficial = false });
     dictionary.Concepts.Add(new SearchConceptRecord { Id = "client-perso", Label = "Meuble spécial", CustomAliasesCsv = "modèle Michel", IsOfficial = false });
     await dictionaryStore.SaveAsync(dictionary);
     var reloadedDictionary = await dictionaryStore.LoadAsync();
     Assert(reloadedDictionary.Concepts.Single(item => item.Id == "element-rayon").CustomAliasesCsv.Contains("claie")
-           && reloadedDictionary.Concepts.Any(item => item.Id == "client-perso"),
-        "Une mise à jour du socle officiel ne doit jamais écraser les expressions ni les concepts du client.");
+           && reloadedDictionary.Concepts.Any(item => item.Id == "client-perso")
+           && reloadedDictionary.Synonyms.Any(item => item.Term == "rayonnette")
+           && reloadedDictionary.Expressions.Any(item => item.Phrase == "rangement maison")
+           && reloadedDictionary.IgnoredTerms.Any(item => item.Term == "vite fait"),
+        "Une mise à jour du socle officiel ne doit jamais écraser le vocabulaire ni les concepts du client.");
 }
 finally
 {
@@ -282,8 +298,9 @@ Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && 
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
 Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
 Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("FurnitureUsageList") && settingsXaml.Contains("Renommer"), "Les paramètres doivent administrer les types de meubles et usages spécifiques.");
-Assert(settingsXaml.Contains("CONCEPTS MÉTIER") && settingsXaml.Contains("TESTER UNE RECHERCHE") && settingsXaml.Contains("RECHERCHES SANS RÉSULTAT")
-       && settingsXaml.Contains("Expressions ajoutées par le client"), "Les paramètres doivent administrer le dictionnaire structuré, le tester et exposer les recherches à enrichir.");
+Assert(settingsXaml.Contains("Header=\"Synonymes\"") && settingsXaml.Contains("Header=\"Expressions\"")
+       && settingsXaml.Contains("Header=\"Mots ignorés\"") && settingsXaml.Contains("Header=\"Demandes enregistrées\"")
+       && settingsXaml.Contains("Header=\"Laboratoire\""), "Les paramètres doivent séparer les cinq outils d’administration du dictionnaire.");
 var settingsCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml.cs"));
 Assert(settingsCode.Contains("AddFurnitureType_OnClick") && settingsCode.Contains("RenameFurnitureUsage_OnClick") && settingsCode.Contains("UpdateFurnitureVocabularyAsync"), "Les référentiels meubles doivent être ajoutables, renommables, supprimables et enregistrés.");
 Assert(settingsCode.Contains("SaveSearchDictionaryAsync") && viewModelSource.Contains("SearchDictionaryService.Interpret") && viewModelSource.Contains("ScheduleUnknownSearchObservation"), "Le dictionnaire doit être persistant, interpréter les intentions et mémoriser les recherches sans résultat.");

@@ -192,6 +192,9 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<CatalogFacetViewModel> ClientBackFacets { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientFavoriteFacets { get; } = [];
     public ObservableCollection<SearchConceptRecord> SearchConcepts { get; } = [];
+    public ObservableCollection<SearchSynonymEntry> SearchSynonyms { get; } = [];
+    public ObservableCollection<SearchExpressionRecord> SearchExpressions { get; } = [];
+    public ObservableCollection<SearchIgnoredTermRecord> SearchIgnoredTerms { get; } = [];
     public ObservableCollection<SearchUnknownQueryRecord> SearchUnknownQueries { get; } = [];
     public ObservableCollection<FurnitureStepViewModel> FurnitureSteps { get; } =
     [
@@ -1152,7 +1155,7 @@ public sealed class MainViewModel : ObservableObject
         {
             var dynamicTags = _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label)
                 .Concat(PersonalTags.Select(tag => tag.Label)).Distinct(StringComparer.OrdinalIgnoreCase);
-            _activeSearchIntent = SearchDictionaryService.Interpret(ClientSearch, SearchConcepts, dynamicTags);
+            _activeSearchIntent = SearchDictionaryService.Interpret(ClientSearch, _searchDictionary, dynamicTags);
             foreach (var card in ClientFurnitureCards) card.SearchScore = EvaluateClientSearch(card.Record, _activeSearchIntent);
             ClientSearchInterpretation = $"Atlas a compris : {_activeSearchIntent.Summary}";
         }
@@ -1182,7 +1185,7 @@ public sealed class MainViewModel : ObservableObject
         var tags = ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label)
             .Concat(furniture.PersonalTags ?? []).ToArray();
         var usages = FurnitureUsagesFor(furniture).ToArray();
-        return constraint.Target switch
+        var matches = constraint.Target switch
         {
             SearchConceptTarget.DoorCount => SearchDictionaryService.QuantityMatches(furniture.NombrePortes, constraint),
             SearchConceptTarget.DrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirs, constraint),
@@ -1201,9 +1204,13 @@ public sealed class MainViewModel : ObservableObject
             SearchConceptTarget.Construction => ValueMatches(furniture.PrincipleConstruction, constraint.Value),
             SearchConceptTarget.Assembly => ValueMatches(furniture.TypeAssemblage, constraint.Value),
             SearchConceptTarget.BackPosition => ValueMatches(furniture.PositionDos, constraint.Value),
+            SearchConceptTarget.SpatialRelation => true,
             SearchConceptTarget.GenericText => SearchFieldsContain(furniture, constraint.Value),
             _ => false
         };
+        return constraint.Mode == SearchConstraintMode.Exclude && !SearchDictionaryService.IsQuantityTarget(constraint.Target)
+            ? !matches
+            : matches;
     }
 
     private static bool ValueMatches(string? actual, string expected) =>
@@ -1268,7 +1275,7 @@ public sealed class MainViewModel : ObservableObject
         RefreshClientFurnitureView();
     }
 
-    public SearchIntent InterpretSearch(string query) => SearchDictionaryService.Interpret(query, SearchConcepts,
+    public SearchIntent InterpretSearch(string query) => SearchDictionaryService.Interpret(query, _searchDictionary,
         _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label).Concat(PersonalTags.Select(tag => tag.Label)));
 
     public async Task<bool> SaveSearchDictionaryAsync()
@@ -1276,6 +1283,9 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             _searchDictionary.Concepts = SearchConcepts.ToList();
+            _searchDictionary.Synonyms = SearchSynonyms.ToList();
+            _searchDictionary.Expressions = SearchExpressions.ToList();
+            _searchDictionary.IgnoredTerms = SearchIgnoredTerms.ToList();
             _searchDictionary.UnknownQueries = SearchUnknownQueries.ToList();
             SearchDictionaryService.MergeOfficial(_searchDictionary);
             await _searchDictionaryStore.SaveAsync(_searchDictionary);
@@ -1301,6 +1311,45 @@ public sealed class MainViewModel : ObservableObject
         return SearchConcepts.Remove(concept);
     }
 
+    public SearchSynonymEntry AddSearchSynonym(string conceptId = "")
+    {
+        var item = new SearchSynonymEntry { ConceptId = conceptId, Term = "Nouveau synonyme", IsActive = true };
+        SearchSynonyms.Add(item);
+        return item;
+    }
+
+    public bool DeleteSearchSynonym(SearchSynonymEntry item)
+    {
+        if (item.IsOfficial) return false;
+        return SearchSynonyms.Remove(item);
+    }
+
+    public SearchExpressionRecord AddSearchExpression()
+    {
+        var item = new SearchExpressionRecord { Phrase = "Nouvelle expression", IsActive = true };
+        SearchExpressions.Add(item);
+        return item;
+    }
+
+    public bool DeleteSearchExpression(SearchExpressionRecord item)
+    {
+        if (item.IsOfficial) return false;
+        return SearchExpressions.Remove(item);
+    }
+
+    public SearchIgnoredTermRecord AddSearchIgnoredTerm()
+    {
+        var item = new SearchIgnoredTermRecord { Term = "Nouveau mot", IsActive = true };
+        SearchIgnoredTerms.Add(item);
+        return item;
+    }
+
+    public bool DeleteSearchIgnoredTerm(SearchIgnoredTermRecord item)
+    {
+        if (item.IsOfficial) return false;
+        return SearchIgnoredTerms.Remove(item);
+    }
+
     public async Task ClearUnknownSearchQueriesAsync()
     {
         SearchUnknownQueries.Clear();
@@ -1313,17 +1362,33 @@ public sealed class MainViewModel : ObservableObject
         SearchConcepts.Clear();
         foreach (var concept in _searchDictionary.Concepts.OrderBy(item => item.Category, StringComparer.CurrentCultureIgnoreCase)
                      .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)) SearchConcepts.Add(concept);
+        SearchSynonyms.Clear();
+        foreach (var item in _searchDictionary.Synonyms.OrderBy(item => ConceptLabel(item.ConceptId), StringComparer.CurrentCultureIgnoreCase)
+                     .ThenBy(item => item.Term, StringComparer.CurrentCultureIgnoreCase)) SearchSynonyms.Add(item);
+        SearchExpressions.Clear();
+        foreach (var item in _searchDictionary.Expressions.OrderBy(item => item.Phrase, StringComparer.CurrentCultureIgnoreCase)) SearchExpressions.Add(item);
+        SearchIgnoredTerms.Clear();
+        foreach (var item in _searchDictionary.IgnoredTerms.OrderBy(item => item.Term, StringComparer.CurrentCultureIgnoreCase)) SearchIgnoredTerms.Add(item);
         SearchUnknownQueries.Clear();
         foreach (var query in _searchDictionary.UnknownQueries.OrderByDescending(item => item.Count).ThenByDescending(item => item.LastSeenUtc))
             SearchUnknownQueries.Add(query);
         OnPropertyChanged(nameof(SearchConcepts));
+        OnPropertyChanged(nameof(SearchSynonyms));
+        OnPropertyChanged(nameof(SearchExpressions));
+        OnPropertyChanged(nameof(SearchIgnoredTerms));
         OnPropertyChanged(nameof(SearchUnknownQueries));
     }
+
+    public string ConceptLabel(string conceptId) => SearchConcepts.FirstOrDefault(item =>
+        item.Id.Equals(conceptId, StringComparison.OrdinalIgnoreCase))?.Label ?? conceptId;
+
+    public string ExpressionConceptLabels(SearchExpressionRecord expression) => string.Join(" + ", expression.ConceptIds()
+        .Select(ConceptLabel).Where(value => !string.IsNullOrWhiteSpace(value)));
 
     private void ScheduleUnknownSearchObservation()
     {
         _searchObservationCancellation?.Cancel();
-        if (string.IsNullOrWhiteSpace(ClientSearch) || ClientSearch.Trim().Length < 3 || ClientResultCount > 0) return;
+        if (string.IsNullOrWhiteSpace(ClientSearch) || ClientSearch.Trim().Length < 3) return;
         var query = ClientSearch.Trim();
         var cancellation = _searchObservationCancellation = new CancellationTokenSource();
         _ = RecordUnknownSearchAfterDelayAsync(query, cancellation.Token);
@@ -1334,7 +1399,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             await Task.Delay(900, cancellationToken);
-            if (!query.Equals(ClientSearch.Trim(), StringComparison.Ordinal) || ClientResultCount > 0) return;
+            if (!query.Equals(ClientSearch.Trim(), StringComparison.Ordinal)) return;
             var normalized = CatalogSearchEngine.Normalize(query);
             var existing = SearchUnknownQueries.FirstOrDefault(item => item.NormalizedQuery.Equals(normalized, StringComparison.Ordinal));
             if (existing is null)
@@ -1348,6 +1413,10 @@ public sealed class MainViewModel : ObservableObject
                 existing.Query = query;
                 existing.LastSeenUtc = DateTimeOffset.UtcNow;
             }
+            existing.LastResultCount = ClientResultCount;
+            existing.LastInterpretation = _activeSearchIntent.Summary;
+            while (SearchUnknownQueries.Count > 500)
+                SearchUnknownQueries.RemoveAt(SearchUnknownQueries.Count - 1);
             _searchDictionary.UnknownQueries = SearchUnknownQueries.ToList();
             await _searchDictionaryStore.SaveAsync(_searchDictionary, cancellationToken);
         }

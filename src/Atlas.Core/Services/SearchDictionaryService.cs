@@ -43,22 +43,30 @@ public sealed class SearchDictionaryStore(string sharedRoot)
 
 public static class SearchDictionaryService
 {
-    public const int OfficialVersion = 1;
+    public const int OfficialVersion = 2;
 
     public static IReadOnlyList<SearchConceptRecord> OfficialConcepts { get; } = BuildOfficialConcepts();
-
-    public static IReadOnlySet<string> IgnoredWords { get; } = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "je", "cherche", "recherche", "veux", "voudrais", "souhaite", "faut", "me", "moi", "montre", "trouve",
-        "avec", "ayant", "equipe", "equipee", "contenant", "mais", "que", "seulement", "uniquement", "un", "une", "des", "du", "de", "la", "le", "les",
-        "d", "l", "a", "en", "dans", "dedans", "dessus", "au", "aux", "pour", "qui", "soit", "sont", "est", "et", "ou", "non",
-        "different", "differents", "differente", "differentes", "meme", "memes", "meuble", "mobilier"
-    };
+    public static IReadOnlyList<SearchSynonymEntry> OfficialSynonyms { get; } = BuildOfficialSynonyms();
+    public static IReadOnlyList<SearchExpressionRecord> OfficialExpressions { get; } = BuildOfficialExpressions();
+    public static IReadOnlyList<SearchIgnoredTermRecord> OfficialIgnoredTerms { get; } = BuildOfficialIgnoredTerms();
 
     public static void MergeOfficial(SearchDictionaryDocument document, IEnumerable<SearchSynonymRecord>? legacy = null)
     {
         document.Concepts ??= [];
+        document.Synonyms ??= [];
+        document.Expressions ??= [];
+        document.IgnoredTerms ??= [];
         document.UnknownQueries ??= [];
+
+        // Migration transparente du schéma v1 : les ajouts saisis par le client deviennent de vraies lignes de synonymes.
+        foreach (var concept in document.Concepts)
+        foreach (var alias in SplitAliases(concept.CustomAliasesCsv))
+            AddIfMissing(document.Synonyms, new SearchSynonymEntry
+            {
+                Id = $"migrated-{concept.Id}-{StableId(alias)}", ConceptId = concept.Id, Term = alias,
+                IsOfficial = false, IsActive = true
+            });
+
         foreach (var source in OfficialConcepts)
         {
             var existing = document.Concepts.FirstOrDefault(item => item.Id.Equals(source.Id, StringComparison.OrdinalIgnoreCase));
@@ -75,6 +83,10 @@ public static class SearchDictionaryService
             existing.IsOfficial = true;
             existing.IsStrict = source.IsStrict;
         }
+
+        MergeOfficialRows(document.Synonyms, OfficialSynonyms, item => item.Id, Clone);
+        MergeOfficialRows(document.Expressions, OfficialExpressions, item => item.Id, Clone);
+        MergeOfficialRows(document.IgnoredTerms, OfficialIgnoredTerms, item => item.Id, Clone);
 
         foreach (var old in legacy ?? [])
         {
@@ -103,12 +115,22 @@ public static class SearchDictionaryService
                 IsStrict = false
             });
         }
+        document.SchemaVersion = 2;
         document.OfficialVersion = OfficialVersion;
     }
 
     public static SearchIntent Interpret(string query, IEnumerable<SearchConceptRecord> concepts, IEnumerable<string>? dynamicTags = null)
     {
-        var active = concepts.Where(item => item.IsActive).ToList();
+        var document = new SearchDictionaryDocument { Concepts = concepts.ToList() };
+        document.Synonyms.AddRange(OfficialSynonyms.Select(Clone));
+        document.Expressions.AddRange(OfficialExpressions.Select(Clone));
+        document.IgnoredTerms.AddRange(OfficialIgnoredTerms.Select(Clone));
+        return Interpret(query, document, dynamicTags);
+    }
+
+    public static SearchIntent Interpret(string query, SearchDictionaryDocument document, IEnumerable<string>? dynamicTags = null)
+    {
+        var active = (document.Concepts ?? []).Where(item => item.IsActive).ToList();
         foreach (var tag in dynamicTags ?? [])
         {
             if (string.IsNullOrWhiteSpace(tag)) continue;
@@ -126,41 +148,80 @@ public static class SearchDictionaryService
         var normalized = CatalogSearchEngine.Normalize(query);
         if (string.IsNullOrWhiteSpace(normalized)) return new SearchIntent { OriginalQuery = query };
         var rawTokens = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var vocabulary = active.SelectMany(item => item.Expressions()).SelectMany(expression => CatalogSearchEngine.Normalize(expression).Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            .Concat(IgnoredWords).Concat(NumberWords.Keys).Concat(["sans", "minimum", "maximum", "max", "exactement", "moins", "plus"])
+        var synonyms = (document.Synonyms ?? []).Where(item => item.IsActive).ToList();
+        var expressionRules = (document.Expressions ?? []).Where(item => item.IsActive).ToList();
+        var ignoredRules = (document.IgnoredTerms ?? []).Where(item => item.IsActive).ToList();
+        var vocabulary = active.SelectMany(item => new[] { item.Label })
+            .Concat(synonyms.Select(item => item.Term)).Concat(expressionRules.Select(item => item.Phrase))
+            .Concat(ignoredRules.Select(item => item.Term))
+            .SelectMany(expression => CatalogSearchEngine.Normalize(expression).Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Concat(NumberWords.Keys).Concat(["sans", "pas", "aucun", "aucune", "minimum", "mini", "maximum", "max", "exactement", "moins", "plus"])
             .Distinct(StringComparer.Ordinal).ToArray();
         var correctedTokens = rawTokens.Select(token => CorrectToken(token, vocabulary)).ToArray();
         var occupied = new bool[correctedTokens.Length];
         var strictOccupied = new bool[correctedTokens.Length];
         var constraints = new List<SearchConstraint>();
         var recognized = new List<string>();
+        var recognizedIds = new List<string>();
+        var ignored = new List<string>();
 
-        var expressions = active.SelectMany(concept => concept.Expressions()
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => (Concept: concept, Tokens: CatalogSearchEngine.Normalize(value).Split(' ', StringSplitOptions.RemoveEmptyEntries))))
+        // Les expressions composées sont prioritaires et peuvent déclencher plusieurs concepts.
+        var phrases = expressionRules.Where(item => !string.IsNullOrWhiteSpace(item.Phrase))
+            .Select(item => (Rule: item, Tokens: CatalogSearchEngine.Normalize(item.Phrase).Split(' ', StringSplitOptions.RemoveEmptyEntries)))
             .OrderByDescending(item => item.Tokens.Length).ToArray();
-        foreach (var (concept, expressionTokens) in expressions)
+        foreach (var (rule, expressionTokens) in phrases)
         {
             for (var index = 0; index <= correctedTokens.Length - expressionTokens.Length; index++)
             {
                 if (!MatchesAt(correctedTokens, expressionTokens, index)) continue;
-                if (concept.IsStrict && expressionTokens.Length == 1 && strictOccupied[index]) continue;
+                if (Enumerable.Range(index, expressionTokens.Length).Any(tokenIndex => strictOccupied[tokenIndex])) continue;
                 for (var tokenIndex = index; tokenIndex < index + expressionTokens.Length; tokenIndex++)
                 {
                     occupied[tokenIndex] = true;
-                    if (concept.IsStrict) strictOccupied[tokenIndex] = true;
+                    strictOccupied[tokenIndex] = true;
                 }
-                var constraint = BuildConstraint(concept, correctedTokens, index);
-                if (!constraints.Any(item => SameConstraint(item, constraint))) constraints.Add(constraint);
-                if (!recognized.Contains(concept.Label, StringComparer.OrdinalIgnoreCase)) recognized.Add(concept.Label);
+                foreach (var conceptId in rule.ConceptIds())
+                {
+                    var concept = active.FirstOrDefault(item => item.Id.Equals(conceptId, StringComparison.OrdinalIgnoreCase));
+                    if (concept is null) continue;
+                    AddConceptMatch(concept, correctedTokens, index, constraints, recognizedIds);
+                }
+                if (!recognized.Contains(rule.Phrase, StringComparer.OrdinalIgnoreCase)) recognized.Add(rule.Phrase);
             }
         }
 
-        for (var index = 0; index < correctedTokens.Length; index++)
+        var terms = active.Select(concept => (Concept: concept, Value: concept.Label))
+            .Concat(synonyms.Select(item => (Concept: active.FirstOrDefault(concept => concept.Id.Equals(item.ConceptId, StringComparison.OrdinalIgnoreCase)), Value: item.Term))
+                .Where(item => item.Concept is not null).Select(item => (Concept: item.Concept!, Value: item.Value)))
+            .Where(item => !string.IsNullOrWhiteSpace(item.Value))
+            .Select(item => (item.Concept, Tokens: CatalogSearchEngine.Normalize(item.Value).Split(' ', StringSplitOptions.RemoveEmptyEntries)))
+            .OrderByDescending(item => item.Tokens.Length).ToArray();
+        foreach (var (concept, termTokens) in terms)
+        for (var index = 0; index <= correctedTokens.Length - termTokens.Length; index++)
         {
-            if (IgnoredWords.Contains(correctedTokens[index]) || IsControlToken(correctedTokens[index]) || ParseNumber(correctedTokens[index]) is not null)
-                occupied[index] = true;
+            if (!MatchesAt(correctedTokens, termTokens, index)) continue;
+            if (Enumerable.Range(index, termTokens.Length).Any(tokenIndex => strictOccupied[tokenIndex])) continue;
+            for (var tokenIndex = index; tokenIndex < index + termTokens.Length; tokenIndex++)
+            {
+                occupied[tokenIndex] = true;
+                if (concept.IsStrict) strictOccupied[tokenIndex] = true;
+            }
+            AddConceptMatch(concept, correctedTokens, index, constraints, recognizedIds);
+            if (!recognized.Contains(concept.Label, StringComparer.OrdinalIgnoreCase)) recognized.Add(concept.Label);
         }
+
+        foreach (var rule in ignoredRules.OrderByDescending(item => item.Term.Length))
+        {
+            var termTokens = CatalogSearchEngine.Normalize(rule.Term).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (var index = 0; index <= correctedTokens.Length - termTokens.Length; index++)
+            {
+                if (!MatchesAt(correctedTokens, termTokens, index)) continue;
+                for (var tokenIndex = index; tokenIndex < index + termTokens.Length; tokenIndex++) occupied[tokenIndex] = true;
+                if (!ignored.Contains(rule.Term, StringComparer.OrdinalIgnoreCase)) ignored.Add(rule.Term);
+            }
+        }
+        for (var index = 0; index < correctedTokens.Length; index++)
+            if (IsControlToken(correctedTokens[index]) || ParseNumber(correctedTokens[index]) is not null) occupied[index] = true;
         var remaining = string.Join(' ', correctedTokens.Where((_, index) => !occupied[index]));
         return new SearchIntent
         {
@@ -169,15 +230,28 @@ public static class SearchDictionaryService
             RemainingQuery = remaining,
             Constraints = constraints,
             RecognizedExpressions = recognized,
+            RecognizedConceptIds = recognizedIds,
+            IgnoredTerms = ignored,
             Summary = BuildSummary(constraints, remaining)
         };
+    }
+
+    private static void AddConceptMatch(SearchConceptRecord concept, string[] tokens, int index,
+        ICollection<SearchConstraint> constraints, ICollection<string> recognizedIds)
+    {
+        var constraint = BuildConstraint(concept, tokens, index);
+        if (!constraints.Any(item => SameConstraint(item, constraint))) constraints.Add(constraint);
+        if (!recognizedIds.Contains(concept.Id, StringComparer.OrdinalIgnoreCase)) recognizedIds.Add(concept.Id);
     }
 
     private static SearchConstraint BuildConstraint(SearchConceptRecord concept, string[] tokens, int expressionStart)
     {
         var mode = SearchConstraintMode.Contains;
         var quantity = 0;
-        if (IsCountTarget(concept.Target))
+        var previous = tokens.Skip(Math.Max(0, expressionStart - 3)).Take(Math.Min(3, expressionStart)).ToArray();
+        var excluded = previous.Contains("sans") || previous.Contains("aucun") || previous.Contains("aucune") ||
+                       previous.Contains("pas");
+        if (IsQuantityTarget(concept.Target))
         {
             mode = SearchConstraintMode.Minimum;
             quantity = 1;
@@ -191,12 +265,13 @@ public static class SearchDictionaryService
                 else if (numberIndex >= 1 && tokens[numberIndex - 1] is "maximum" or "max") mode = SearchConstraintMode.Maximum;
                 else if (numberIndex >= 1 && tokens[numberIndex - 1] == "exactement") mode = SearchConstraintMode.Exact;
             }
-            if (tokens.Skip(Math.Max(0, expressionStart - 2)).Take(Math.Min(2, expressionStart)).Contains("sans"))
+            if (excluded)
             {
                 mode = SearchConstraintMode.Exact;
                 quantity = 0;
             }
         }
+        else if (excluded) mode = SearchConstraintMode.Exclude;
         return new SearchConstraint(concept.Target, string.IsNullOrWhiteSpace(concept.TargetValue) ? concept.Label : concept.TargetValue,
             mode, quantity, concept.IsStrict, concept.Label);
     }
@@ -215,10 +290,10 @@ public static class SearchDictionaryService
             SearchConceptTarget.LiftUpCount => QuantitySummary("relevant", constraint),
             SearchConceptTarget.ShelfCount => QuantitySummary("rayon", constraint),
             SearchConceptTarget.OpenNicheCount => QuantitySummary("niche ouverte", constraint),
-            SearchConceptTarget.FurnitureTag => $"tag {constraint.Value}",
-            SearchConceptTarget.FurnitureUsage => $"usage {constraint.Value}",
+            SearchConceptTarget.FurnitureTag => constraint.Mode == SearchConstraintMode.Exclude ? $"sans tag {constraint.Value}" : $"tag {constraint.Value}",
+            SearchConceptTarget.FurnitureUsage => constraint.Mode == SearchConstraintMode.Exclude ? $"sans usage {constraint.Value}" : $"usage {constraint.Value}",
             SearchConceptTarget.FurnitureType => $"préférence {constraint.Value}",
-            _ => constraint.ConceptLabel
+            _ => constraint.Mode == SearchConstraintMode.Exclude ? $"sans {constraint.ConceptLabel}" : constraint.ConceptLabel
         }).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (!string.IsNullOrWhiteSpace(remaining)) parts.Add($"texte « {remaining} »");
         return parts.Count == 0 ? "Aucun critère métier reconnu" : string.Join(" · ", parts);
@@ -231,6 +306,7 @@ public static class SearchDictionaryService
         {
             SearchConstraintMode.Exact => $"{constraint.Quantity} {plural}",
             SearchConstraintMode.Maximum => $"maximum {constraint.Quantity} {plural}",
+            SearchConstraintMode.Exclude => $"sans {singular}",
             _ => constraint.Quantity <= 1 ? $"au moins 1 {singular}" : $"au moins {constraint.Quantity} {plural}"
         };
     }
@@ -240,14 +316,16 @@ public static class SearchDictionaryService
         SearchConstraintMode.Exact => actual == constraint.Quantity,
         SearchConstraintMode.Maximum => actual <= constraint.Quantity,
         SearchConstraintMode.Minimum => actual >= constraint.Quantity,
+        SearchConstraintMode.Exclude => actual == 0,
         _ => actual > 0
     };
 
-    private static bool IsCountTarget(SearchConceptTarget target) => target is SearchConceptTarget.DoorCount or SearchConceptTarget.DrawerCount
+    public static bool IsQuantityTarget(SearchConceptTarget target) => target is SearchConceptTarget.DoorCount or SearchConceptTarget.DrawerCount
         or SearchConceptTarget.InnerDrawerCount or SearchConceptTarget.FlapCount or SearchConceptTarget.LiftUpCount
         or SearchConceptTarget.ShelfCount or SearchConceptTarget.OpenNicheCount;
 
-    private static bool IsControlToken(string token) => token is "sans" or "minimum" or "mini" or "maximum" or "max" or "exactement" or "moins" or "plus";
+    private static bool IsControlToken(string token) => token is "sans" or "pas" or "aucun" or "aucune" or "minimum" or "mini" or
+        "maximum" or "max" or "exactement" or "moins" or "plus" or "avec" or "mais" or "que" or "seulement" or "uniquement";
 
     private static readonly Dictionary<string, int> NumberWords = new(StringComparer.Ordinal)
     {
@@ -312,23 +390,100 @@ public static class SearchDictionaryService
         IsActive = source.IsActive, IsStrict = source.IsStrict
     };
 
+    private static SearchSynonymEntry Clone(SearchSynonymEntry source) => new()
+    {
+        Id = source.Id, ConceptId = source.ConceptId, Term = source.Term, IsOfficial = source.IsOfficial, IsActive = source.IsActive
+    };
+
+    private static SearchExpressionRecord Clone(SearchExpressionRecord source) => new()
+    {
+        Id = source.Id, Phrase = source.Phrase, ConceptIdsCsv = source.ConceptIdsCsv, Description = source.Description,
+        IsOfficial = source.IsOfficial, IsActive = source.IsActive
+    };
+
+    private static SearchIgnoredTermRecord Clone(SearchIgnoredTermRecord source) => new()
+    {
+        Id = source.Id, Term = source.Term, IsOfficial = source.IsOfficial, IsActive = source.IsActive
+    };
+
+    private static void MergeOfficialRows<T>(ICollection<T> destination, IEnumerable<T> sources,
+        Func<T, string> id, Func<T, T> clone)
+    {
+        foreach (var source in sources)
+        {
+            var existing = destination.FirstOrDefault(item => id(item).Equals(id(source), StringComparison.OrdinalIgnoreCase));
+            if (existing is null) destination.Add(clone(source));
+            else
+            {
+                var active = existing switch
+                {
+                    SearchSynonymEntry value => value.IsActive,
+                    SearchExpressionRecord value => value.IsActive,
+                    SearchIgnoredTermRecord value => value.IsActive,
+                    _ => true
+                };
+                destination.Remove(existing);
+                var replacement = clone(source);
+                switch (replacement)
+                {
+                    case SearchSynonymEntry value: value.IsActive = active; break;
+                    case SearchExpressionRecord value: value.IsActive = active; break;
+                    case SearchIgnoredTermRecord value: value.IsActive = active; break;
+                }
+                destination.Add(replacement);
+            }
+        }
+    }
+
+    private static void AddIfMissing(ICollection<SearchSynonymEntry> destination, SearchSynonymEntry source)
+    {
+        var normalized = CatalogSearchEngine.Normalize(source.Term);
+        if (destination.Any(item => item.ConceptId.Equals(source.ConceptId, StringComparison.OrdinalIgnoreCase) &&
+                                    CatalogSearchEngine.Normalize(item.Term).Equals(normalized, StringComparison.Ordinal))) return;
+        destination.Add(source);
+    }
+
+    private static IEnumerable<string> SplitAliases(string value) => (value ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static string StableId(string value)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(CatalogSearchEngine.Normalize(value)));
+        return Convert.ToHexString(hash)[..10].ToLowerInvariant();
+    }
+
     private static string MergeAliases(params string[] values) => string.Join(", ", values.SelectMany(value =>
             (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         .Distinct(StringComparer.OrdinalIgnoreCase));
 
     private static IReadOnlyList<SearchConceptRecord> BuildOfficialConcepts() =>
     [
-        Official("element-porte", "Porte", "Éléments", SearchConceptTarget.DoorCount, "", "ouvrant, porte battante"),
-        Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "coulissant de rangement"),
-        Official("element-tiroir-anglais", "Tiroir à l’anglaise", "Éléments", SearchConceptTarget.InnerDrawerCount, "", "tiroir anglais, tiroir intérieur, coulissant intérieur"),
-        Official("element-rayon", "Rayon", "Éléments", SearchConceptTarget.ShelfCount, "", "tablette, étagère"),
+        Official("element-porte", "Porte", "Éléments", SearchConceptTarget.DoorCount, "", "portes, ouvrant, ouvrants, vantail, vantaux, porte battante, portes battantes"),
+        Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "tiroirs, coulissant de rangement, coulissants de rangement, tiroir simple, tiroirs simples"),
+        Official("element-tiroir-anglais", "Tiroir à l’anglaise", "Éléments", SearchConceptTarget.InnerDrawerCount, "", "tiroirs à l’anglaise, tiroir anglais, tiroirs anglais, tiroir intérieur, tiroirs intérieurs, coulissant intérieur"),
+        Official("element-rayon", "Rayon", "Éléments", SearchConceptTarget.ShelfCount, "", "rayons, tablette, tablettes, étagère, étagères, planche de rangement, planches de rangement"),
         Official("expression-rangement-rayons", "Armoire de rangement", "Expressions", SearchConceptTarget.ShelfCount, "", "placard de rangement, rangement avec étagères"),
-        Official("element-penderie", "Penderie", "Éléments", SearchConceptTarget.Hanging, "", "tringle, barre de penderie"),
-        Official("element-relevant", "Relevant", "Éléments", SearchConceptTarget.LiftUpCount, "", "hayon, porte relevable, ouvrant vers le haut"),
-        Official("element-abattant", "Abattant", "Éléments", SearchConceptTarget.FlapCount, "", "porte abattante, ouvrant vers le bas"),
-        Official("element-niche", "Niche ouverte", "Éléments", SearchConceptTarget.OpenNicheCount, "", "niche, case ouverte, compartiment ouvert"),
+        Official("element-penderie", "Penderie", "Éléments", SearchConceptTarget.Hanging, "", "penderies, tringle, tringles, barre de penderie, barres de penderie"),
+        Official("element-relevant", "Relevant", "Éléments", SearchConceptTarget.LiftUpCount, "", "relevants, hayon, hayons, porte relevable, portes relevables, ouvrant vers le haut"),
+        Official("element-abattant", "Abattant", "Éléments", SearchConceptTarget.FlapCount, "", "abattants, porte abattante, portes abattantes, ouvrant vers le bas"),
+        Official("element-niche", "Niche ouverte", "Éléments", SearchConceptTarget.OpenNicheCount, "", "niche, niches, niches ouvertes, case ouverte, cases ouvertes, compartiment ouvert"),
         Official("element-separation-h", "Séparation horizontale", "Éléments", SearchConceptTarget.HorizontalSeparation, "", "cloison horizontale"),
         Official("element-separation-v", "Séparation verticale", "Éléments", SearchConceptTarget.VerticalSeparation, "", "cloison verticale"),
+        Official("element-tablette-reglable", "Tablette réglable", "Éléments", SearchConceptTarget.GenericText, "tablette réglable", "tablette mobile, rayon réglable, étagère réglable, tablette amovible"),
+        Official("element-tablette-fixe", "Tablette fixe", "Éléments", SearchConceptTarget.GenericText, "tablette fixe", "rayon fixe, étagère fixe"),
+        Official("element-panier-coulissant", "Panier coulissant", "Éléments", SearchConceptTarget.GenericText, "panier coulissant", "panier extractible, corbeille coulissante"),
+        Official("element-plateau-tournant", "Plateau tournant", "Éléments", SearchConceptTarget.GenericText, "plateau tournant", "carrousel, tourniquet"),
+        Official("element-porte-coulissante", "Porte coulissante", "Éléments", SearchConceptTarget.GenericText, "porte coulissante", "façade coulissante, ouvrant coulissant"),
+        Official("element-porte-pliante", "Porte pliante", "Éléments", SearchConceptTarget.GenericText, "porte pliante", "porte accordéon, porte repliable"),
+        Official("element-porte-escamotable", "Porte escamotable", "Éléments", SearchConceptTarget.GenericText, "porte escamotable", "porte rentrante, porte pocket, façade escamotable"),
+        Official("element-tringle-basculante", "Tringle basculante", "Éléments", SearchConceptTarget.GenericText, "tringle basculante", "penderie escamotable, penderie descendante, lift penderie"),
+        Official("element-porte-pantalons", "Porte-pantalons", "Éléments", SearchConceptTarget.GenericText, "porte-pantalons", "range pantalons, penderie pantalons"),
+        Official("position-dessus", "Au-dessus", "Positions", SearchConceptTarget.SpatialRelation, "au-dessus", "", false),
+        Official("position-dessous", "En dessous", "Positions", SearchConceptTarget.SpatialRelation, "en dessous", "", false),
+        Official("position-haut", "En partie haute", "Positions", SearchConceptTarget.SpatialRelation, "en partie haute", "", false),
+        Official("position-bas", "En partie basse", "Positions", SearchConceptTarget.SpatialRelation, "en partie basse", "", false),
+        Official("position-gauche", "À gauche", "Positions", SearchConceptTarget.SpatialRelation, "à gauche", "", false),
+        Official("position-droite", "À droite", "Positions", SearchConceptTarget.SpatialRelation, "à droite", "", false),
 
         Official("usage-sous-evier", "Sous-évier", "Usages", SearchConceptTarget.FurnitureUsage, "Sous-évier", "sous évier, meuble évier, caisson évier"),
         Official("usage-vasque", "Vasque", "Usages", SearchConceptTarget.FurnitureUsage, "Vasque", "meuble vasque, sous vasque, lavabo"),
@@ -342,11 +497,34 @@ public static class SearchDictionaryService
         Official("usage-chaussures", "Chaussures", "Usages", SearchConceptTarget.FurnitureUsage, "Chaussures", "meuble à chaussures"),
         Official("usage-tv", "TV / multimédia", "Usages", SearchConceptTarget.FurnitureUsage, "TV / multimédia", "télévision, télé, tv, multimédia"),
         Official("usage-technique", "Technique", "Usages", SearchConceptTarget.FurnitureUsage, "Technique", "meuble technique, coffret technique"),
+        Official("usage-imprimante", "Imprimante", "Usages", SearchConceptTarget.FurnitureUsage, "Imprimante", "meuble imprimante"),
+        Official("usage-caisse", "Caisse", "Usages", SearchConceptTarget.FurnitureUsage, "Caisse", "meuble caisse, comptoir caisse"),
+        Official("usage-presentation", "Présentation / exposition", "Usages", SearchConceptTarget.FurnitureUsage, "Présentation / exposition", "exposition, présentoir"),
+        Official("usage-hotte", "Hotte", "Usages", SearchConceptTarget.GenericText, "hotte", "groupe filtrant, hotte intégrée, hotte encastrée"),
+        Official("usage-plaque", "Plaque de cuisson", "Usages", SearchConceptTarget.GenericText, "plaque de cuisson", "table de cuisson, induction"),
+        Official("usage-casserolier", "Casserolier", "Usages", SearchConceptTarget.GenericText, "casserolier", "tiroir casserolier, tiroir à casseroles"),
+        Official("usage-epices", "Épices", "Usages", SearchConceptTarget.GenericText, "épices", "range épices, meuble à épices, épicier"),
+        Official("usage-bouteilles", "Bouteilles", "Usages", SearchConceptTarget.GenericText, "bouteilles", "porte bouteilles, range bouteilles"),
+        Official("usage-linge", "Linge", "Usages", SearchConceptTarget.GenericText, "linge", "lingère, rangement linge, colonne à linge"),
+        Official("usage-entretien", "Entretien", "Usages", SearchConceptTarget.GenericText, "entretien", "placard balai, meuble à balais, rangement aspirateur"),
+        Official("usage-dossiers", "Dossiers suspendus", "Usages", SearchConceptTarget.GenericText, "dossiers suspendus", "classement suspendu"),
+        Official("usage-minibar", "Minibar", "Usages", SearchConceptTarget.GenericText, "minibar", "mini bar"),
 
         Official("type-bas", "Meuble bas", "Types", SearchConceptTarget.FurnitureType, "Meuble bas", "caisson bas, élément bas", false),
         Official("type-haut", "Meuble haut", "Types", SearchConceptTarget.FurnitureType, "Meuble haut", "élément haut, meuble suspendu", false),
-        Official("type-colonne", "Colonne", "Types", SearchConceptTarget.FurnitureType, "Colonne", "armoire, tour, meuble vertical", false),
+        Official("type-colonne", "Colonne", "Types", SearchConceptTarget.FurnitureType, "Colonne", "tour, meuble vertical, colonne réserve", false),
+        Official("type-demi-colonne", "Demi-colonne", "Types", SearchConceptTarget.FurnitureType, "Demi-colonne", "demi colonne", false),
+        Official("type-armoire", "Armoire", "Types", SearchConceptTarget.FurnitureType, "Armoire", "armoire de rangement", false),
         Official("type-placard", "Placard", "Types", SearchConceptTarget.FurnitureType, "Armoire", "rangement fermé", false),
+        Official("type-niche", "Meuble niche", "Types", SearchConceptTarget.FurnitureType, "Niche", "meuble ouvert", false),
+        Official("type-banc", "Banc", "Types", SearchConceptTarget.FurnitureType, "Banc", "banquette", false),
+        Official("type-bureau", "Bureau", "Types", SearchConceptTarget.FurnitureType, "Bureau", "poste de travail", false),
+        Official("type-console", "Console", "Types", SearchConceptTarget.FurnitureType, "Console", "meuble console", false),
+        Official("type-comptoir", "Comptoir", "Types", SearchConceptTarget.FurnitureType, "Comptoir", "banque d’accueil, banque accueil", false),
+        Official("type-presentoir", "Présentoir", "Types", SearchConceptTarget.FurnitureType, "Présentoir", "gondole, meuble d’exposition", false),
+        Official("type-bibliotheque", "Bibliothèque", "Types", SearchConceptTarget.GenericText, "bibliothèque", "biblio, rayonnage", false),
+        Official("type-dressing", "Dressing", "Types", SearchConceptTarget.GenericText, "dressing", "placard dressing", false),
+        Official("type-commode", "Commode", "Types", SearchConceptTarget.GenericText, "commode", "meuble à tiroirs", false),
 
         Official("forme-angle", "Angle", "Formes", SearchConceptTarget.FurnitureForm, "Angle", "meuble d’angle, coin"),
         Official("forme-sous-rampant", "Sous rampant", "Formes", SearchConceptTarget.FurnitureForm, "Sous rampant", "sous-rampant, mansarde, combles"),
@@ -366,6 +544,103 @@ public static class SearchDictionaryService
         Official("assemblage-clamex", "Clamex", "Assemblages", SearchConceptTarget.Assembly, "Clamex", "lamello clamex"),
         Official("assemblage-cabineo", "Cabineo", "Assemblages", SearchConceptTarget.Assembly, "Cabineo", "lamello cabineo")
     ];
+
+    private static IReadOnlyList<SearchSynonymEntry> BuildOfficialSynonyms()
+    {
+        var result = new List<SearchSynonymEntry>();
+        foreach (var concept in OfficialConcepts)
+        foreach (var alias in SplitAliases(concept.OfficialAliasesCsv))
+            result.Add(new SearchSynonymEntry
+            {
+                Id = $"syn-{concept.Id}-{StableId(alias)}", ConceptId = concept.Id, Term = alias,
+                IsOfficial = true, IsActive = true
+            });
+        return result;
+    }
+
+    private static IReadOnlyList<SearchExpressionRecord> BuildOfficialExpressions()
+    {
+        static SearchExpressionRecord Rule(string id, string phrase, string concepts, string description) => new()
+        {
+            Id = id, Phrase = phrase, ConceptIdsCsv = concepts, Description = description,
+            IsOfficial = true, IsActive = true
+        };
+        return
+        [
+            Rule("expr-armoire-rangement", "armoire de rangement", "type-armoire,element-rayon", "Armoire avec au moins un rayon"),
+            Rule("expr-placard-rangement", "placard de rangement", "type-placard,element-rayon", "Placard avec au moins un rayon"),
+            Rule("expr-rangement-etageres", "rangement avec étagères", "element-rayon", "Au moins un rayon"),
+            Rule("expr-porte-relevable", "porte relevable", "element-relevant", "Relevant uniquement, sans compter une porte battante"),
+            Rule("expr-ouvrant-haut", "ouvrant vers le haut", "element-relevant", "Relevant"),
+            Rule("expr-porte-abattante", "porte abattante", "element-abattant", "Abattant uniquement"),
+            Rule("expr-ouvrant-bas", "ouvrant vers le bas", "element-abattant", "Abattant"),
+            Rule("expr-tiroir-anglais", "tiroir à l anglaise", "element-tiroir-anglais", "Tiroir intérieur"),
+            Rule("expr-tiroir-interieur", "tiroir intérieur", "element-tiroir-anglais", "Tiroir à l’anglaise"),
+            Rule("expr-sous-evier", "sous évier", "usage-sous-evier", "Usage sous-évier"),
+            Rule("expr-meuble-evier", "meuble évier", "usage-sous-evier", "Usage sous-évier"),
+            Rule("expr-sous-vasque", "sous vasque", "usage-vasque", "Usage vasque"),
+            Rule("expr-meuble-vasque", "meuble vasque", "usage-vasque", "Usage vasque"),
+            Rule("expr-meuble-bas", "meuble bas", "type-bas", "Préférence meuble bas"),
+            Rule("expr-element-bas", "élément bas", "type-bas", "Préférence meuble bas"),
+            Rule("expr-meuble-haut", "meuble haut", "type-haut", "Préférence meuble haut"),
+            Rule("expr-element-haut", "élément haut", "type-haut", "Préférence meuble haut"),
+            Rule("expr-demi-colonne", "demi colonne", "type-demi-colonne", "Préférence demi-colonne"),
+            Rule("expr-armoire-four", "armoire four", "type-armoire,usage-four", "Armoire équipée pour un four"),
+            Rule("expr-colonne-four", "colonne four", "type-colonne,usage-four", "Colonne équipée pour un four"),
+            Rule("expr-colonne-four-mo", "colonne four micro onde", "type-colonne,usage-four,usage-micro-ondes", "Colonne four et micro-ondes"),
+            Rule("expr-meuble-mo", "meuble micro onde", "usage-micro-ondes", "Usage micro-ondes"),
+            Rule("expr-lave-vaisselle", "lave vaisselle", "usage-lave-vaisselle", "Usage lave-vaisselle"),
+            Rule("expr-lave-linge", "lave linge", "usage-lave-linge", "Usage lave-linge"),
+            Rule("expr-seche-linge", "sèche linge", "usage-seche-linge", "Usage sèche-linge"),
+            Rule("expr-tri-selectif", "tri sélectif", "usage-poubelle", "Usage déchets et tri"),
+            Rule("expr-meuble-tv", "meuble tv", "usage-tv", "Usage télévision et multimédia"),
+            Rule("expr-tablette-reglable", "tablette réglable", "element-tablette-reglable", "Tablette réglable"),
+            Rule("expr-tablette-mobile", "tablette mobile", "element-tablette-reglable", "Tablette réglable"),
+            Rule("expr-tablette-fixe", "tablette fixe", "element-tablette-fixe", "Tablette fixe"),
+            Rule("expr-porte-coulissante", "porte coulissante", "element-porte-coulissante", "Porte coulissante"),
+            Rule("expr-porte-pliante", "porte pliante", "element-porte-pliante", "Porte pliante"),
+            Rule("expr-porte-accordeon", "porte accordéon", "element-porte-pliante", "Porte pliante"),
+            Rule("expr-porte-escamotable", "porte escamotable", "element-porte-escamotable", "Porte escamotable"),
+            Rule("expr-porte-rentrante", "porte rentrante", "element-porte-escamotable", "Porte escamotable"),
+            Rule("expr-panier-coulissant", "panier coulissant", "element-panier-coulissant", "Panier extractible"),
+            Rule("expr-plateau-tournant", "plateau tournant", "element-plateau-tournant", "Plateau d’angle tournant"),
+            Rule("expr-tringle-basculante", "tringle basculante", "element-tringle-basculante", "Penderie descendante"),
+            Rule("expr-porte-pantalons", "porte pantalons", "element-porte-pantalons", "Porte-pantalons"),
+            Rule("expr-au-dessus", "au dessus", "position-dessus", "Position au-dessus"),
+            Rule("expr-en-dessous", "en dessous", "position-dessous", "Position en dessous"),
+            Rule("expr-partie-haute", "en partie haute", "position-haut", "Position haute"),
+            Rule("expr-partie-basse", "en partie basse", "position-bas", "Position basse"),
+            Rule("expr-a-gauche", "à gauche", "position-gauche", "Position à gauche"),
+            Rule("expr-a-droite", "à droite", "position-droite", "Position à droite"),
+            Rule("expr-dossiers-suspendus", "dossiers suspendus", "usage-dossiers", "Rangement de dossiers suspendus"),
+            Rule("expr-dos-applique", "dos en applique", "dos-applique", "Dos appliqué"),
+            Rule("expr-fond-applique", "fond en applique", "dos-applique", "Dos appliqué"),
+            Rule("expr-dos-rainure", "dos en rainure", "dos-rainure", "Dos rainuré"),
+            Rule("expr-fond-rainure", "fond rainuré", "dos-rainure", "Dos rainuré"),
+            Rule("expr-sans-dos", "sans dos", "dos-sans", "Meuble sans dos"),
+            Rule("expr-sans-fond", "sans fond", "dos-sans", "Meuble sans dos"),
+            Rule("expr-tourillons-vis", "tourillons vis", "assemblage-tourillons-vis", "Assemblage tourillons et vis"),
+            Rule("expr-tourillon-vis", "tourillon vis", "assemblage-tourillons-vis", "Assemblage tourillons et vis"),
+            Rule("expr-banque-accueil", "banque d accueil", "type-comptoir", "Comptoir ou banque d’accueil"),
+            Rule("expr-meuble-caisse", "meuble caisse", "type-comptoir,usage-caisse", "Comptoir de caisse")
+        ];
+    }
+
+    private static IReadOnlyList<SearchIgnoredTermRecord> BuildOfficialIgnoredTerms()
+    {
+        var terms = new[]
+        {
+            "je", "j", "nous", "on", "cherche", "recherche", "veux", "voudrais", "souhaite", "aimerais", "besoin",
+            "faudrait", "faut", "falloir", "me", "moi", "trouve moi", "montre moi", "il me faut", "si possible",
+            "s il te plaît", "s il vous plaît", "un", "une", "des", "du", "de la", "le", "la", "les", "d", "l",
+            "pour", "dans", "sur", "au", "aux", "qui", "soit", "sont", "est", "et", "ayant", "contenant", "équipé",
+            "équipée", "genre", "modèle", "quelque chose", "meuble", "mobilier"
+        };
+        return terms.Select((term, index) => new SearchIgnoredTermRecord
+        {
+            Id = $"ignore-{index:000}", Term = term, IsOfficial = true, IsActive = true
+        }).ToList();
+    }
 
     private static SearchConceptRecord Official(string id, string label, string category, SearchConceptTarget target, string value, string aliases, bool strict = true) => new()
     {
