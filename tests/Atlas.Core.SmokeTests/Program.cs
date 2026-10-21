@@ -99,7 +99,6 @@ var twoDoorsIntent = SearchDictionaryService.Interpret("meuble bas 2 portes", st
 Assert(twoDoorsIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DoorCount && item.Mode == SearchConstraintMode.Exact && item.Quantity == 2),
     "Une quantité explicite doit être interprétée comme une quantité exacte.");
 var hettichIntent = SearchDictionaryService.Interpret("je veux un meuble bas 4 tiroirs mais que du hettich", structuredDictionary, ["Hettich"]);
-Console.WriteLine($"Diagnostic Hettich : {hettichIntent.Summary} | {string.Join(" / ", hettichIntent.Constraints)}");
 Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DrawerCount && item.Quantity == 4),
     "La quantité de tiroirs doit rester exacte dans une demande avec une marque.");
 Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich"),
@@ -299,8 +298,9 @@ Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && 
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
 Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
 Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("FurnitureUsageList") && settingsXaml.Contains("Renommer"), "Les paramètres doivent administrer les types de meubles et usages spécifiques.");
-Assert(settingsXaml.Contains("CONCEPTS MÉTIER") && settingsXaml.Contains("TESTER UNE RECHERCHE") && settingsXaml.Contains("RECHERCHES SANS RÉSULTAT")
-       && settingsXaml.Contains("Expressions ajoutées par le client"), "Les paramètres doivent administrer le dictionnaire structuré, le tester et exposer les recherches à enrichir.");
+Assert(settingsXaml.Contains("Header=\"Synonymes\"") && settingsXaml.Contains("Header=\"Expressions\"")
+       && settingsXaml.Contains("Header=\"Mots ignorés\"") && settingsXaml.Contains("Header=\"Demandes enregistrées\"")
+       && settingsXaml.Contains("Header=\"Laboratoire\""), "Les paramètres doivent séparer les cinq outils d’administration du dictionnaire.");
 var settingsCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml.cs"));
 Assert(settingsCode.Contains("AddFurnitureType_OnClick") && settingsCode.Contains("RenameFurnitureUsage_OnClick") && settingsCode.Contains("UpdateFurnitureVocabularyAsync"), "Les référentiels meubles doivent être ajoutables, renommables, supprimables et enregistrés.");
 Assert(settingsCode.Contains("SaveSearchDictionaryAsync") && viewModelSource.Contains("SearchDictionaryService.Interpret") && viewModelSource.Contains("ScheduleUnknownSearchObservation"), "Le dictionnaire doit être persistant, interpréter les intentions et mémoriser les recherches sans résultat.");
