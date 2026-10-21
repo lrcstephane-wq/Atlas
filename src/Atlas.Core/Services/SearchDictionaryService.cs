@@ -458,15 +458,15 @@ public static class SearchDictionaryService
 
     private static IReadOnlyList<SearchConceptRecord> BuildOfficialConcepts() =>
     [
-        Official("element-porte", "Porte", "Éléments", SearchConceptTarget.DoorCount, "", "ouvrant, vantail, porte battante"),
-        Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "coulissant de rangement, tiroir simple"),
-        Official("element-tiroir-anglais", "Tiroir à l’anglaise", "Éléments", SearchConceptTarget.InnerDrawerCount, "", "tiroir anglais, tiroir intérieur, coulissant intérieur"),
-        Official("element-rayon", "Rayon", "Éléments", SearchConceptTarget.ShelfCount, "", "tablette, étagère, planche de rangement"),
+        Official("element-porte", "Porte", "Éléments", SearchConceptTarget.DoorCount, "", "portes, ouvrant, ouvrants, vantail, vantaux, porte battante, portes battantes"),
+        Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "tiroirs, coulissant de rangement, coulissants de rangement, tiroir simple, tiroirs simples"),
+        Official("element-tiroir-anglais", "Tiroir à l’anglaise", "Éléments", SearchConceptTarget.InnerDrawerCount, "", "tiroirs à l’anglaise, tiroir anglais, tiroirs anglais, tiroir intérieur, tiroirs intérieurs, coulissant intérieur"),
+        Official("element-rayon", "Rayon", "Éléments", SearchConceptTarget.ShelfCount, "", "rayons, tablette, tablettes, étagère, étagères, planche de rangement, planches de rangement"),
         Official("expression-rangement-rayons", "Armoire de rangement", "Expressions", SearchConceptTarget.ShelfCount, "", "placard de rangement, rangement avec étagères"),
-        Official("element-penderie", "Penderie", "Éléments", SearchConceptTarget.Hanging, "", "tringle, barre de penderie"),
-        Official("element-relevant", "Relevant", "Éléments", SearchConceptTarget.LiftUpCount, "", "hayon, porte relevable, ouvrant vers le haut"),
-        Official("element-abattant", "Abattant", "Éléments", SearchConceptTarget.FlapCount, "", "porte abattante, ouvrant vers le bas"),
-        Official("element-niche", "Niche ouverte", "Éléments", SearchConceptTarget.OpenNicheCount, "", "niche, case ouverte, compartiment ouvert"),
+        Official("element-penderie", "Penderie", "Éléments", SearchConceptTarget.Hanging, "", "penderies, tringle, tringles, barre de penderie, barres de penderie"),
+        Official("element-relevant", "Relevant", "Éléments", SearchConceptTarget.LiftUpCount, "", "relevants, hayon, hayons, porte relevable, portes relevables, ouvrant vers le haut"),
+        Official("element-abattant", "Abattant", "Éléments", SearchConceptTarget.FlapCount, "", "abattants, porte abattante, portes abattantes, ouvrant vers le bas"),
+        Official("element-niche", "Niche ouverte", "Éléments", SearchConceptTarget.OpenNicheCount, "", "niche, niches, niches ouvertes, case ouverte, cases ouvertes, compartiment ouvert"),
         Official("element-separation-h", "Séparation horizontale", "Éléments", SearchConceptTarget.HorizontalSeparation, "", "cloison horizontale"),
         Official("element-separation-v", "Séparation verticale", "Éléments", SearchConceptTarget.VerticalSeparation, "", "cloison verticale"),
         Official("element-tablette-reglable", "Tablette réglable", "Éléments", SearchConceptTarget.GenericText, "tablette réglable", "tablette mobile, rayon réglable, étagère réglable, tablette amovible"),
