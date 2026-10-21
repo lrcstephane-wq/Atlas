@@ -99,8 +99,10 @@ var twoDoorsIntent = SearchDictionaryService.Interpret("meuble bas 2 portes", st
 Assert(twoDoorsIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DoorCount && item.Mode == SearchConstraintMode.Exact && item.Quantity == 2),
     "Une quantité explicite doit être interprétée comme une quantité exacte.");
 var hettichIntent = SearchDictionaryService.Interpret("je veux un meuble bas 4 tiroirs mais que du hettich", structuredDictionary, ["Hettich"]);
-Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DrawerCount && item.Quantity == 4)
-       && hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich"),
+Console.WriteLine($"Diagnostic Hettich : {hettichIntent.Summary} | {string.Join(" / ", hettichIntent.Constraints)}");
+Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DrawerCount && item.Quantity == 4),
+    "La quantité de tiroirs doit rester exacte dans une demande avec une marque.");
+Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich"),
     "Une marque active doit devenir un tag obligatoire à côté de la quantité demandée.");
 var applianceIntent = SearchDictionaryService.Interpret("me faut un meuble micro onde avec un relevant au dessus sotn", structuredDictionary);
 Assert(applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Micro-ondes")
