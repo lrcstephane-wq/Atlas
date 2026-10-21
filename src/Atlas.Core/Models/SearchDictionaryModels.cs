@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Atlas.Core.Models;
 
 public enum SearchConceptTarget
@@ -91,16 +93,21 @@ public sealed class SearchConceptRecord : BindableModel
 
     private static IEnumerable<string> SplitAliases(string value) =>
         (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public override string ToString() => Label;
 }
 
 public sealed class SearchSynonymEntry : BindableModel
 {
     private string _conceptId = string.Empty;
+    private string _conceptLabel = string.Empty;
     private string _term = string.Empty;
     private bool _isActive = true;
 
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];
     public string ConceptId { get => _conceptId; set => Set(ref _conceptId, value); }
+    [JsonIgnore]
+    public string ConceptLabel { get => _conceptLabel; set => Set(ref _conceptLabel, value); }
     public string Term { get => _term; set => Set(ref _term, value); }
     public bool IsOfficial { get; set; }
     public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }

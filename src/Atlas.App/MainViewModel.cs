@@ -1313,7 +1313,13 @@ public sealed class MainViewModel : ObservableObject
 
     public SearchSynonymEntry AddSearchSynonym(string conceptId = "")
     {
-        var item = new SearchSynonymEntry { ConceptId = conceptId, Term = "Nouveau synonyme", IsActive = true };
+        var item = new SearchSynonymEntry
+        {
+            ConceptId = conceptId,
+            ConceptLabel = ConceptLabel(conceptId),
+            Term = "Nouveau synonyme",
+            IsActive = true
+        };
         SearchSynonyms.Add(item);
         return item;
     }
@@ -1364,7 +1370,11 @@ public sealed class MainViewModel : ObservableObject
                      .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)) SearchConcepts.Add(concept);
         SearchSynonyms.Clear();
         foreach (var item in _searchDictionary.Synonyms.OrderBy(item => ConceptLabel(item.ConceptId), StringComparer.CurrentCultureIgnoreCase)
-                     .ThenBy(item => item.Term, StringComparer.CurrentCultureIgnoreCase)) SearchSynonyms.Add(item);
+                     .ThenBy(item => item.Term, StringComparer.CurrentCultureIgnoreCase))
+        {
+            item.ConceptLabel = ConceptLabel(item.ConceptId);
+            SearchSynonyms.Add(item);
+        }
         SearchExpressions.Clear();
         foreach (var item in _searchDictionary.Expressions.OrderBy(item => item.Phrase, StringComparer.CurrentCultureIgnoreCase)) SearchExpressions.Add(item);
         SearchIgnoredTerms.Clear();
