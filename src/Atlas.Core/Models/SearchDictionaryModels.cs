@@ -19,7 +19,8 @@ public enum SearchConceptTarget
     OpenNicheCount,
     Hanging,
     HorizontalSeparation,
-    VerticalSeparation
+    VerticalSeparation,
+    SpatialRelation
 }
 
 public enum SearchConstraintMode
@@ -27,7 +28,8 @@ public enum SearchConstraintMode
     Contains,
     Minimum,
     Exact,
-    Maximum
+    Maximum,
+    Exclude
 }
 
 public sealed class SearchConceptRecord : BindableModel
@@ -76,6 +78,7 @@ public sealed class SearchConceptRecord : BindableModel
         SearchConceptTarget.Hanging => "Penderie",
         SearchConceptTarget.HorizontalSeparation => "Séparation horizontale",
         SearchConceptTarget.VerticalSeparation => "Séparation verticale",
+        SearchConceptTarget.SpatialRelation => "Position demandée",
         _ => Target.ToString()
     };
 
@@ -90,27 +93,94 @@ public sealed class SearchConceptRecord : BindableModel
         (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
 
+public sealed class SearchSynonymEntry : BindableModel
+{
+    private string _conceptId = string.Empty;
+    private string _term = string.Empty;
+    private bool _isActive = true;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];
+    public string ConceptId { get => _conceptId; set => Set(ref _conceptId, value); }
+    public string Term { get => _term; set => Set(ref _term, value); }
+    public bool IsOfficial { get; set; }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    public string OriginLabel => IsOfficial ? "Atlas" : "Client";
+}
+
+public sealed class SearchExpressionRecord : BindableModel
+{
+    private string _phrase = string.Empty;
+    private string _conceptIdsCsv = string.Empty;
+    private string _description = string.Empty;
+    private bool _isActive = true;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];
+    public string Phrase { get => _phrase; set => Set(ref _phrase, value); }
+    public string ConceptIdsCsv { get => _conceptIdsCsv; set => Set(ref _conceptIdsCsv, value); }
+    public string Description { get => _description; set => Set(ref _description, value); }
+    public bool IsOfficial { get; set; }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    public string OriginLabel => IsOfficial ? "Atlas" : "Client";
+    public IEnumerable<string> ConceptIds() => (ConceptIdsCsv ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+
+public sealed class SearchIgnoredTermRecord : BindableModel
+{
+    private string _term = string.Empty;
+    private bool _isActive = true;
+
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];
+    public string Term { get => _term; set => Set(ref _term, value); }
+    public bool IsOfficial { get; set; }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    public string OriginLabel => IsOfficial ? "Atlas" : "Client";
+}
+
 public sealed class SearchUnknownQueryRecord : BindableModel
 {
     private int _count = 1;
     private DateTimeOffset _lastSeenUtc = DateTimeOffset.UtcNow;
+    private int _lastResultCount;
+    private string _lastInterpretation = string.Empty;
+    private string _expectedInterpretation = string.Empty;
+    private string _expectedConceptIdsCsv = string.Empty;
+    private bool _isReviewed;
 
     public string Query { get; set; } = string.Empty;
     public string NormalizedQuery { get; set; } = string.Empty;
     public int Count { get => _count; set => Set(ref _count, Math.Max(1, value)); }
+    public int LastResultCount
+    {
+        get => _lastResultCount;
+        set { if (Set(ref _lastResultCount, Math.Max(0, value))) { Raise(nameof(ResultLabel)); Raise(nameof(ReviewLabel)); } }
+    }
+    public string LastInterpretation { get => _lastInterpretation; set => Set(ref _lastInterpretation, value); }
+    public string ExpectedInterpretation { get => _expectedInterpretation; set => Set(ref _expectedInterpretation, value); }
+    public string ExpectedConceptIdsCsv { get => _expectedConceptIdsCsv; set => Set(ref _expectedConceptIdsCsv, value); }
+    public bool IsReviewed
+    {
+        get => _isReviewed;
+        set { if (Set(ref _isReviewed, value)) Raise(nameof(ReviewLabel)); }
+    }
     public DateTimeOffset LastSeenUtc
     {
         get => _lastSeenUtc;
         set { if (Set(ref _lastSeenUtc, value)) Raise(nameof(LastSeenLabel)); }
     }
     public string LastSeenLabel => LastSeenUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+    public string ResultLabel => LastResultCount == 0 ? "Aucun" : LastResultCount.ToString();
+    public string ReviewLabel => IsReviewed ? "Validée" : LastResultCount == 0 ? "À corriger" : "À vérifier";
 }
 
 public sealed class SearchDictionaryDocument
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public int OfficialVersion { get; set; }
     public List<SearchConceptRecord> Concepts { get; set; } = [];
+    public List<SearchSynonymEntry> Synonyms { get; set; } = [];
+    public List<SearchExpressionRecord> Expressions { get; set; } = [];
+    public List<SearchIgnoredTermRecord> IgnoredTerms { get; set; } = [];
     public List<SearchUnknownQueryRecord> UnknownQueries { get; set; } = [];
 }
 
@@ -129,5 +199,7 @@ public sealed class SearchIntent
     public string RemainingQuery { get; init; } = string.Empty;
     public List<SearchConstraint> Constraints { get; init; } = [];
     public List<string> RecognizedExpressions { get; init; } = [];
+    public List<string> RecognizedConceptIds { get; init; } = [];
+    public List<string> IgnoredTerms { get; init; } = [];
     public string Summary { get; init; } = string.Empty;
 }

@@ -38,7 +38,10 @@ public partial class SettingsView : UserControl
         {
             foreach (var universe in vm.CatalogUniverseDefinitions.OrderBy(item => item.SortOrder)) _universes.Add(universe);
             foreach (var category in vm.TagCategories.Where(category => !_tagCategoryFilters.Contains(category, StringComparer.OrdinalIgnoreCase))) _tagCategoryFilters.Add(category);
-            SearchConceptGrid.SelectedItem = vm.SearchConcepts.FirstOrDefault();
+            NewSynonymConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
+            ExpressionConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
+            RequestExpectedConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
+            SearchExpressionGrid.SelectedItem = vm.SearchExpressions.FirstOrDefault();
         }
         if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted || currentVm.IsCreatorMode && !currentVm.CanManageCustomerFurniture))
         {
@@ -61,24 +64,83 @@ public partial class SettingsView : UserControl
         TaxonomyStatus.Text = $"{_tags.Count} tag(s) disponible(s).";
     }
 
-    private void AddSearchConcept_OnClick(object sender, RoutedEventArgs e)
+    private void AddSearchSynonym_OnClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
-        vm.AddSearchConcept();
-        SearchConceptGrid.SelectedItem = vm.SearchConcepts.Last();
-        SearchConceptGrid.ScrollIntoView(SearchConceptGrid.SelectedItem);
-        SearchDictionaryStatus.Text = "Nouveau concept client ajouté. Définissez sa cible et ses expressions.";
+        if (DataContext is not MainViewModel { CanEdit: true } vm || NewSynonymConceptPicker.SelectedItem is not SearchConceptRecord concept) return;
+        var term = NewSynonymTermBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(term)) { SearchDictionaryStatus.Text = "Saisissez le synonyme à ajouter."; return; }
+        if (vm.SearchSynonyms.Any(item => item.ConceptId == concept.Id && CatalogSearchEngine.Normalize(item.Term) == CatalogSearchEngine.Normalize(term)))
+        { SearchDictionaryStatus.Text = "Ce synonyme existe déjà pour ce concept."; return; }
+        var item = vm.AddSearchSynonym(concept.Id); item.Term = term;
+        SearchSynonymGrid.SelectedItem = item; SearchSynonymGrid.ScrollIntoView(item); NewSynonymTermBox.Clear();
+        SearchDictionaryStatus.Text = $"« {term} » sera compris comme « {concept.Label} ».";
     }
 
-    private void DeleteSearchConcept_OnClick(object sender, RoutedEventArgs e)
+    private void DeleteSearchSynonym_OnClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainViewModel { CanEdit: true } vm || SearchConceptGrid.SelectedItem is not SearchConceptRecord item) return;
-        if (!vm.DeleteSearchConcept(item))
-        {
-            SearchDictionaryStatus.Text = "Un concept officiel Atlas ne peut pas être supprimé. Vous pouvez le désactiver.";
-            return;
-        }
-        SearchDictionaryStatus.Text = "Concept client retiré. Enregistrez pour confirmer.";
+        if (DataContext is not MainViewModel { CanEdit: true } vm || sender is not Button { Tag: SearchSynonymEntry item }) return;
+        if (vm.DeleteSearchSynonym(item)) SearchDictionaryStatus.Text = "Synonyme client supprimé.";
+    }
+
+    private void AddSearchExpression_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        var item = vm.AddSearchExpression(); SearchExpressionGrid.SelectedItem = item; SearchExpressionGrid.ScrollIntoView(item);
+        RefreshExpressionConcepts();
+    }
+
+    private void DeleteSearchExpression_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || SearchExpressionGrid.SelectedItem is not SearchExpressionRecord item) return;
+        if (!vm.DeleteSearchExpression(item)) { SearchDictionaryStatus.Text = "Une expression Atlas peut être désactivée, mais pas supprimée."; return; }
+        SearchDictionaryStatus.Text = "Expression client supprimée.";
+    }
+
+    private void SearchExpressionGrid_OnSelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshExpressionConcepts();
+
+    private void RefreshExpressionConcepts()
+    {
+        if (DataContext is not MainViewModel vm || SearchExpressionGrid.SelectedItem is not SearchExpressionRecord expression) { ExpressionConceptList.ItemsSource = null; return; }
+        ExpressionConceptList.ItemsSource = expression.ConceptIds().Select(id => vm.SearchConcepts.FirstOrDefault(item => item.Id == id)).Where(item => item is not null).ToList();
+    }
+
+    private void AddExpressionConcept_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (SearchExpressionGrid.SelectedItem is not SearchExpressionRecord { IsOfficial: false } expression || ExpressionConceptPicker.SelectedItem is not SearchConceptRecord concept) return;
+        var ids = expression.ConceptIds().ToList();
+        if (!ids.Contains(concept.Id, StringComparer.OrdinalIgnoreCase)) ids.Add(concept.Id);
+        expression.ConceptIdsCsv = string.Join(",", ids); RefreshExpressionConcepts();
+    }
+
+    private void RemoveExpressionConcept_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (SearchExpressionGrid.SelectedItem is not SearchExpressionRecord { IsOfficial: false } expression || ExpressionConceptList.SelectedItem is not SearchConceptRecord concept) return;
+        expression.ConceptIdsCsv = string.Join(",", expression.ConceptIds().Where(id => !id.Equals(concept.Id, StringComparison.OrdinalIgnoreCase)));
+        RefreshExpressionConcepts();
+    }
+
+    private void AddIgnoredTerm_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        var term = NewIgnoredTermBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(term)) return;
+        if (vm.SearchIgnoredTerms.Any(item => CatalogSearchEngine.Normalize(item.Term) == CatalogSearchEngine.Normalize(term)))
+        { SearchDictionaryStatus.Text = "Ce mot ou cette formulation existe déjà."; return; }
+        var item = vm.AddSearchIgnoredTerm(); item.Term = term; SearchIgnoredGrid.SelectedItem = item; NewIgnoredTermBox.Clear();
+    }
+
+    private void DeleteIgnoredTerm_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || sender is not Button { Tag: SearchIgnoredTermRecord item }) return;
+        if (vm.DeleteSearchIgnoredTerm(item)) SearchDictionaryStatus.Text = "Mot ignoré client supprimé.";
+    }
+
+    private void AddExpectedConcept_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (SearchRequestGrid.SelectedItem is not SearchUnknownQueryRecord request || RequestExpectedConceptPicker.SelectedItem is not SearchConceptRecord concept) return;
+        var ids = (request.ExpectedConceptIdsCsv ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (!ids.Contains(concept.Id, StringComparer.OrdinalIgnoreCase)) ids.Add(concept.Id);
+        request.ExpectedConceptIdsCsv = string.Join(", ", ids);
     }
 
     private async void SaveSearchDictionary_OnClick(object sender, RoutedEventArgs e)
@@ -91,6 +153,9 @@ public partial class SettingsView : UserControl
             item.TargetValue = (item.TargetValue ?? string.Empty).Trim();
             item.CustomAliasesCsv = (item.CustomAliasesCsv ?? string.Empty).Trim();
         }
+        foreach (var item in vm.SearchSynonyms) item.Term = (item.Term ?? string.Empty).Trim();
+        foreach (var item in vm.SearchExpressions) { item.Phrase = (item.Phrase ?? string.Empty).Trim(); item.Description = (item.Description ?? string.Empty).Trim(); }
+        foreach (var item in vm.SearchIgnoredTerms) item.Term = (item.Term ?? string.Empty).Trim();
         if (vm.SearchConcepts.Any(item => string.IsNullOrWhiteSpace(item.Label)))
         {
             SearchDictionaryStatus.Text = "Chaque concept doit avoir un nom.";
@@ -102,6 +167,10 @@ public partial class SettingsView : UserControl
             SearchDictionaryStatus.Text = $"Concept en double : {duplicate.Key}.";
             return;
         }
+        if (vm.SearchSynonyms.Any(item => string.IsNullOrWhiteSpace(item.Term) || string.IsNullOrWhiteSpace(item.ConceptId)) ||
+            vm.SearchExpressions.Any(item => string.IsNullOrWhiteSpace(item.Phrase) || !item.ConceptIds().Any()) ||
+            vm.SearchIgnoredTerms.Any(item => string.IsNullOrWhiteSpace(item.Term)))
+        { SearchDictionaryStatus.Text = "Un synonyme, une expression ou un mot ignoré est incomplet."; return; }
         if (await vm.SaveSearchDictionaryAsync()) SearchDictionaryStatus.Text = "Dictionnaire enregistré et immédiatement actif dans Horizon.";
     }
 
@@ -109,15 +178,18 @@ public partial class SettingsView : UserControl
     {
         if (DataContext is not MainViewModel vm) return;
         var intent = vm.InterpretSearch(SearchDictionaryTestBox.Text);
-        var correction = string.IsNullOrWhiteSpace(intent.CorrectedQuery) ? string.Empty : $"\nRequête normalisée : {intent.CorrectedQuery}";
-        SearchDictionaryTestResult.Text = $"Atlas comprend : {intent.Summary}{correction}";
+        SearchDictionaryTestResult.Text = $"Atlas comprend : {intent.Summary}";
+        SearchTestExpressions.Text = intent.RecognizedExpressions.Count == 0 ? "—" : string.Join(" · ", intent.RecognizedExpressions);
+        SearchTestIgnored.Text = intent.IgnoredTerms.Count == 0 ? "—" : string.Join(" · ", intent.IgnoredTerms);
+        SearchTestRemaining.Text = string.IsNullOrWhiteSpace(intent.RemainingQuery) ? "Aucun" : intent.RemainingQuery;
+        SearchTestNormalized.Text = string.IsNullOrWhiteSpace(intent.CorrectedQuery) ? "—" : intent.CorrectedQuery;
     }
 
     private async void ClearUnknownSearches_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel { CanEdit: true } vm) return;
         await vm.ClearUnknownSearchQueriesAsync();
-        SearchDictionaryStatus.Text = "Historique des recherches sans résultat vidé.";
+        SearchDictionaryStatus.Text = "Historique des demandes vidé.";
     }
 
     private void RefreshCollections()

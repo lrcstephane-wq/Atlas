@@ -2,6 +2,12 @@
 
 Biblidéo Atlas est la future application catalogue de la gamme Idéo. Elle est distincte de l’outil interne Biblidéo Post-production.
 
+## Recherche métier v0.14
+
+Le dictionnaire partagé d’Horizon distingue cinq espaces d’administration : synonymes, expressions composées, mots ignorés, demandes réelles et laboratoire de diagnostic. Le socle Atlas est versionné et enrichi à chaque mise à jour, tandis que les ajouts propres au site restent conservés dans `Configuration/search-dictionary.atlas.json`.
+
+Les demandes saisies dans Horizon sont mémorisées après temporisation avec leur interprétation et leur nombre de résultats. L’administrateur peut documenter l’interprétation attendue et valider les cas qui serviront de références métier.
+
 La V0.3 pose deux espaces :
 
 - **Forge** pour parcourir visuellement les bibliothèques, documenter les composants, structurer les familles et variantes, composer les meubles et valider les fiches ;
