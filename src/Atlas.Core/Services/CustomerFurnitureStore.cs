@@ -20,8 +20,27 @@ public sealed class CustomerFurnitureStore(string sharedRoot)
         var catalog = await JsonSerializer.DeserializeAsync<CustomerFurnitureCatalog>(stream, JsonOptions, cancellationToken)
             ?? new CustomerFurnitureCatalog();
         catalog.PersonalTags ??= [];
+        catalog.Locations ??= [];
+        catalog.ClientUniverses ??= [];
+        catalog.ClientTags ??= [];
+        catalog.Exclusions ??= [];
         catalog.Furniture ??= [];
-        foreach (var item in catalog.Furniture) item.PersonalTagIds ??= [];
+        if (catalog.Locations.Count == 0 && !string.IsNullOrWhiteSpace(catalog.FurnitureRoot))
+            catalog.Locations.Add(new CustomerFurnitureLocation { Name = "Meubles Client", RootPath = catalog.FurnitureRoot });
+        if (catalog.ClientTags.Count == 0 && catalog.PersonalTags.Count > 0)
+            catalog.ClientTags = catalog.PersonalTags;
+        var legacyLocationId = catalog.Locations.FirstOrDefault()?.Id ?? string.Empty;
+        foreach (var item in catalog.Furniture)
+        {
+            item.PersonalTagIds ??= [];
+            item.AtlasUniverseIds ??= [];
+            item.ClientUniverseIds ??= [];
+            item.AtlasTagIds ??= [];
+            item.ClientTagIds ??= [];
+            if (item.ClientTagIds.Count == 0 && item.PersonalTagIds.Count > 0) item.ClientTagIds = item.PersonalTagIds.ToList();
+            if (string.IsNullOrWhiteSpace(item.LocationId)) item.LocationId = legacyLocationId;
+        }
+        catalog.SchemaVersion = 2;
         return catalog;
     }
 
@@ -36,46 +55,59 @@ public sealed class CustomerFurnitureStore(string sharedRoot)
 
     public int Synchronize(CustomerFurnitureCatalog catalog)
     {
-        if (string.IsNullOrWhiteSpace(catalog.FurnitureRoot) || !Directory.Exists(catalog.FurnitureRoot)) return 0;
-
-        var files = Directory.EnumerateFiles(catalog.FurnitureRoot, "*.top", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        if (catalog.Locations.Count == 0 && !string.IsNullOrWhiteSpace(catalog.FurnitureRoot))
+            catalog.Locations.Add(new CustomerFurnitureLocation { Name = "Meubles Client", RootPath = catalog.FurnitureRoot });
         var existing = catalog.Furniture
             .Where(item => !string.IsNullOrWhiteSpace(item.RelativeTopPath))
-            .ToDictionary(item => NormalizeRelative(item.RelativeTopPath), StringComparer.OrdinalIgnoreCase);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            .GroupBy(ItemKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var exclusions = catalog.Exclusions.Select(item => ItemKey(item.LocationId, item.RelativeTopPath)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var added = 0;
-
-        foreach (var file in files)
+        foreach (var location in catalog.Locations.Where(item => item.IsActive && Directory.Exists(item.RootPath)))
         {
-            var relative = NormalizeRelative(Path.GetRelativePath(catalog.FurnitureRoot, file));
-            seen.Add(relative);
-            if (!existing.TryGetValue(relative, out var item))
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var files = Directory.EnumerateFiles(location.RootPath, "*.top", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+            foreach (var file in files)
             {
-                item = new CustomerFurnitureItem
+                var relative = NormalizeRelative(Path.GetRelativePath(location.RootPath, file));
+                var key = ItemKey(location.Id, relative);
+                seen.Add(key);
+                if (exclusions.Contains(key)) continue;
+                if (!existing.TryGetValue(key, out var item))
                 {
-                    DisplayName = HumanizeFileName(Path.GetFileNameWithoutExtension(file)),
-                    RelativeTopPath = relative
-                };
-                catalog.Furniture.Add(item);
-                added++;
+                    item = new CustomerFurnitureItem
+                    {
+                        LocationId = location.Id,
+                        DisplayName = HumanizeFileName(Path.GetFileNameWithoutExtension(file)),
+                        RelativeTopPath = relative
+                    };
+                    catalog.Furniture.Add(item);
+                    existing[key] = item;
+                    added++;
+                }
+
+                item.LastSeenUtc = DateTimeOffset.UtcNow;
+                var image = FindPreview(file);
+                if (image is not null) item.ImageRelativePath = NormalizeRelative(Path.GetRelativePath(location.RootPath, image));
             }
-
-            item.LastSeenUtc = DateTimeOffset.UtcNow;
-            var image = FindPreview(file);
-            if (image is not null) item.ImageRelativePath = NormalizeRelative(Path.GetRelativePath(catalog.FurnitureRoot, image));
+            catalog.Furniture.RemoveAll(item => item.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase) && !seen.Contains(ItemKey(item)));
         }
-
-        catalog.Furniture.RemoveAll(item => !seen.Contains(NormalizeRelative(item.RelativeTopPath)));
         return added;
     }
 
-    public static string ResolvePath(CustomerFurnitureCatalog catalog, string relativePath)
+    public static string ResolvePath(CustomerFurnitureCatalog catalog, CustomerFurnitureItem item, string? relativePath = null)
     {
+        relativePath ??= item.RelativeTopPath;
         if (string.IsNullOrWhiteSpace(relativePath)) return string.Empty;
-        return Path.IsPathRooted(relativePath) ? relativePath : Path.Combine(catalog.FurnitureRoot, relativePath);
+        if (Path.IsPathRooted(relativePath)) return relativePath;
+        var root = catalog.Locations.FirstOrDefault(location => location.Id.Equals(item.LocationId, StringComparison.OrdinalIgnoreCase))?.RootPath
+            ?? catalog.FurnitureRoot;
+        return string.IsNullOrWhiteSpace(root) ? relativePath : Path.Combine(root, relativePath);
     }
+
+    public static string ItemKey(CustomerFurnitureItem item) => ItemKey(item.LocationId, item.RelativeTopPath);
+    public static string ItemKey(string locationId, string relativePath) => $"{locationId}|{NormalizeRelative(relativePath)}";
 
     private static string? FindPreview(string topPath)
     {
