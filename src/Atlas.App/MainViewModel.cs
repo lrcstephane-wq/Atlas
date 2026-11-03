@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using Atlas.App.Infrastructure;
@@ -62,6 +63,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
     private readonly HashSet<string> _dirtyFurnitureIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _persistedFurnitureReferences = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _persistedFurnitureSnapshots = new(StringComparer.OrdinalIgnoreCase);
 
     public MainViewModel(SharedCatalogStore store, UserAccountStore userStore, LocalBootstrap bootstrap, UserAccount currentUser, bool userMode = false)
     {
@@ -726,6 +728,7 @@ public sealed class MainViewModel : ObservableObject
             Furniture.Clear(); foreach (var item in _catalog.Furniture) Furniture.Add(item);
             _persistedFurnitureReferences.Clear();
             foreach (var item in Furniture) _persistedFurnitureReferences[item.Id] = item.Reference;
+            CaptureFurnitureSnapshots();
             _dirtyFurnitureIds.Clear();
             FurnitureFamilies.Clear(); foreach (var item in _catalog.FurnitureFamilies) FurnitureFamilies.Add(item);
             RebuildComponentCards(); RebuildClientCards();
@@ -800,6 +803,7 @@ public sealed class MainViewModel : ObservableObject
             await _store.SaveAsync(_catalog, _catalog.Revision, CurrentUser.DisplayName); StatusText = $"Enregistré · révision {_catalog.Revision}"; NotifySummary();
             _persistedFurnitureReferences.Clear();
             foreach (var item in Furniture) _persistedFurnitureReferences[item.Id] = item.Reference;
+            CaptureFurnitureSnapshots();
             _dirtyFurnitureIds.Clear();
             NotifySelectedFurnitureState();
             return true;
@@ -1700,6 +1704,37 @@ public sealed class MainViewModel : ObservableObject
 
     public Task<bool> SaveCatalogAsync() => SaveAsync();
 
+    public async Task<bool> TryOpenFurnitureAsync(FurnitureRecord? target)
+    {
+        if (target is null) return false;
+        if (ReferenceEquals(target, SelectedFurniture))
+        {
+            CurrentPage = "Furniture";
+            return true;
+        }
+
+        if (HasUnsavedFurnitureChanges)
+        {
+            var choice = AtlasDialog.ChooseThree(
+                $"La fiche « {SelectedFurniture!.DisplayName} » contient des modifications non enregistrées.",
+                "Changer de meuble",
+                "Enregistrer conserve toutes les modifications en attente dans la Forge. Abandonner restaure uniquement la fiche actuellement ouverte.",
+                "Enregistrer et ouvrir",
+                "Abandonner",
+                "Annuler");
+            if (choice == AtlasDialogChoice.Cancel) return false;
+            if (choice == AtlasDialogChoice.Confirm && !await SaveAsync()) return false;
+            if (choice == AtlasDialogChoice.Third) DiscardSelectedFurnitureChanges();
+        }
+
+        SelectedFurniture = target;
+        CurrentPage = "Furniture";
+        StatusText = $"Fiche « {target.DisplayName} » ouverte dans la Forge.";
+        return true;
+    }
+
+    public string ResolveFurnitureAssetPath(string path) => ResolveFurniturePath(path);
+
     public void AddFurnitureType(string value) => AddVocabularyValue(FurnitureTypes, value, "Ce type de meuble existe déjà.");
 
     public void AddFurnitureUsage(string value)
@@ -2124,6 +2159,37 @@ public sealed class MainViewModel : ObservableObject
     {
         if (SelectedFurniture is null) return;
         _dirtyFurnitureIds.Add(SelectedFurniture.Id);
+        NotifySelectedFurnitureState();
+    }
+
+    private void CaptureFurnitureSnapshots()
+    {
+        _persistedFurnitureSnapshots.Clear();
+        foreach (var item in Furniture)
+            _persistedFurnitureSnapshots[item.Id] = JsonSerializer.Serialize(item);
+    }
+
+    private void DiscardSelectedFurnitureChanges()
+    {
+        if (SelectedFurniture is not { } item) return;
+        var index = Furniture.IndexOf(item);
+        _dirtyFurnitureIds.Remove(item.Id);
+        if (!_persistedFurnitureSnapshots.TryGetValue(item.Id, out var snapshot))
+        {
+            if (index >= 0) Furniture.RemoveAt(index);
+            SelectedFurniture = null;
+            FurnitureView.Refresh();
+            RebuildClientCards();
+            NotifySummary();
+            return;
+        }
+
+        var restored = JsonSerializer.Deserialize<FurnitureRecord>(snapshot);
+        if (restored is null) return;
+        if (index >= 0) Furniture[index] = restored;
+        SelectedFurniture = restored;
+        FurnitureView.Refresh();
+        RebuildClientCards();
         NotifySelectedFurnitureState();
     }
 

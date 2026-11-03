@@ -8,47 +8,11 @@
   <Border Background="{StaticResource SurfaceGradient}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="7" Padding="20,16">
    <Grid>
     <StackPanel><TextBlock Text="FORGE / MEUBLES" Style="{StaticResource Eyebrow}"/><TextBlock Text="Composer sans perdre le fil" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/><TextBlock Text="La composition réelle pilote automatiquement les familles et les tags du meuble." Style="{StaticResource Caption}" Margin="0,3,0,0"/></StackPanel>
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Content="Dupliquer" Style="{StaticResource GhostButton}" Command="{Binding DuplicateFurnitureCommand}"/><Button Content="+  Nouveau meuble" Command="{Binding CreateFurnitureCommand}" Margin="10,0,0,0"/></StackPanel>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Content="▤  Ouvrir le catalogue" Style="{StaticResource GhostButton}" Click="OpenFurnitureCatalog_OnClick" ToolTip="Ouvrir le catalogue dans une fenêtre indépendante (Ctrl+K)"/><Button Content="Dupliquer" Style="{StaticResource GhostButton}" Command="{Binding DuplicateFurnitureCommand}" Margin="10,0,0,0"/><Button Content="+  Nouveau meuble" Command="{Binding CreateFurnitureCommand}" Margin="10,0,0,0"/></StackPanel>
    </Grid>
   </Border>
   <Grid Grid.Row="2">
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="285" MinWidth="245" MaxWidth="320"/>
-<ColumnDefinition Width="14"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
    <Border Style="{StaticResource Card}" Padding="0">
-<Grid>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="*"/>
-</Grid.RowDefinitions>
-<Border Background="#292E31" Padding="16,15"><StackPanel>
-<TextBlock Text="FICHES MEUBLES" Style="{StaticResource Eyebrow}"/>
-<TextBlock Text="{Binding VisibleFurnitureCount, StringFormat={}{0} fiche(s) affichée(s)}" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
-</StackPanel></Border>
-<StackPanel Grid.Row="1" Margin="14,13,14,10"><TextBlock Text="Rechercher" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding FurnitureSearch, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nom, référence, type ou description"/><ComboBox ItemsSource="{Binding FurnitureStatusOptions}" SelectedItem="{Binding SelectedFurnitureStatus}" Margin="0,8,0,0"/></StackPanel>
-<ListBox Grid.Row="2" ItemsSource="{Binding FurnitureView}" SelectedItem="{Binding SelectedFurniture}" Margin="10,0,10,10" ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
-<ListBox.ItemTemplate>
-<DataTemplate>
-<Border Style="{StaticResource RaisedCard}" Padding="13" Margin="0,0,0,8" MinHeight="68">
-<Grid>
-<StackPanel>
-<TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
-<TextBlock Text="{Binding Reference}" Foreground="{StaticResource CyanBrush}" FontSize="11" Margin="0,5,0,0"/>
-</StackPanel>
-<Border Style="{StaticResource Pill}" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-<TextBlock Text="{Binding Status, Converter={StaticResource StatusLabel}}" Style="{StaticResource Caption}"/>
-</Border>
-</Grid>
-</Border>
-</DataTemplate>
-</ListBox.ItemTemplate>
-</ListBox>
-</Grid>
-</Border>
-   <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
 <Grid>
 <Grid.RowDefinitions>
 <RowDefinition Height="74"/>
@@ -114,11 +78,11 @@
 <TextBlock Text="Date de conception" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>
 <DatePicker SelectedDate="{Binding SelectedFurniture.ConceptionDate}" SelectedDateFormat="Long" Foreground="White" Background="{StaticResource FieldBrush}" BorderBrush="{StaticResource CobaltBrush}"/>
 <TextBlock Text="Description libre" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>
-<TextBox Text="{Binding SelectedFurniture.Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="130" VerticalContentAlignment="Top"/>
+<TextBox Text="{Binding SelectedFurniture.Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="110" VerticalContentAlignment="Top"/>
 </StackPanel>
 <StackPanel Grid.Column="2" Background="#292E31">
 <TextBlock Text="APERÇU ASSOCIÉ" Style="{StaticResource Eyebrow}"/>
-<Border Background="{StaticResource PreviewBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Height="280" Margin="0,9,0,14">
+<Border Background="{StaticResource PreviewBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Height="220" Margin="0,9,0,14">
 <Grid>
 <TextBlock Text="Aucun aperçu .top.png" Style="{StaticResource Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 <Image Source="{Binding FurniturePreview}" Stretch="Uniform" Margin="10"/>

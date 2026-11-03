@@ -5,7 +5,8 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Biblidéo Atlas" MinWidth="1180" MinHeight="720" Width="1500" Height="920"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
-        Background="{StaticResource CanvasBrush}" StateChanged="Window_StateChanged">
+        Background="{StaticResource CanvasBrush}" StateChanged="Window_StateChanged"
+        PreviewKeyDown="Window_OnPreviewKeyDown" Closing="Window_OnClosing">
     <Window.Resources>
         <Geometry x:Key="HomeIcon">M3,10 L12,3 L21,10 M5,9 L5,21 L19,21 L19,9 M9,21 L9,14 L15,14 L15,21</Geometry>
         <Geometry x:Key="ComponentsIcon">M3,3 L10,3 L10,10 L3,10 Z M14,3 L21,3 L21,10 L14,10 Z M3,14 L10,14 L10,21 L3,21 Z M14,14 L21,14 L21,21 L14,21 Z</Geometry>
