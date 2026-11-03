@@ -19,6 +19,10 @@ public partial class SettingsView : UserControl
     private readonly ObservableCollection<CatalogUniverseRecord> _universes = [];
     private ComponentTaxonomy _taxonomy = new();
     private Button? _activeSettingsButton;
+    private ICollectionView? _synonymView;
+    private ICollectionView? _expressionView;
+    private ICollectionView? _ignoredTermView;
+    private ICollectionView? _requestView;
 
     public SettingsView()
     {
@@ -42,6 +46,7 @@ public partial class SettingsView : UserControl
             ExpressionConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
             RequestExpectedConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
             SearchExpressionGrid.SelectedItem = vm.SearchExpressions.FirstOrDefault();
+            InitializeSearchDictionaryViews(vm);
         }
         if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted || currentVm.IsCreatorMode && !currentVm.CanManageCustomerFurniture))
         {
@@ -72,6 +77,7 @@ public partial class SettingsView : UserControl
         if (vm.SearchSynonyms.Any(item => item.ConceptId == concept.Id && CatalogSearchEngine.Normalize(item.Term) == CatalogSearchEngine.Normalize(term)))
         { SearchDictionaryStatus.Text = "Ce synonyme existe déjà pour ce concept."; return; }
         var item = vm.AddSearchSynonym(concept.Id); item.Term = term;
+        SynonymSearchBox.Clear();
         SearchSynonymGrid.SelectedItem = item; SearchSynonymGrid.ScrollIntoView(item); NewSynonymTermBox.Clear();
         SearchDictionaryStatus.Text = $"« {term} » sera compris comme « {concept.Label} ».";
     }
@@ -85,7 +91,7 @@ public partial class SettingsView : UserControl
     private void AddSearchExpression_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel { CanEdit: true } vm) return;
-        var item = vm.AddSearchExpression(); SearchExpressionGrid.SelectedItem = item; SearchExpressionGrid.ScrollIntoView(item);
+        var item = vm.AddSearchExpression(); ExpressionSearchBox.Clear(); SearchExpressionGrid.SelectedItem = item; SearchExpressionGrid.ScrollIntoView(item);
         RefreshExpressionConcepts();
     }
 
@@ -126,7 +132,7 @@ public partial class SettingsView : UserControl
         if (string.IsNullOrWhiteSpace(term)) return;
         if (vm.SearchIgnoredTerms.Any(item => CatalogSearchEngine.Normalize(item.Term) == CatalogSearchEngine.Normalize(term)))
         { SearchDictionaryStatus.Text = "Ce mot ou cette formulation existe déjà."; return; }
-        var item = vm.AddSearchIgnoredTerm(); item.Term = term; SearchIgnoredGrid.SelectedItem = item; NewIgnoredTermBox.Clear();
+        var item = vm.AddSearchIgnoredTerm(); item.Term = term; IgnoredTermSearchBox.Clear(); SearchIgnoredGrid.SelectedItem = item; NewIgnoredTermBox.Clear();
     }
 
     private void DeleteIgnoredTerm_OnClick(object sender, RoutedEventArgs e)
@@ -190,6 +196,50 @@ public partial class SettingsView : UserControl
         if (DataContext is not MainViewModel { CanEdit: true } vm) return;
         await vm.ClearUnknownSearchQueriesAsync();
         SearchDictionaryStatus.Text = "Historique des demandes vidé.";
+    }
+
+    private void InitializeSearchDictionaryViews(MainViewModel vm)
+    {
+        _synonymView = CollectionViewSource.GetDefaultView(vm.SearchSynonyms);
+        _synonymView.Filter = FilterSynonym;
+        _expressionView = CollectionViewSource.GetDefaultView(vm.SearchExpressions);
+        _expressionView.Filter = FilterExpression;
+        _ignoredTermView = CollectionViewSource.GetDefaultView(vm.SearchIgnoredTerms);
+        _ignoredTermView.Filter = FilterIgnoredTerm;
+        _requestView = CollectionViewSource.GetDefaultView(vm.SearchUnknownQueries);
+        _requestView.Filter = FilterRequest;
+    }
+
+    private void SearchDictionaryFilter_OnChanged(object sender, TextChangedEventArgs e)
+    {
+        _synonymView?.Refresh();
+        _expressionView?.Refresh();
+        _ignoredTermView?.Refresh();
+        _requestView?.Refresh();
+    }
+
+    private bool FilterSynonym(object value) => value is SearchSynonymEntry item &&
+        MatchesDictionarySearch(SynonymSearchBox.Text, item.ConceptLabel, item.Term, item.OriginLabel);
+
+    private bool FilterExpression(object value)
+    {
+        if (value is not SearchExpressionRecord item) return false;
+        var concepts = DataContext is MainViewModel vm ? vm.ExpressionConceptLabels(item) : item.ConceptIdsCsv;
+        return MatchesDictionarySearch(ExpressionSearchBox.Text, item.Phrase, item.Description, concepts, item.OriginLabel);
+    }
+
+    private bool FilterIgnoredTerm(object value) => value is SearchIgnoredTermRecord item &&
+        MatchesDictionarySearch(IgnoredTermSearchBox.Text, item.Term, item.OriginLabel);
+
+    private bool FilterRequest(object value) => value is SearchUnknownQueryRecord item &&
+        MatchesDictionarySearch(RequestSearchBox.Text, item.Query, item.LastInterpretation,
+            item.ExpectedInterpretation, item.ReviewLabel, item.ResultLabel);
+
+    private static bool MatchesDictionarySearch(string search, params string?[] values)
+    {
+        var needle = CatalogSearchEngine.Normalize(search);
+        return string.IsNullOrWhiteSpace(needle) || values.Any(value =>
+            CatalogSearchEngine.Normalize(value ?? string.Empty).Contains(needle, StringComparison.Ordinal));
     }
 
     private void RefreshCollections()
