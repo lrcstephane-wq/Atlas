@@ -19,6 +19,7 @@ public sealed class FurnitureCatalogViewModel : ObservableObject, IDisposable
     private string _selectedType = "Tous les types";
     private string _selectedSort = "Modification récente";
     private bool _incompleteOnly;
+    private bool _isCardView;
     private FurnitureRecord? _selectedFurniture;
     private BitmapImage? _preview;
 
@@ -76,6 +77,12 @@ public sealed class FurnitureCatalogViewModel : ObservableObject, IDisposable
     {
         get => _incompleteOnly;
         set { if (SetProperty(ref _incompleteOnly, value)) Refresh(); }
+    }
+
+    public bool IsCardView
+    {
+        get => _isCardView;
+        set => SetProperty(ref _isCardView, value);
     }
 
     public FurnitureRecord? SelectedFurniture

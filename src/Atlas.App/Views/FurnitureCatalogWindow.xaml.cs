@@ -1,8 +1,11 @@
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using Atlas.App.Services;
 using Atlas.App.ViewModels;
 
@@ -12,6 +15,7 @@ public partial class FurnitureCatalogWindow : Window
 {
     private readonly MainViewModel _mainViewModel;
     private readonly FurnitureCatalogViewModel _catalogViewModel;
+    private readonly Dictionary<string, WeakReference<BitmapImage>> _thumbnailCache = new(StringComparer.OrdinalIgnoreCase);
 
     public FurnitureCatalogWindow(MainViewModel mainViewModel)
     {
@@ -22,7 +26,7 @@ public partial class FurnitureCatalogWindow : Window
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessageHook);
         Loaded += (_, _) =>
         {
-            if (_catalogViewModel.SelectedFurniture is { } selected) FurnitureGrid.ScrollIntoView(selected);
+            ScrollSelectedIntoView();
             SearchBox.Focus();
         };
     }
@@ -61,9 +65,54 @@ public partial class FurnitureCatalogWindow : Window
 
     private async void OpenSelected_OnClick(object sender, RoutedEventArgs e) => await OpenSelectedAsync();
 
-    private async void FurnitureGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private async void FurnitureItems_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton == MouseButton.Left) await OpenSelectedAsync();
+    }
+
+    private void ViewMode_OnClick(object sender, RoutedEventArgs e) => Dispatcher.BeginInvoke(new Action(ScrollSelectedIntoView));
+
+    private void ScrollSelectedIntoView()
+    {
+        if (_catalogViewModel.SelectedFurniture is not { } selected) return;
+        if (_catalogViewModel.IsCardView) FurnitureCards.ScrollIntoView(selected);
+        else FurnitureGrid.ScrollIntoView(selected);
+    }
+
+    private async void CardImage_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Image image || image.DataContext is not Atlas.Core.Models.FurnitureRecord furniture) return;
+        var imagePath = _mainViewModel.ResolveFurnitureAssetPath(furniture.ImageRelativePath);
+        if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath)) return;
+        if (_thumbnailCache.TryGetValue(imagePath, out var cached) && cached.TryGetTarget(out var thumbnail))
+        {
+            image.Source = thumbnail;
+            return;
+        }
+
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(imagePath);
+            if (!image.IsLoaded || !ReferenceEquals(image.DataContext, furniture)) return;
+            using var stream = new MemoryStream(bytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = 420;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            _thumbnailCache[imagePath] = new WeakReference<BitmapImage>(bitmap);
+            image.Source = bitmap;
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (NotSupportedException) { }
+    }
+
+    private void CardImage_OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Image image) image.Source = null;
     }
 
     private async Task OpenSelectedAsync()
@@ -106,6 +155,7 @@ public partial class FurnitureCatalogWindow : Window
         Top = state.Top;
         Width = state.Width;
         Height = state.Height;
+        _catalogViewModel.IsCardView = state.IsCardView;
         if (state.IsMaximized) Loaded += (_, _) => WindowState = WindowState.Maximized;
     }
 
@@ -126,7 +176,8 @@ public partial class FurnitureCatalogWindow : Window
             Top = bounds.Top,
             Width = bounds.Width,
             Height = bounds.Height,
-            IsMaximized = WindowState == WindowState.Maximized
+            IsMaximized = WindowState == WindowState.Maximized,
+            IsCardView = _catalogViewModel.IsCardView
         });
         _catalogViewModel.Dispose();
     }

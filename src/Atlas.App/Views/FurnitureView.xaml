@@ -63,9 +63,9 @@
 <Grid Margin="22" HorizontalAlignment="Stretch">
      <Grid Visibility="{Binding CurrentFurnitureStep, Converter={StaticResource PageVisibility}, ConverterParameter=Identity}">
 <Grid.ColumnDefinitions>
-<ColumnDefinition Width="1.1*" MinWidth="400"/>
-<ColumnDefinition Width="24"/>
-<ColumnDefinition Width="0.9*" MinWidth="340"/>
+<ColumnDefinition Width="*" MinWidth="400"/>
+<ColumnDefinition Width="20"/>
+<ColumnDefinition Width="430" MinWidth="380" MaxWidth="460"/>
 </Grid.ColumnDefinitions>
 <StackPanel Background="#292E31">
 <TextBlock Text="01 / IDENTITÉ" Style="{StaticResource Eyebrow}"/>
@@ -80,29 +80,43 @@
 <TextBlock Text="Description libre" Style="{StaticResource FieldLabel}" Margin="0,13,0,5"/>
 <TextBox Text="{Binding SelectedFurniture.Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="110" VerticalContentAlignment="Top"/>
 </StackPanel>
-<StackPanel Grid.Column="2" Background="#292E31">
-<TextBlock Text="APERÇU ASSOCIÉ" Style="{StaticResource Eyebrow}"/>
-<Border Background="{StaticResource PreviewBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Height="220" Margin="0,9,0,14">
+<Border Grid.Column="2" Style="{StaticResource RaisedCard}" Padding="14" VerticalAlignment="Top">
+<StackPanel>
 <Grid>
-<TextBlock Text="Aucun aperçu .top.png" Style="{StaticResource Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-<Image Source="{Binding FurniturePreview}" Stretch="Uniform" Margin="10"/>
+<StackPanel><TextBlock Text="APERÇU ASSOCIÉ" Style="{StaticResource Eyebrow}"/><TextBlock Text="Image utilisée dans Horizon" Style="{StaticResource Caption}" Margin="0,4,0,0"/></StackPanel>
+<Border HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource Pill}" Visibility="{Binding IsSelectedFurnitureImageMissing, Converter={StaticResource BoolVisibility}}"><TextBlock Text="IMAGE ABSENTE" Foreground="{StaticResource AmberBrush}" FontSize="9" FontWeight="Bold"/></Border>
+<Border HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource Pill}" Visibility="{Binding IsSelectedFurnitureImageMissing, Converter={StaticResource InverseBoolVisibility}}"><TextBlock Text="IMAGE DISPONIBLE" Foreground="{StaticResource SuccessBrush}" FontSize="9" FontWeight="Bold"/></Border>
+</Grid>
+<Border Background="{StaticResource PreviewBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="7" Height="170" Margin="0,12,0,9">
+<Grid>
+<TextBlock Text="Aucun aperçu .top.png" Foreground="#6A7479" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+<Image Source="{Binding FurniturePreview}" Stretch="Uniform" Margin="8"/>
 </Grid>
 </Border>
-<Button Content="Actualiser l’image…" Style="{StaticResource GhostButton}" Command="{Binding ChooseFurnitureImageCommand}" HorizontalAlignment="Left" Margin="0,0,0,13"/>
-<TextBlock Text="Fichier .TOP" Style="{StaticResource FieldLabel}"/>
 <Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="*"/>
-<ColumnDefinition Width="Auto"/>
-<ColumnDefinition Width="Auto"/>
-</Grid.ColumnDefinitions>
-<TextBox Text="{Binding SelectedFurniture.SourceRelativePath}" IsReadOnly="True"/>
-<Button Grid.Column="1" Content="Choisir…" Command="{Binding ChooseFurnitureTopCommand}" Margin="7,0,0,0"/>
-<Button Grid.Column="2" Content="Ouvrir le dossier" Style="{StaticResource GhostButton}" Command="{Binding OpenFurnitureFolderCommand}" Margin="7,0,0,0"/>
+<TextBlock Text="{Binding SelectedFurniture.ImageRelativePath}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="2,0,145,0"/>
+<Button Content="Actualiser l’image…" Style="{StaticResource GhostButton}" Command="{Binding ChooseFurnitureImageCommand}" HorizontalAlignment="Right" Padding="12,7"/>
 </Grid>
-<TextBlock Text="Atlas ne lit jamais le contenu du .TOP. Il utilise uniquement son emplacement et son image associée." Style="{StaticResource Caption}" Margin="0,9,0,0"/>
-<Border Background="#454137" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" Padding="10" Margin="0,10,0,0"><TextBlock Text="{Binding SelectedFurnitureFileHealth}" Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap"/></Border>
+<Border Background="#292E31" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="1" CornerRadius="5" Padding="12" Margin="0,12,0,0">
+<StackPanel>
+<TextBlock Text="FICHIER TOPSOLID" Style="{StaticResource Eyebrow}"/>
+<TextBox Text="{Binding SelectedFurniture.SourceRelativePath}" IsReadOnly="True" Margin="0,8,0,0"/>
+<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+<Button Content="Choisir…" Command="{Binding ChooseFurnitureTopCommand}" Padding="13,7"/>
+<Button Content="Ouvrir le dossier" Style="{StaticResource GhostButton}" Command="{Binding OpenFurnitureFolderCommand}" Margin="8,0,0,0" Padding="13,7"/>
 </StackPanel>
+<TextBlock Text="Atlas utilise uniquement l’emplacement du fichier .TOP et son aperçu." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+</StackPanel>
+</Border>
+<Grid Margin="2,12,2,0">
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<TextBlock Text="●  Fichier .TOP disponible" Foreground="{StaticResource SuccessBrush}" Visibility="{Binding IsSelectedFurnitureTopMissing, Converter={StaticResource InverseBoolVisibility}}"/>
+<TextBlock Text="●  Fichier .TOP absent ou introuvable" Foreground="{StaticResource AmberBrush}" Visibility="{Binding IsSelectedFurnitureTopMissing, Converter={StaticResource BoolVisibility}}"/>
+<TextBlock Grid.Row="1" Text="●  Image disponible" Foreground="{StaticResource SuccessBrush}" Margin="0,5,0,0" Visibility="{Binding IsSelectedFurnitureImageMissing, Converter={StaticResource InverseBoolVisibility}}"/>
+<TextBlock Grid.Row="1" Text="●  Image absente ou introuvable" Foreground="{StaticResource AmberBrush}" Margin="0,5,0,0" Visibility="{Binding IsSelectedFurnitureImageMissing, Converter={StaticResource BoolVisibility}}"/>
+</Grid>
+</StackPanel>
+</Border>
 </Grid>
      <StackPanel Visibility="{Binding CurrentFurnitureStep, Converter={StaticResource PageVisibility}, ConverterParameter=Classification}">
 <TextBlock Text="03 / CLASSEMENT" Style="{StaticResource Eyebrow}"/>
