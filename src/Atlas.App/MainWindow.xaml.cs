@@ -3,12 +3,15 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Runtime.InteropServices;
 using Atlas.App.ViewModels;
+using Atlas.App.Views;
+using System.ComponentModel;
 
 namespace Atlas.App;
 
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private FurnitureCatalogWindow? _furnitureCatalogWindow;
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent(); DataContext = _viewModel = viewModel;
@@ -18,6 +21,20 @@ public partial class MainWindow : Window
     private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
     private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+
+    public void OpenFurnitureCatalog()
+    {
+        if (_furnitureCatalogWindow is { IsLoaded: true })
+        {
+            if (_furnitureCatalogWindow.WindowState == WindowState.Minimized) _furnitureCatalogWindow.WindowState = WindowState.Normal;
+            _furnitureCatalogWindow.Activate();
+            return;
+        }
+
+        _furnitureCatalogWindow = new FurnitureCatalogWindow(_viewModel);
+        _furnitureCatalogWindow.Closed += (_, _) => _furnitureCatalogWindow = null;
+        _furnitureCatalogWindow.Show();
+    }
     private async void AccessAdministrator_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).OpenAdministratorSessionAsync(this);
     private async void Logout_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).LogoutAdministratorAsync(this);
     private void ToggleMaximize()
@@ -34,6 +51,19 @@ public partial class MainWindow : Window
         MaximizeButton.ToolTip = maximized ? "Restaurer" : "Agrandir";
         WindowFrame.CornerRadius = maximized ? new CornerRadius(0) : new CornerRadius(12);
         WindowFrame.BorderThickness = maximized ? new Thickness(0) : new Thickness(1);
+    }
+
+    private void Window_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.K || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || !_viewModel.CanUseAdministrativeInterfaces) return;
+        OpenFurnitureCatalog();
+        e.Handled = true;
+    }
+
+    private void Window_OnClosing(object? sender, CancelEventArgs e)
+    {
+        _furnitureCatalogWindow?.Close();
+        _furnitureCatalogWindow = null;
     }
 
     private void ClientFacetFavorite_OnClick(object sender, RoutedEventArgs e)

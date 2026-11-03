@@ -290,6 +290,18 @@ Assert(viewModelSource.Contains("ArchiveFurnitureAsync") && viewModelSource.Cont
 Assert(furnitureXaml.Contains("Mettre à la corbeille") && furnitureXaml.Contains("Restaurer") && furnitureXaml.Contains("Supprimer définitivement"), "La Forge doit exposer tout le cycle de vie de la corbeille.");
 Assert(!furnitureXaml.Contains("Fiche directe") && !furnitureXaml.Contains("Famille + variantes"), "Les anciens boutons de mode de création doivent être retirés.");
 Assert(furnitureXaml.Contains("Dupliquer") && furnitureXaml.Contains("Voir dans Horizon") && furnitureXaml.Contains("MODIFICATIONS NON ENREGISTRÉES"), "La fiche meuble doit offrir les raccourcis de contrôle validés.");
+Assert(furnitureXaml.Contains("Ouvrir le catalogue") && !furnitureXaml.Contains("ItemsSource=\"{Binding FurnitureView}\""), "La fiche meuble doit libérer sa largeur et ouvrir le catalogue dans une fenêtre dédiée.");
+var furnitureCatalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureCatalogWindow.xaml"));
+var furnitureCatalogCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureCatalogWindow.xaml.cs"));
+Assert(furnitureCatalogXaml.Contains("EnableRowVirtualization=\"True\"") && furnitureCatalogXaml.Contains("VirtualizationMode=\"Recycling\"")
+       && furnitureCatalogXaml.Contains("Ouvrir dans la Forge") && furnitureCatalogXaml.Contains("Fiches à compléter"),
+    "Le catalogue de la Forge doit rester fluide sur de gros volumes et proposer recherche, filtres et ouverture explicite.");
+Assert(mainWindowCode.Contains("OpenFurnitureCatalog") && mainWindowCode.Contains("_furnitureCatalogWindow is { IsLoaded: true }")
+       && mainWindowXaml.Contains("PreviewKeyDown=\"Window_OnPreviewKeyDown\""),
+    "Une seule fenêtre Catalogue doit être ouverte et rester accessible par Ctrl+K.");
+Assert(furnitureCatalogCode.Contains("FurnitureCatalogWindowStateStore") && furnitureCatalogCode.Contains("IntersectsVirtualScreen")
+       && viewModelSource.Contains("TryOpenFurnitureAsync") && viewModelSource.Contains("ChooseThree"),
+    "Le catalogue doit mémoriser son écran et protéger le changement de meuble en présence de modifications non enregistrées.");
 Assert(viewModelSource.Contains("linkedComponents") && viewModelSource.Contains("component.TechnicalName") && viewModelSource.Contains("furniture.NicheOuverte") && viewModelSource.Contains("furniture.UseCasesCsv"), "La recherche Horizon doit couvrir toute la fiche et les composants liés.");
 Assert(viewModelSource.Contains("$\"{SelectedFurniture.Reference}.top\"") && viewModelSource.Contains("File.Copy(sourceTop, targetTop, false)"), "Le fichier TopSolid doit être copié sous la référence Atlas sans écraser l’original.");
 Assert(viewModelSource.Contains("Settings.FurnitureRoot") && viewModelSource.Contains("ChooseFurnitureRootCommand") && viewModelSource.Contains("ResolveFurniturePath"), "Les meubles doivent disposer d’un dossier central configurable distinct de la bibliothèque des composants.");

@@ -54,6 +54,11 @@ internal static class Program
                 Console.WriteLine($"Rendu {size.Item1} × {size.Item2}…");
                 Render(vm, output, size.Item1, size.Item2);
             }
+            foreach (var size in new[] { (1366, 768), (1920, 1080) })
+            {
+                Console.WriteLine($"Rendu Catalogue Forge {size.Item1} × {size.Item2}…");
+                RenderFurnitureCatalog(vm, output, size.Item1, size.Item2);
+            }
             Console.WriteLine("Captures Horizon terminées.");
         }
         finally
@@ -137,6 +142,23 @@ internal static class Program
         if (visiblePixels < width * height / 20) throw new InvalidOperationException($"Capture {width} × {height} vide ou illisible.");
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(output, $"horizon-{width}x{height}.png"));
+        encoder.Save(stream);
+    }
+
+    private static void RenderFurnitureCatalog(MainViewModel vm, string output, int width, int height)
+    {
+        var window = new FurnitureCatalogWindow(vm);
+        var view = (FrameworkElement)window.Content;
+        view.Width = width;
+        view.Height = height;
+        view.Measure(new Size(width, height));
+        view.Arrange(new Rect(0, 0, width, height));
+        view.UpdateLayout();
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(view);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(output, $"catalogue-forge-{width}x{height}.png"));
         encoder.Save(stream);
     }
 }

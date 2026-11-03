@@ -5,6 +5,7 @@ using System.Windows.Media;
 namespace Atlas.App.Views;
 
 public enum AtlasDialogTone { Info, Warning, Error, Confirm }
+public enum AtlasDialogChoice { Cancel, Confirm, Third }
 
 public partial class AtlasDialogWindow : Window
 {
@@ -26,8 +27,15 @@ public partial class AtlasDialogWindow : Window
         }
     }
 
+    public void EnableThirdChoice(string label)
+    {
+        ThirdButton.Content = label;
+        ThirdButton.Visibility = Visibility.Visible;
+    }
+
     private void Confirm_OnClick(object sender, RoutedEventArgs e) { DialogResult = true; Close(); }
     private void Cancel_OnClick(object sender, RoutedEventArgs e) { DialogResult = false; Close(); }
+    private void Third_OnClick(object sender, RoutedEventArgs e) { Tag = AtlasDialogChoice.Third; DialogResult = false; Close(); }
     private void Close_OnClick(object sender, RoutedEventArgs e) { DialogResult = false; Close(); }
     private void TitleBar_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); }
 }
@@ -39,10 +47,27 @@ public static class AtlasDialog
     public static void Error(string message, string title = "Erreur", string? detail = null) => Show(title, message, detail, AtlasDialogTone.Error);
     public static bool Confirm(string message, string title = "Confirmation", string? detail = null) => Show(title, message, detail, AtlasDialogTone.Confirm) == true;
     public static bool Choose(string message, string title, string? detail, string confirmLabel, string cancelLabel) => Show(title, message, detail, AtlasDialogTone.Confirm, confirmLabel, cancelLabel) == true;
+    public static AtlasDialogChoice ChooseThree(string message, string title, string? detail, string confirmLabel, string thirdLabel, string cancelLabel)
+    {
+        var dialog = new AtlasDialogWindow(title, message, detail, AtlasDialogTone.Confirm, confirmLabel, cancelLabel);
+        dialog.EnableThirdChoice(thirdLabel);
+        SetOwner(dialog);
+        var result = dialog.ShowDialog();
+        if (dialog.Tag is AtlasDialogChoice.Third) return AtlasDialogChoice.Third;
+        return result == true ? AtlasDialogChoice.Confirm : AtlasDialogChoice.Cancel;
+    }
     private static bool? Show(string title, string message, string? detail, AtlasDialogTone tone, string? confirmLabel = null, string? cancelLabel = null)
     {
         var dialog = new AtlasDialogWindow(title, message, detail, tone, confirmLabel, cancelLabel);
-        if (Application.Current?.MainWindow is { IsVisible: true } owner) dialog.Owner = owner;
+        SetOwner(dialog);
         return dialog.ShowDialog();
+    }
+
+
+    private static void SetOwner(Window dialog)
+    {
+        var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(window => window.IsActive && window != dialog)
+                    ?? Application.Current?.MainWindow;
+        if (owner is { IsVisible: true }) dialog.Owner = owner;
     }
 }
