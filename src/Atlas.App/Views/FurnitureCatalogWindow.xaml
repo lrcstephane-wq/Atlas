@@ -89,7 +89,7 @@
                                 <DataGridTemplateColumn Header="Statut" Width="108">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Border Style="{StaticResource Pill}" HorizontalAlignment="Left"><TextBlock Text="{Binding Status, Converter={StaticResource StatusLabel}}" Style="{StaticResource Caption}"/></Border>
+                                            <Border Style="{StaticResource Pill}" HorizontalAlignment="Left" VerticalAlignment="Center"><TextBlock Text="{Binding Status, Converter={StaticResource StatusLabel}}" Style="{StaticResource Caption}"/></Border>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

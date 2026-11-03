@@ -20,7 +20,11 @@ public partial class FurnitureCatalogWindow : Window
         DataContext = _catalogViewModel = new FurnitureCatalogViewModel(mainViewModel);
         RestoreWindowState();
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessageHook);
-        Loaded += (_, _) => SearchBox.Focus();
+        Loaded += (_, _) =>
+        {
+            if (_catalogViewModel.SelectedFurniture is { } selected) FurnitureGrid.ScrollIntoView(selected);
+            SearchBox.Focus();
+        };
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
