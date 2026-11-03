@@ -47,7 +47,8 @@ public sealed class MainViewModel : ObservableObject
     private FurnitureFamilyRecord? _selectedFurnitureFamily;
     private CustomerFurnitureItem? _selectedCustomerFurniture;
     private LibraryFilterViewModel? _selectedLibraryFilter;
-    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _showAdvancedClientFilters, _suppressClientFacetRefresh;
+    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _suppressClientFacetRefresh, _isClientFilterPanelOpen, _isClientFilterPanelPinned;
+    private string _activeClientFilterGroup = "Types", _clientFacetSearch = string.Empty;
     private bool _isTopSolidBridgeReady;
     private string _topSolidBridgeFolder = string.Empty;
     private IReadOnlyList<string> _topSolidBridgeFiles = Array.Empty<string>();
@@ -108,7 +109,9 @@ public sealed class MainViewModel : ObservableObject
         SelectVisibleComponentsCommand = new(_ => MarkVisibleComponents(true), _ => CanEdit);
         ClearMarkedComponentsCommand = new(_ => MarkVisibleComponents(false), _ => CanEdit);
         ClearClientFiltersCommand = new(_ => ClearClientFilters());
-        ToggleClientFiltersCommand = new(_ => ShowAdvancedClientFilters = !ShowAdvancedClientFilters);
+        OpenClientFilterPanelCommand = new(group => OpenClientFilterPanel(group?.ToString()));
+        PinClientFilterPanelCommand = new(_ => TogglePinnedClientFilterPanel());
+        CloseClientFilterPanelCommand = new(_ => CloseClientFilterPanel());
         ClearClientSelectionCommand = new(_ => ClearClientSelection(), _ => ClientSelectionCount > 0);
         PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => HasFullHorizonAccess && ClientSelectionCount > 0 && !IsBusy);
         OpenTopSolidBridgeFolderCommand = new(_ => OpenTopSolidBridgeFolder(), _ => IsTopSolidBridgeReady && Directory.Exists(TopSolidBridgeFolder));
@@ -150,7 +153,6 @@ public sealed class MainViewModel : ObservableObject
     public bool IsLicenseValid => _licenseInfo.IsValid;
     public bool IsLicenseRestricted => !IsAdministrator && !IsLicenseValid;
     public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
-    public bool ShowLicensedAdvancedClientFilters => HasFullHorizonAccess && ShowAdvancedClientFilters;
     public string LicenseCustomer => string.IsNullOrWhiteSpace(_licenseInfo.Customer) ? "Non renseigné" : _licenseInfo.Customer;
     public string LicenseValidUntil => _licenseInfo.ValidUntil is { } date ? date.ToString("dd/MM/yyyy") : "—";
     public string DeviceId => MachineIdentityService.CurrentDeviceId;
@@ -273,11 +275,10 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _currentPage, requestedPage)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(MyFurnitureNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
             OnPropertyChanged(nameof(IsCatalogPage));
-            OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
+            if (!IsCatalogPage) CloseClientFilterPanel();
         }
     }
     public bool IsCatalogPage => CurrentPage.Equals("Catalog", StringComparison.OrdinalIgnoreCase);
-    public bool ShowLicensedUniverseNavigation => IsCatalogPage && HasFullHorizonAccess;
     public string DashboardNavBackground => NavBackground("Dashboard");
     public string ComponentsNavBackground => NavBackground("Components");
     public string FurnitureNavBackground => NavBackground("Furniture");
@@ -308,7 +309,46 @@ public sealed class MainViewModel : ObservableObject
     public bool ShowAdministrativeSessionActions => IsAdministrativeMode && IsNavigationExpanded;
     public bool ShowAuthenticatedSessionActions => !IsUserMode && IsNavigationExpanded;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
-    public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set { if (SetProperty(ref _showAdvancedClientFilters, value)) OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters)); } }
+    public bool IsClientFilterPanelOpen { get => _isClientFilterPanelOpen; set => SetProperty(ref _isClientFilterPanelOpen, value); }
+    public bool IsClientFilterPanelPinned { get => _isClientFilterPanelPinned; private set => SetProperty(ref _isClientFilterPanelPinned, value); }
+    public string ActiveClientFilterGroup
+    {
+        get => _activeClientFilterGroup;
+        private set
+        {
+            if (!SetProperty(ref _activeClientFilterGroup, value)) return;
+            ClientFacetSearch = string.Empty;
+            OnPropertyChanged(nameof(ActiveClientFilterTitle));
+            OnPropertyChanged(nameof(ActiveClientFilterOptions));
+            OnPropertyChanged(nameof(ActiveClientFilterSelectionLabel));
+        }
+    }
+    public string ActiveClientFilterTitle => ActiveClientFilterGroup switch
+    {
+        "Types" => "Type de meuble", "Usages" => "Usage", "Familles" => "Famille",
+        "Tags Atlas" => "Tags Atlas", "Univers Client" => "Univers Client", "Tags Client" => "Tags Client",
+        "Source" => "Source", "Formes" => "Forme", "Construction" => "Construction",
+        "Assemblage" => "Assemblage", "Dos" => "Dos", _ => ActiveClientFilterGroup
+    };
+    public string ActiveClientFilterSelectionLabel
+    {
+        get
+        {
+            var count = ClientFacetGroup(ActiveClientFilterGroup).Count(option => option.IsSelected);
+            return count == 0 ? "Aucune sélection" : count == 1 ? "1 filtre actif" : $"{count} filtres actifs";
+        }
+    }
+    public string ClientFacetSearch
+    {
+        get => _clientFacetSearch;
+        set
+        {
+            if (!SetProperty(ref _clientFacetSearch, value)) return;
+            OnPropertyChanged(nameof(ActiveClientFilterOptions));
+        }
+    }
+    public IEnumerable<CatalogFacetViewModel> ActiveClientFilterOptions => ClientFacetGroup(ActiveClientFilterGroup)
+        .Where(option => string.IsNullOrWhiteSpace(ClientFacetSearch) || option.Label.Contains(ClientFacetSearch.Trim(), StringComparison.OrdinalIgnoreCase));
     public bool IsFamilyMode => CreationMode == "Family";
     public string EnvironmentLabel => Settings.Environment == CatalogEnvironment.NonConfigure ? "ENV. À CONFIGURER" : $"ENV. {Settings.Environment}";
     public int ComponentCount => Components.Count(item => !item.IsDemo);
@@ -316,7 +356,6 @@ public sealed class MainViewModel : ObservableObject
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
     public int ClientResultCount => ClientFurnitureView.Cast<object>().Count();
     public bool HasClientResults => ClientResultCount > 0;
-    public int ActiveClientFilterCount => ClientFacetGroups().Sum(group => group.Count(option => option.IsSelected));
     public int ClientSelectionCount => ClientFurnitureCards.Count(item => item.IsChosen);
     public string ClientSelectionLabel => ClientSelectionCount == 0 ? "Aucun meuble sélectionné" : ClientSelectionCount == 1 ? "1 meuble sélectionné" : $"{ClientSelectionCount} meubles sélectionnés";
     public bool IsTopSolidBridgeReady { get => _isTopSolidBridgeReady; private set => SetProperty(ref _isTopSolidBridgeReady, value); }
@@ -326,8 +365,8 @@ public sealed class MainViewModel : ObservableObject
     public string ClientSearchInterpretation { get; private set; } = string.Empty;
     public bool HasClientSearchInterpretation => !string.IsNullOrWhiteSpace(ClientSearchInterpretation);
     public bool HasClientFavorites => ClientFavoriteFacets.Count > 0;
+    public IEnumerable<CatalogFacetViewModel> SelectedClientFacets => ClientFacetGroups().SelectMany(group => group).Where(option => option.IsSelected);
     public string ClientResultLabel => ClientResultCount <= 1 ? $"{ClientResultCount} meuble trouvé" : $"{ClientResultCount} meubles trouvés";
-    public string ClientFilterButtonLabel => ActiveClientFilterCount == 0 ? "Filtres techniques" : $"Filtres techniques · {ActiveClientFilterCount}";
     public int HealthIssueCount => Components.Count(item => !item.IsNameCompliant || item.IsMissing) + Furniture.Count(item => item.ComponentIds.Count == 0);
     public int MarkedComponentCount => ComponentCards.Count(item => item.IsMarked);
     public string VisibleComponentLabel => $"{ComponentView.Cast<object>().Count():N0} affichés sur {ScopedComponentCards().Count():N0}";
@@ -532,7 +571,9 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SelectVisibleComponentsCommand { get; }
     public RelayCommand ClearMarkedComponentsCommand { get; }
     public RelayCommand ClearClientFiltersCommand { get; }
-    public RelayCommand ToggleClientFiltersCommand { get; }
+    public RelayCommand OpenClientFilterPanelCommand { get; }
+    public RelayCommand PinClientFilterPanelCommand { get; }
+    public RelayCommand CloseClientFilterPanelCommand { get; }
     public RelayCommand ClearClientSelectionCommand { get; }
     public RelayCommand PrepareTopSolidBridgeCommand { get; }
     public RelayCommand OpenTopSolidBridgeFolderCommand { get; }
@@ -649,13 +690,11 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsLicenseValid));
         OnPropertyChanged(nameof(IsLicenseRestricted));
         OnPropertyChanged(nameof(HasFullHorizonAccess));
-        OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
         OnPropertyChanged(nameof(CanUseAdministrativeInterfaces));
         OnPropertyChanged(nameof(CanManageCustomerFurniture));
         OnPropertyChanged(nameof(IsCreatorFeatureLicensed));
         OnPropertyChanged(nameof(LicenseFeaturesLabel));
         OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
-        OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters));
         OnPropertyChanged(nameof(LicenseCustomer));
         OnPropertyChanged(nameof(LicenseValidUntil));
         OnPropertyChanged(nameof(LicensedDeviceId));
@@ -666,7 +705,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LicenseSigningKeyStatus));
         if (IsLicenseRestricted)
         {
-            ShowAdvancedClientFilters = false;
+            CloseClientFilterPanel();
             ClearClientFilters();
             ClearClientSelection();
             InvalidateTopSolidBridge();
@@ -1006,8 +1045,46 @@ public sealed class MainViewModel : ObservableObject
         yield return ClientBackFacets;
     }
 
+    private ObservableCollection<CatalogFacetViewModel> ClientFacetGroup(string group) => group switch
+    {
+        "Source" => ClientSourceFacets,
+        "Types" => ClientTypeFacets,
+        "Usages" => ClientUsageFacets,
+        "Familles" => ClientFamilyFacets,
+        "Tags Atlas" => ClientTagFacets,
+        "Univers Client" => ClientCustomUniverseFacets,
+        "Tags Client" => ClientPersonalTagFacets,
+        "Formes" => ClientFormFacets,
+        "Construction" => ClientConstructionFacets,
+        "Assemblage" => ClientAssemblyFacets,
+        "Dos" => ClientBackFacets,
+        _ => ClientTypeFacets
+    };
+
+    private void OpenClientFilterPanel(string? group)
+    {
+        if (!HasFullHorizonAccess || string.IsNullOrWhiteSpace(group)) return;
+        ActiveClientFilterGroup = group;
+        if (!IsClientFilterPanelPinned) IsClientFilterPanelOpen = true;
+    }
+
+    private void TogglePinnedClientFilterPanel()
+    {
+        IsClientFilterPanelPinned = !IsClientFilterPanelPinned;
+        IsClientFilterPanelOpen = false;
+    }
+
+    private void CloseClientFilterPanel()
+    {
+        IsClientFilterPanelOpen = false;
+        IsClientFilterPanelPinned = false;
+    }
+
     private void ClientFacetChanged()
     {
+        OnPropertyChanged(nameof(ActiveClientFilterOptions));
+        OnPropertyChanged(nameof(ActiveClientFilterSelectionLabel));
+        OnPropertyChanged(nameof(SelectedClientFacets));
         if (!_suppressClientFacetRefresh) RefreshClientFurnitureView();
     }
 
@@ -1020,6 +1097,7 @@ public sealed class MainViewModel : ObservableObject
             ClientSearch = string.Empty;
         }
         finally { _suppressClientFacetRefresh = false; }
+        OnPropertyChanged(nameof(SelectedClientFacets));
         RefreshClientFurnitureView();
     }
 
@@ -1164,8 +1242,6 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ClientResultCount));
         OnPropertyChanged(nameof(HasClientResults));
         OnPropertyChanged(nameof(ClientResultLabel));
-        OnPropertyChanged(nameof(ActiveClientFilterCount));
-        OnPropertyChanged(nameof(ClientFilterButtonLabel));
         if (SelectedClientFurnitureCard is null || !ClientFurnitureView.Cast<FurnitureCardViewModel>().Contains(SelectedClientFurnitureCard))
             SelectedClientFurnitureCard = ClientFurnitureView.Cast<FurnitureCardViewModel>().FirstOrDefault();
         ScheduleUnknownSearchObservation();

@@ -26,6 +26,14 @@ public partial class CatalogView : UserControl
         e.Handled = true;
     }
 
+    private void OpenMoreFilters_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button) return;
+        menu.DataContext = DataContext;
+        menu.PlacementTarget = button;
+        menu.IsOpen = true;
+    }
+
     private void TopSolidDragCapsule_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart = e.GetPosition(this);
