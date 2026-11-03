@@ -301,7 +301,12 @@ Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("Furn
 Assert(settingsXaml.Contains("Header=\"Synonymes\"") && settingsXaml.Contains("Header=\"Expressions\"")
        && settingsXaml.Contains("Header=\"Mots ignorés\"") && settingsXaml.Contains("Header=\"Demandes enregistrées\"")
        && settingsXaml.Contains("Header=\"Laboratoire\""), "Les paramètres doivent séparer les cinq outils d’administration du dictionnaire.");
+Assert(settingsXaml.Contains("SynonymSearchBox") && settingsXaml.Contains("ExpressionSearchBox")
+       && settingsXaml.Contains("IgnoredTermSearchBox") && settingsXaml.Contains("RequestSearchBox"),
+    "Chaque liste du dictionnaire doit proposer une recherche dédiée.");
 var settingsCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml.cs"));
+Assert(settingsCode.Contains("SearchDictionaryFilter_OnChanged") && settingsCode.Contains("MatchesDictionarySearch"),
+    "Les recherches du dictionnaire doivent filtrer les termes, expressions et demandes affichés.");
 Assert(settingsCode.Contains("AddFurnitureType_OnClick") && settingsCode.Contains("RenameFurnitureUsage_OnClick") && settingsCode.Contains("UpdateFurnitureVocabularyAsync"), "Les référentiels meubles doivent être ajoutables, renommables, supprimables et enregistrés.");
 Assert(settingsCode.Contains("SaveSearchDictionaryAsync") && viewModelSource.Contains("SearchDictionaryService.Interpret") && viewModelSource.Contains("ScheduleUnknownSearchObservation"), "Le dictionnaire doit être persistant, interpréter les intentions et mémoriser les recherches sans résultat.");
 Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Contains("DefaultFurnitureUsages") && viewModelSource.Contains("_catalog.FurnitureTypes = FurnitureTypes.ToList()"), "Les valeurs historiques doivent migrer vers des référentiels configurables et persistés.");
