@@ -18,6 +18,7 @@ public static class ComponentTaxonomyStore
         await EnsureLayeredAsync(sharedRoot, cancellationToken);
         var official = await ReadAsync<ComponentTaxonomy>(GetOfficialPath(sharedRoot), cancellationToken) ?? new();
         var site = await ReadAsync<ComponentTaxonomySiteOverlay>(GetPath(sharedRoot), cancellationToken) ?? new();
+        site.Families ??= []; site.RemovedFamilyIds ??= []; site.Tags ??= []; site.RemovedTagIds ??= [];
         Normalize(official);
         var taxonomy = new ComponentTaxonomy
         {

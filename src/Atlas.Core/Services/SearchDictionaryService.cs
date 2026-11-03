@@ -56,7 +56,9 @@ public sealed class SearchDictionaryStore(string sharedRoot)
         if (File.Exists(FilePath))
         {
             await using var stream = File.Open(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            return await JsonSerializer.DeserializeAsync<SearchDictionarySiteOverlay>(stream, JsonOptions, cancellationToken) ?? new();
+            var site = await JsonSerializer.DeserializeAsync<SearchDictionarySiteOverlay>(stream, JsonOptions, cancellationToken) ?? new();
+            NormalizeSite(site);
+            return site;
         }
 
         SearchDictionaryDocument combined;
@@ -79,6 +81,13 @@ public sealed class SearchDictionaryStore(string sharedRoot)
         await using (var output = File.Create(temporary)) await JsonSerializer.SerializeAsync(output, migrated, JsonOptions, cancellationToken);
         File.Move(temporary, FilePath, true);
         return migrated;
+    }
+
+    private static void NormalizeSite(SearchDictionarySiteOverlay site)
+    {
+        site.Concepts ??= []; site.Synonyms ??= []; site.Expressions ??= []; site.IgnoredTerms ??= []; site.UnknownQueries ??= [];
+        site.OfficialActiveStates ??= new(StringComparer.OrdinalIgnoreCase);
+        site.OfficialConceptCustomAliases ??= new(StringComparer.OrdinalIgnoreCase);
     }
 
     private static SearchDictionaryDocument Compose(SearchDictionaryDocument official, SearchDictionarySiteOverlay site)
