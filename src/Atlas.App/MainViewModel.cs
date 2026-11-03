@@ -54,7 +54,8 @@ public sealed class MainViewModel : ObservableObject
     private BitmapImage? _furniturePreview;
     private AtlasLicenseInfo _licenseInfo;
     private string _licenseCodeEntry = "", _generatedLicenseCode = "", _newLicenseCustomer = "", _newLicenseDeviceId = "";
-    private string _newPersonalTagName = "";
+    private string _newPersonalTagName = "", _newClientUniverseName = "";
+    private CustomerFurnitureLocation? _selectedCustomerFurnitureLocation;
     private bool _newLicenseCreatorEnabled;
     private DateTime? _newLicenseValidUntil = DateTime.Today.AddYears(1);
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
@@ -92,6 +93,11 @@ public sealed class MainViewModel : ObservableObject
         OpenCustomerFurnitureFolderCommand = new(_ => OpenCustomerFurnitureFolder(), _ => !string.IsNullOrWhiteSpace(CustomerFurnitureRoot));
         AddPersonalTagCommand = new(_ => AddPersonalTag(), _ => CanManageCustomerFurniture && !string.IsNullOrWhiteSpace(NewPersonalTagName));
         DeletePersonalTagCommand = new(tag => DeletePersonalTag(tag as PersonalTagRecord), _ => CanManageCustomerFurniture);
+        AddClientUniverseCommand = new(_ => AddClientUniverse(), _ => CanManageCustomerFurniture && !string.IsNullOrWhiteSpace(NewClientUniverseName));
+        DeleteClientUniverseCommand = new(item => DeleteClientUniverse(item as PersonalTagRecord), _ => CanManageCustomerFurniture);
+        DeleteCustomerFurnitureLocationCommand = new(item => DeleteCustomerFurnitureLocation(item as CustomerFurnitureLocation), _ => CanManageCustomerFurniture);
+        ExcludeCustomerFurnitureCommand = new(_ => _ = ExcludeCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && SelectedCustomerFurniture is not null);
+        RestoreCustomerFurnitureCommand = new(item => _ = RestoreCustomerFurnitureAsync(item as CustomerFurnitureExclusion), _ => CanManageCustomerFurniture);
         ChooseSharedRootCommand = new(_ => ChooseSharedRoot(), _ => IsAdministrator);
         SaveBootstrapCommand = new(_ => _ = SaveBootstrapAsync(), _ => IsAdministrator);
         MoveWorkspaceCommand = new(_ => _ = MoveWorkspaceAsync(), _ => IsAdministrator && !IsBusy);
@@ -168,8 +174,14 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<string> FurnitureUsages { get; } = [];
     public ObservableCollection<FurnitureCardViewModel> ClientFurnitureCards { get; } = [];
     public ObservableCollection<CustomerFurnitureItem> CustomerFurniture { get; } = [];
+    public ObservableCollection<CustomerFurnitureLocation> CustomerFurnitureLocations { get; } = [];
+    public ObservableCollection<CustomerFurnitureExclusion> ExcludedCustomerFurniture { get; } = [];
     public ObservableCollection<PersonalTagRecord> PersonalTags { get; } = [];
-    public ObservableCollection<CustomerPersonalTagOptionViewModel> SelectedCustomerPersonalTagOptions { get; } = [];
+    public ObservableCollection<PersonalTagRecord> ClientUniverses { get; } = [];
+    public ObservableCollection<CustomerTaxonomyOptionViewModel> SelectedCustomerAtlasUniverseOptions { get; } = [];
+    public ObservableCollection<CustomerTaxonomyOptionViewModel> SelectedCustomerClientUniverseOptions { get; } = [];
+    public ObservableCollection<CustomerTaxonomyOptionViewModel> SelectedCustomerAtlasTagOptions { get; } = [];
+    public ObservableCollection<CustomerTaxonomyOptionViewModel> SelectedCustomerPersonalTagOptions { get; } = [];
     public ObservableCollection<ComponentRecord> LinkedComponents { get; } = [];
     public ObservableCollection<FurnitureCompositionLineViewModel> CompositionLines { get; } = [];
     public ObservableCollection<FurnitureCompositionLineViewModel> SelectedClientCompositionLines { get; } = [];
@@ -180,6 +192,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ToggleOptionViewModel> UsageOptions { get; } = [];
     public ObservableCollection<ToggleOptionViewModel> FurnitureTagOptions { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientUniverseFacets { get; } = [];
+    public ObservableCollection<CatalogFacetViewModel> ClientCustomUniverseFacets { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientTypeFacets { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientUsageFacets { get; } = [];
     public ObservableCollection<CatalogFacetViewModel> ClientFamilyFacets { get; } = [];
@@ -432,7 +445,7 @@ public sealed class MainViewModel : ObservableObject
     }
     public FurnitureRecord? SelectedClientFurniture => SelectedClientFurnitureCard?.Record;
     public string SelectedClientTags => SelectedClientFurniture is null ? "Aucun tag" : string.Join(" · ", ComponentTaxonomyStore.Resolve(SelectedClientFurniture, Components, _taxonomy).Select(tag => tag.Label));
-    public string SelectedClientPersonalTags => SelectedClientFurniture is null || SelectedClientFurniture.PersonalTags.Count == 0 ? "Aucun repère personnel" : string.Join(" · ", SelectedClientFurniture.PersonalTags);
+    public string SelectedClientPersonalTags => SelectedClientFurniture is null || SelectedClientFurniture.PersonalTags.Count == 0 ? "Aucun Tag Client" : string.Join(" · ", SelectedClientFurniture.PersonalTags);
     public bool SelectedClientIsCustomerFurniture => SelectedClientFurniture?.IsCustomerFurniture == true;
     public string SelectedClientUses => SelectedClientFurniture is null ? string.Empty : string.Join(" · ", FurnitureUsagesFor(SelectedClientFurniture));
     public string SelectedClientStructure => SelectedClientFurniture is null ? string.Empty : string.Join(" · ", new[] { SelectedClientFurniture.PrincipleConstruction, SelectedClientFurniture.TypeAssemblage, SelectedClientFurniture.PositionDos }.Where(value => !string.IsNullOrWhiteSpace(value) && !value.Equals("Non applicable", StringComparison.OrdinalIgnoreCase)));
@@ -452,11 +465,11 @@ public sealed class MainViewModel : ObservableObject
     public BitmapImage? FurniturePreview { get => _furniturePreview; private set => SetProperty(ref _furniturePreview, value); }
     public string CustomerFurnitureRoot
     {
-        get => _customerCatalog.FurnitureRoot;
+        get => SelectedCustomerFurnitureLocation?.RootPath ?? _customerCatalog.Locations.FirstOrDefault()?.RootPath ?? string.Empty;
         set
         {
-            if (_customerCatalog.FurnitureRoot == value) return;
-            _customerCatalog.FurnitureRoot = value?.Trim() ?? string.Empty;
+            if (SelectedCustomerFurnitureLocation is null) return;
+            SelectedCustomerFurnitureLocation.RootPath = value?.Trim() ?? string.Empty;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CustomerFurnitureRootStatus));
         }
@@ -465,19 +478,26 @@ public sealed class MainViewModel : ObservableObject
         ? "Aucun dossier client n’est configuré."
         : Directory.Exists(CustomerFurnitureRoot) ? "Dossier disponible." : "Dossier actuellement inaccessible.";
     public string NewPersonalTagName { get => _newPersonalTagName; set { if (SetProperty(ref _newPersonalTagName, value)) AddPersonalTagCommand.RaiseCanExecuteChanged(); } }
+    public string NewClientUniverseName { get => _newClientUniverseName; set { if (SetProperty(ref _newClientUniverseName, value)) AddClientUniverseCommand.RaiseCanExecuteChanged(); } }
+    public CustomerFurnitureLocation? SelectedCustomerFurnitureLocation
+    {
+        get => _selectedCustomerFurnitureLocation;
+        set { if (SetProperty(ref _selectedCustomerFurnitureLocation, value)) { OnPropertyChanged(nameof(CustomerFurnitureRoot)); OnPropertyChanged(nameof(CustomerFurnitureRootStatus)); RaiseCommandStates(); } }
+    }
     public CustomerFurnitureItem? SelectedCustomerFurniture
     {
         get => _selectedCustomerFurniture;
         set
         {
             if (!SetProperty(ref _selectedCustomerFurniture, value)) return;
-            RebuildSelectedCustomerTagOptions();
+            RebuildSelectedCustomerTaxonomyOptions();
             OnPropertyChanged(nameof(SelectedCustomerFurnitureFileStatus));
+            ExcludeCustomerFurnitureCommand.RaiseCanExecuteChanged();
         }
     }
     public string SelectedCustomerFurnitureFileStatus => SelectedCustomerFurniture is null
         ? string.Empty
-        : File.Exists(CustomerFurnitureStore.ResolvePath(_customerCatalog, SelectedCustomerFurniture.RelativeTopPath)) ? "Fichier .TOP disponible" : "Fichier .TOP introuvable";
+        : File.Exists(CustomerFurnitureStore.ResolvePath(_customerCatalog, SelectedCustomerFurniture)) ? "Fichier .TOP disponible" : "Fichier .TOP introuvable";
     public int CustomerFurnitureCount => CustomerFurniture.Count;
 
     public RelayCommand NavigateCommand { get; }
@@ -497,6 +517,11 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand OpenCustomerFurnitureFolderCommand { get; }
     public RelayCommand AddPersonalTagCommand { get; }
     public RelayCommand DeletePersonalTagCommand { get; }
+    public RelayCommand AddClientUniverseCommand { get; }
+    public RelayCommand DeleteClientUniverseCommand { get; }
+    public RelayCommand DeleteCustomerFurnitureLocationCommand { get; }
+    public RelayCommand ExcludeCustomerFurnitureCommand { get; }
+    public RelayCommand RestoreCustomerFurnitureCommand { get; }
     public RelayCommand ChooseSharedRootCommand { get; }
     public RelayCommand SaveBootstrapCommand { get; }
     public RelayCommand MoveWorkspaceCommand { get; }
@@ -541,7 +566,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             _customerCatalog = await _customerFurnitureStore.LoadAsync();
-            if (!string.IsNullOrWhiteSpace(_customerCatalog.FurnitureRoot) && Directory.Exists(_customerCatalog.FurnitureRoot))
+            if (_customerCatalog.Locations.Any(value => value.IsActive && Directory.Exists(value.RootPath)))
             {
                 _customerFurnitureStore.Synchronize(_customerCatalog);
                 await _customerFurnitureStore.SaveAsync(_customerCatalog);
@@ -852,6 +877,8 @@ public sealed class MainViewModel : ObservableObject
         {
             var published = ClientFurnitureCards.Select(card => card.Record).Where(item => item.Status == RecordStatus.Publiee).ToArray();
             BuildUniverseFacets(published);
+            var clientUniverseNames = ClientUniverses.Select(value => value.Label).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            BuildClientFacet("Univers Client", ClientCustomUniverseFacets, CountValues(published.SelectMany(item => item.Universes).Where(clientUniverseNames.Contains)));
             BuildClientFacet("Source", ClientSourceFacets, CountValues(published.Select(item => item.IsCustomerFurniture ? "Mes meubles" : "Atlas")));
             BuildClientFacet("Types", ClientTypeFacets, CountValues(published.Select(item => item.TypeMeuble)));
             BuildClientFacet("Usages", ClientUsageFacets, CountValues(published.SelectMany(FurnitureUsagesFor)));
@@ -860,8 +887,8 @@ public sealed class MainViewModel : ObservableObject
             BuildClientFacet("Construction", ClientConstructionFacets, CountValues(published.Select(item => item.PrincipleConstruction)));
             BuildClientFacet("Assemblage", ClientAssemblyFacets, CountValues(published.Select(item => item.TypeAssemblage)));
             BuildClientFacet("Dos", ClientBackFacets, CountValues(published.Select(item => item.PositionDos)));
-            BuildClientFacet("Tags", ClientTagFacets, CountValues(published.SelectMany(item => ComponentTaxonomyStore.Resolve(item, Components, _taxonomy).Select(tag => tag.Label).Distinct(StringComparer.OrdinalIgnoreCase))));
-            BuildClientFacet("Repères personnels", ClientPersonalTagFacets, CountValues(published.SelectMany(item => item.PersonalTags)));
+            BuildClientFacet("Tags Atlas", ClientTagFacets, CountValues(published.SelectMany(item => ComponentTaxonomyStore.Resolve(item, Components, _taxonomy).Select(tag => tag.Label).Distinct(StringComparer.OrdinalIgnoreCase))));
+            BuildClientFacet("Tags Client", ClientPersonalTagFacets, CountValues(published.SelectMany(item => item.PersonalTags)));
             UpdateFavoriteFacets();
         }
         finally { _suppressClientFacetRefresh = false; }
@@ -966,6 +993,7 @@ public sealed class MainViewModel : ObservableObject
     private IEnumerable<ObservableCollection<CatalogFacetViewModel>> ClientFacetGroups()
     {
         yield return ClientUniverseFacets;
+        yield return ClientCustomUniverseFacets;
         yield return ClientSourceFacets;
         yield return ClientTypeFacets;
         yield return ClientUsageFacets;
@@ -2309,6 +2337,7 @@ public sealed class MainViewModel : ObservableObject
         var resolvedTags = ComponentTaxonomyStore.Resolve(card.Record, Components, _taxonomy);
         if (!MatchesClientFacet(ClientSourceFacets, [card.Record.IsCustomerFurniture ? "Mes meubles" : "Atlas"])) return false;
         if (!MatchesClientFacet(ClientUniverseFacets, card.Record.Universes)) return false;
+        if (!MatchesClientFacet(ClientCustomUniverseFacets, card.Record.Universes)) return false;
         if (!MatchesClientFacet(ClientTypeFacets, [card.Record.TypeMeuble])) return false;
         if (!MatchesClientFacet(ClientUsageFacets, FurnitureUsagesFor(card.Record))) return false;
         if (!MatchesClientFacet(ClientFamilyFacets, [card.Record.Family])) return false;
@@ -2340,13 +2369,17 @@ public sealed class MainViewModel : ObservableObject
 
     private FurnitureRecord BuildCustomerFurnitureRecord(CustomerFurnitureItem item)
     {
-        var tagLabels = item.PersonalTagIds
+        var clientTagLabels = item.ClientTagIds
             .Select(id => PersonalTags.FirstOrDefault(tag => tag.Id.Equals(id, StringComparison.OrdinalIgnoreCase))?.Label)
             .Where(label => !string.IsNullOrWhiteSpace(label))
             .Cast<string>()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+        var atlasUniverses = item.AtlasUniverseIds
+            .Select(id => _catalog.UniverseDefinitions.FirstOrDefault(value => value.Id.Equals(id, StringComparison.OrdinalIgnoreCase))?.Name);
+        var clientUniverses = item.ClientUniverseIds
+            .Select(id => ClientUniverses.FirstOrDefault(value => value.Id.Equals(id, StringComparison.OrdinalIgnoreCase))?.Label);
         return new FurnitureRecord
         {
             Id = $"customer-{item.Id}",
@@ -2354,20 +2387,30 @@ public sealed class MainViewModel : ObservableObject
             DisplayName = string.IsNullOrWhiteSpace(item.DisplayName) ? Path.GetFileNameWithoutExtension(item.RelativeTopPath) : item.DisplayName,
             Description = item.Description,
             TypeMeuble = "Meuble utilisateur",
-            SourceRelativePath = item.RelativeTopPath,
-            ImageRelativePath = item.ImageRelativePath,
+            SourceRelativePath = CustomerFurnitureStore.ResolvePath(_customerCatalog, item),
+            ImageRelativePath = CustomerFurnitureStore.ResolvePath(_customerCatalog, item, item.ImageRelativePath),
+            Universes = atlasUniverses.Concat(clientUniverses).Where(value => !string.IsNullOrWhiteSpace(value)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            AddedTagIds = item.AtlasTagIds.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Status = RecordStatus.Publiee,
             ConceptionDate = item.FirstSeenUtc.LocalDateTime.Date,
             IsCustomerFurniture = true,
-            PersonalTags = tagLabels
+            PersonalTags = clientTagLabels
         };
     }
 
     private void ReloadCustomerFurnitureCollections()
     {
         var selectedId = SelectedCustomerFurniture?.Id;
+        var selectedLocationId = SelectedCustomerFurnitureLocation?.Id;
+        CustomerFurnitureLocations.Clear();
+        foreach (var location in _customerCatalog.Locations) CustomerFurnitureLocations.Add(location);
+        SelectedCustomerFurnitureLocation = CustomerFurnitureLocations.FirstOrDefault(value => value.Id == selectedLocationId) ?? CustomerFurnitureLocations.FirstOrDefault();
+        ClientUniverses.Clear();
+        foreach (var universe in _customerCatalog.ClientUniverses.OrderBy(value => value.Label, StringComparer.CurrentCultureIgnoreCase)) ClientUniverses.Add(universe);
         PersonalTags.Clear();
-        foreach (var tag in _customerCatalog.PersonalTags.OrderBy(tag => tag.Label, StringComparer.CurrentCultureIgnoreCase)) PersonalTags.Add(tag);
+        foreach (var tag in _customerCatalog.ClientTags.OrderBy(tag => tag.Label, StringComparer.CurrentCultureIgnoreCase)) PersonalTags.Add(tag);
+        ExcludedCustomerFurniture.Clear();
+        foreach (var item in _customerCatalog.Exclusions.OrderBy(value => value.DisplayName, StringComparer.CurrentCultureIgnoreCase)) ExcludedCustomerFurniture.Add(item);
         CustomerFurniture.Clear();
         foreach (var item in _customerCatalog.Furniture.OrderBy(item => item.DisplayName, StringComparer.CurrentCultureIgnoreCase)) CustomerFurniture.Add(item);
         SelectedCustomerFurniture = CustomerFurniture.FirstOrDefault(item => item.Id == selectedId) ?? CustomerFurniture.FirstOrDefault();
@@ -2379,9 +2422,9 @@ public sealed class MainViewModel : ObservableObject
     private async Task SynchronizeCustomerFurnitureAsync()
     {
         if (!CanManageCustomerFurniture) throw new UnauthorizedAccessException("Ce compte ne peut pas gérer les meubles du client.");
-        if (string.IsNullOrWhiteSpace(CustomerFurnitureRoot) || !Directory.Exists(CustomerFurnitureRoot))
+        if (!_customerCatalog.Locations.Any(value => value.IsActive && Directory.Exists(value.RootPath)))
         {
-            AtlasDialog.Warning("Choisissez d’abord un dossier de meubles client accessible.", "Mes meubles");
+            AtlasDialog.Warning("Ajoutez d’abord au moins un emplacement client accessible.", "Mes meubles");
             return;
         }
         IsBusy = true;
@@ -2404,11 +2447,14 @@ public sealed class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            _customerCatalog.PersonalTags = PersonalTags.ToList();
+            _customerCatalog.ClientTags = PersonalTags.ToList();
+            _customerCatalog.ClientUniverses = ClientUniverses.ToList();
+            _customerCatalog.Locations = CustomerFurnitureLocations.ToList();
+            _customerCatalog.Exclusions = ExcludedCustomerFurniture.ToList();
             _customerCatalog.Furniture = CustomerFurniture.ToList();
             await _customerFurnitureStore.SaveAsync(_customerCatalog);
             RebuildClientCards();
-            StatusText = "Les meubles et repères personnels ont été enregistrés.";
+            StatusText = "Les meubles, univers et tags Client ont été enregistrés.";
         }
         catch (Exception exception) { ShowError(exception); }
         finally { IsBusy = false; }
@@ -2417,9 +2463,17 @@ public sealed class MainViewModel : ObservableObject
     private void ChooseCustomerFurnitureRoot()
     {
         var dialog = new OpenFolderDialog { Title = "Choisir le dossier des meubles du client", Multiselect = false };
-        if (Directory.Exists(CustomerFurnitureRoot)) dialog.InitialDirectory = CustomerFurnitureRoot;
         if (dialog.ShowDialog() != true) return;
-        CustomerFurnitureRoot = dialog.FolderName;
+        var fullPath = Path.GetFullPath(dialog.FolderName).TrimEnd(Path.DirectorySeparatorChar);
+        if (CustomerFurnitureLocations.Any(value => PathsOverlap(value.RootPath, fullPath)))
+        {
+            AtlasDialog.Warning("Cet emplacement est déjà couvert par un autre dossier Client.", "Emplacement en double");
+            return;
+        }
+        var location = new CustomerFurnitureLocation { Name = Path.GetFileName(fullPath), RootPath = fullPath };
+        CustomerFurnitureLocations.Add(location);
+        _customerCatalog.Locations.Add(location);
+        SelectedCustomerFurnitureLocation = location;
         _ = SynchronizeCustomerFurnitureAsync();
     }
 
@@ -2438,46 +2492,57 @@ public sealed class MainViewModel : ObservableObject
         var label = NewPersonalTagName.Trim();
         if (PersonalTags.Any(tag => tag.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
         {
-            AtlasDialog.Warning("Ce repère personnel existe déjà.", "Repères personnels");
+            AtlasDialog.Warning("Ce Tag Client existe déjà.", "Tags Client");
             return;
         }
         var tag = new PersonalTagRecord { Label = label };
         PersonalTags.Add(tag);
-        _customerCatalog.PersonalTags.Add(tag);
+        _customerCatalog.ClientTags.Add(tag);
         NewPersonalTagName = string.Empty;
-        RebuildSelectedCustomerTagOptions();
+        RebuildSelectedCustomerTaxonomyOptions();
     }
 
     private void DeletePersonalTag(PersonalTagRecord? tag)
     {
         if (tag is null) return;
-        foreach (var item in CustomerFurniture) RemoveIgnoreCase(item.PersonalTagIds, tag.Id);
+        foreach (var item in CustomerFurniture) RemoveIgnoreCase(item.ClientTagIds, tag.Id);
         PersonalTags.Remove(tag);
-        _customerCatalog.PersonalTags.RemoveAll(item => item.Id.Equals(tag.Id, StringComparison.OrdinalIgnoreCase));
-        RebuildSelectedCustomerTagOptions();
+        _customerCatalog.ClientTags.RemoveAll(item => item.Id.Equals(tag.Id, StringComparison.OrdinalIgnoreCase));
+        RebuildSelectedCustomerTaxonomyOptions();
     }
 
-    private void RebuildSelectedCustomerTagOptions()
+    private void RebuildSelectedCustomerTaxonomyOptions()
     {
+        SelectedCustomerAtlasUniverseOptions.Clear();
+        SelectedCustomerClientUniverseOptions.Clear();
+        SelectedCustomerAtlasTagOptions.Clear();
         SelectedCustomerPersonalTagOptions.Clear();
         if (SelectedCustomerFurniture is null) return;
+        AddOptions(SelectedCustomerAtlasUniverseOptions, _catalog.UniverseDefinitions.Where(value => value.IsActive).Select(value => (value.Id, value.Name)), SelectedCustomerFurniture.AtlasUniverseIds);
+        AddOptions(SelectedCustomerClientUniverseOptions, ClientUniverses.Select(value => (value.Id, value.Label)), SelectedCustomerFurniture.ClientUniverseIds);
+        AddOptions(SelectedCustomerAtlasTagOptions, _taxonomy.Tags.Where(value => value.IsActive).Select(value => (value.Id, value.Label)), SelectedCustomerFurniture.AtlasTagIds);
         foreach (var tag in PersonalTags.OrderBy(tag => tag.Label, StringComparer.CurrentCultureIgnoreCase))
         {
-            var selected = SelectedCustomerFurniture.PersonalTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
-            SelectedCustomerPersonalTagOptions.Add(new CustomerPersonalTagOptionViewModel(tag, selected, CustomerPersonalTagChanged));
+            var selected = SelectedCustomerFurniture.ClientTagIds.Contains(tag.Id, StringComparer.OrdinalIgnoreCase);
+            SelectedCustomerPersonalTagOptions.Add(new CustomerTaxonomyOptionViewModel(tag.Id, tag.Label, selected, option => UpdateSelection(SelectedCustomerFurniture.ClientTagIds, option)));
         }
     }
 
-    private void CustomerPersonalTagChanged(CustomerPersonalTagOptionViewModel option)
+    private void AddOptions(ObservableCollection<CustomerTaxonomyOptionViewModel> target, IEnumerable<(string Id, string Label)> values, List<string> selected)
     {
-        if (SelectedCustomerFurniture is null) return;
-        if (option.IsSelected && !SelectedCustomerFurniture.PersonalTagIds.Contains(option.Id, StringComparer.OrdinalIgnoreCase)) SelectedCustomerFurniture.PersonalTagIds.Add(option.Id);
-        else if (!option.IsSelected) RemoveIgnoreCase(SelectedCustomerFurniture.PersonalTagIds, option.Id);
+        foreach (var value in values.OrderBy(value => value.Label, StringComparer.CurrentCultureIgnoreCase))
+            target.Add(new CustomerTaxonomyOptionViewModel(value.Id, value.Label, selected.Contains(value.Id, StringComparer.OrdinalIgnoreCase), option => UpdateSelection(selected, option)));
+    }
+
+    private static void UpdateSelection(List<string> selected, CustomerTaxonomyOptionViewModel option)
+    {
+        if (option.IsSelected && !selected.Contains(option.Id, StringComparer.OrdinalIgnoreCase)) selected.Add(option.Id);
+        else if (!option.IsSelected) RemoveIgnoreCase(selected, option.Id);
     }
 
     private void ChooseCustomerFurnitureImage()
     {
-        if (SelectedCustomerFurniture is null || !Directory.Exists(CustomerFurnitureRoot)) return;
+        if (SelectedCustomerFurniture is null) return;
         var dialog = new OpenFileDialog
         {
             Title = $"Choisir l’aperçu de {SelectedCustomerFurniture.DisplayName}",
@@ -2487,14 +2552,82 @@ public sealed class MainViewModel : ObservableObject
         if (dialog.ShowDialog() != true) return;
         try
         {
-            var topPath = CustomerFurnitureStore.ResolvePath(_customerCatalog, SelectedCustomerFurniture.RelativeTopPath);
+            var topPath = CustomerFurnitureStore.ResolvePath(_customerCatalog, SelectedCustomerFurniture);
             var target = topPath + Path.GetExtension(dialog.FileName).ToLowerInvariant();
             if (!Path.GetFullPath(dialog.FileName).Equals(Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase)) File.Copy(dialog.FileName, target, true);
-            SelectedCustomerFurniture.ImageRelativePath = Path.GetRelativePath(CustomerFurnitureRoot, target);
+            var root = _customerCatalog.Locations.First(value => value.Id.Equals(SelectedCustomerFurniture.LocationId, StringComparison.OrdinalIgnoreCase)).RootPath;
+            SelectedCustomerFurniture.ImageRelativePath = Path.GetRelativePath(root, target);
             RebuildClientCards();
             StatusText = "Aperçu actualisé. Enregistrez pour conserver la modification.";
         }
         catch (Exception exception) { ShowError(exception); }
+    }
+
+    private void AddClientUniverse()
+    {
+        var label = NewClientUniverseName.Trim();
+        if (ClientUniverses.Any(value => value.Label.Equals(label, StringComparison.OrdinalIgnoreCase))) { AtlasDialog.Warning("Cet Univers Client existe déjà.", "Univers Client"); return; }
+        var universe = new PersonalTagRecord { Label = label };
+        ClientUniverses.Add(universe);
+        _customerCatalog.ClientUniverses.Add(universe);
+        NewClientUniverseName = string.Empty;
+        RebuildSelectedCustomerTaxonomyOptions();
+    }
+
+    private void DeleteClientUniverse(PersonalTagRecord? universe)
+    {
+        if (universe is null || !AtlasDialog.Confirm($"Supprimer l’Univers Client « {universe.Label} » ?", "Univers Client")) return;
+        foreach (var item in CustomerFurniture) RemoveIgnoreCase(item.ClientUniverseIds, universe.Id);
+        ClientUniverses.Remove(universe);
+        _customerCatalog.ClientUniverses.RemoveAll(value => value.Id.Equals(universe.Id, StringComparison.OrdinalIgnoreCase));
+        RebuildSelectedCustomerTaxonomyOptions();
+    }
+
+    private void DeleteCustomerFurnitureLocation(CustomerFurnitureLocation? location)
+    {
+        if (location is null) return;
+        var count = CustomerFurniture.Count(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
+        if (!AtlasDialog.Confirm($"Retirer l’emplacement « {location.Name} » d’Atlas ?", "Emplacement Client", $"{count} meuble(s) disparaîtront d’Atlas. Aucun fichier réseau ne sera supprimé.")) return;
+        CustomerFurnitureLocations.Remove(location);
+        _customerCatalog.Locations.RemoveAll(value => value.Id.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
+        _customerCatalog.Furniture.RemoveAll(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
+        foreach (var item in CustomerFurniture.Where(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase)).ToArray()) CustomerFurniture.Remove(item);
+        SelectedCustomerFurnitureLocation = CustomerFurnitureLocations.FirstOrDefault();
+        RebuildClientCards();
+    }
+
+    private async Task ExcludeCustomerFurnitureAsync()
+    {
+        var item = SelectedCustomerFurniture;
+        if (item is null || !AtlasDialog.Confirm($"Retirer « {item.DisplayName} » d’Atlas ?", "Retirer le meuble", "Le fichier .TOP restera intact sur le réseau. Vous pourrez restaurer ce meuble plus tard.")) return;
+        var exclusion = new CustomerFurnitureExclusion { LocationId = item.LocationId, RelativeTopPath = item.RelativeTopPath, DisplayName = item.DisplayName };
+        _customerCatalog.Exclusions.RemoveAll(value => CustomerFurnitureStore.ItemKey(value.LocationId, value.RelativeTopPath).Equals(CustomerFurnitureStore.ItemKey(item), StringComparison.OrdinalIgnoreCase));
+        _customerCatalog.Exclusions.Add(exclusion);
+        ExcludedCustomerFurniture.Add(exclusion);
+        _customerCatalog.Furniture.Remove(item);
+        CustomerFurniture.Remove(item);
+        SelectedCustomerFurniture = CustomerFurniture.FirstOrDefault();
+        await _customerFurnitureStore.SaveAsync(_customerCatalog);
+        RebuildClientCards();
+    }
+
+    private async Task RestoreCustomerFurnitureAsync(CustomerFurnitureExclusion? exclusion)
+    {
+        if (exclusion is null) return;
+        _customerCatalog.Exclusions.Remove(exclusion);
+        ExcludedCustomerFurniture.Remove(exclusion);
+        _customerFurnitureStore.Synchronize(_customerCatalog);
+        await _customerFurnitureStore.SaveAsync(_customerCatalog);
+        ReloadCustomerFurnitureCollections();
+        RebuildClientCards();
+    }
+
+    private static bool PathsOverlap(string first, string second)
+    {
+        if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(second)) return false;
+        var a = Path.GetFullPath(first).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var b = Path.GetFullPath(second).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return a.StartsWith(b, StringComparison.OrdinalIgnoreCase) || b.StartsWith(a, StringComparison.OrdinalIgnoreCase);
     }
 
     private void ChooseLibrary()
@@ -2610,7 +2743,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand, ChooseCustomerFurnitureRootCommand, SynchronizeCustomerFurnitureCommand, SaveCustomerFurnitureCommand, ChooseCustomerFurnitureImageCommand, OpenCustomerFurnitureFolderCommand, AddPersonalTagCommand, DeletePersonalTagCommand, MoveWorkspaceCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand, ChooseCustomerFurnitureRootCommand, SynchronizeCustomerFurnitureCommand, SaveCustomerFurnitureCommand, ChooseCustomerFurnitureImageCommand, OpenCustomerFurnitureFolderCommand, AddPersonalTagCommand, DeletePersonalTagCommand, AddClientUniverseCommand, DeleteClientUniverseCommand, DeleteCustomerFurnitureLocationCommand, ExcludeCustomerFurnitureCommand, RestoreCustomerFurnitureCommand, MoveWorkspaceCommand }) command.RaiseCanExecuteChanged();
     }
 
     private sealed class ClientFurnitureSearchComparer(Func<string> query) : System.Collections.IComparer
