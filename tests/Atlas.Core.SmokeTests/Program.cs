@@ -275,6 +275,7 @@ Assert(catalogXaml.Contains("ClientUniverseFacets") && catalogXaml.Contains("Uni
 Assert(catalogXaml.Contains("UniverseCard") && catalogXaml.Contains("Height=\"82\""), "La galerie des univers doit rester compacte et lisible sans occuper le menu principal.");
 Assert(!catalogXaml.Contains("MaxWidth=\"1820\""), "Horizon doit utiliser toute la largeur disponible en plein écran.");
 Assert(mainWindowXaml.Contains("NavPathIcon") && !mainWindowXaml.Contains("Text=\"⚙\""), "Le menu principal doit utiliser des icônes vectorielles cohérentes.");
+Assert(mainWindowXaml.Contains("Content=\"›\"") && mainWindowXaml.Contains("InverseBoolVisibility") && mainWindowXaml.Contains("ToolTip=\"Développer le menu\""), "Le menu réduit doit toujours présenter un bouton visible permettant de le développer.");
 Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains("<views:HorizonShell"), "Horizon doit rester intégré dans la coque Atlas commune.");
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
 Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"235\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
