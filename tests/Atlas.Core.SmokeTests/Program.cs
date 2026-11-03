@@ -211,11 +211,21 @@ try
     var customerCatalog = new CustomerFurnitureCatalog { FurnitureRoot = furnitureRoot };
     Assert(customerStore.Synchronize(customerCatalog) == 1 && customerCatalog.Furniture.Count == 1, "Un .TOP déposé doit rejoindre le catalogue client séparé.");
     Assert(customerCatalog.Furniture[0].ImageRelativePath.EndsWith(".top.png", StringComparison.OrdinalIgnoreCase), "L’aperçu voisin du .TOP doit être détecté automatiquement.");
-    customerCatalog.PersonalTags.Add(new PersonalTagRecord { Id = "michel", Label = "Modèle Michel" });
-    customerCatalog.Furniture[0].PersonalTagIds.Add("michel");
+    customerCatalog.ClientUniverses.Add(new PersonalTagRecord { Id = "sur-mesure", Label = "Sur mesure" });
+    customerCatalog.ClientTags.Add(new PersonalTagRecord { Id = "michel", Label = "Modèle Michel" });
+    customerCatalog.Furniture[0].ClientUniverseIds.Add("sur-mesure");
+    customerCatalog.Furniture[0].ClientTagIds.Add("michel");
+    var exclusion = new CustomerFurnitureExclusion
+    {
+        LocationId = customerCatalog.Furniture[0].LocationId,
+        RelativeTopPath = "Meuble_ignore.top",
+        DisplayName = "Meuble ignoré"
+    };
+    customerCatalog.Exclusions.Add(exclusion);
     await customerStore.SaveAsync(customerCatalog);
     var reloadedCustomerCatalog = await customerStore.LoadAsync();
-    Assert(reloadedCustomerCatalog.Furniture.Single().PersonalTagIds.Contains("michel") && !customerStore.CatalogPath.Contains("catalog.atlas.json", StringComparison.OrdinalIgnoreCase), "Les repères et meubles client doivent rester hors de la base Atlas officielle.");
+    Assert(reloadedCustomerCatalog.Furniture.Single().ClientTagIds.Contains("michel") && reloadedCustomerCatalog.Furniture.Single().ClientUniverseIds.Contains("sur-mesure"), "Les Univers Client et Tags Client doivent être conservés.");
+    Assert(reloadedCustomerCatalog.Exclusions.Single().DisplayName == "Meuble ignoré" && !customerStore.CatalogPath.Contains("catalog.atlas.json", StringComparison.OrdinalIgnoreCase), "Les exclusions doivent rester hors de la base Atlas officielle.");
 }
 finally
 {
