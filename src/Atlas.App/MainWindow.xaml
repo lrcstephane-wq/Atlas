@@ -32,16 +32,19 @@
                     <Rectangle Fill="{StaticResource AtlasGridBrush}" IsHitTestVisible="False"/>
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="88"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <Grid Margin="16,14,12,10">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
-                            <Border Width="46" Height="46" CornerRadius="4" Background="#292E31" BorderBrush="#4B5358" BorderThickness="1">
-                                <Image Source="pack://application:,,,/Assets/IdeoMark.png" Margin="7"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="11,0,0,0" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
-                                <TextBlock Text="ATLAS" FontWeight="Bold" FontSize="15"/>
-                                <TextBlock Text="BIBLIDÉO" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/>
-                            </StackPanel>
-                            <Button Grid.Column="2" Content="‹" FontSize="23" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Réduire ou développer le menu" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                        <Grid Margin="10">
+                            <Grid Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
+                                <Border Width="46" Height="46" CornerRadius="4" Background="#292E31" BorderBrush="#4B5358" BorderThickness="1">
+                                    <Image Source="pack://application:,,,/Assets/IdeoMark.png" Margin="7"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="11,0,0,0">
+                                    <TextBlock Text="ATLAS" FontWeight="Bold" FontSize="15"/>
+                                    <TextBlock Text="BIBLIDÉO" Foreground="{StaticResource CyanBrush}" FontWeight="Bold" FontSize="9"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="‹" FontSize="23" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Réduire le menu" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                            </Grid>
+                            <Button Content="›" FontSize="23" Style="{StaticResource IconButton}" Command="{Binding ToggleNavigationCommand}" ToolTip="Développer le menu" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource InverseBoolVisibility}}" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                         </Grid>
 
                         <Grid Grid.Row="1">
