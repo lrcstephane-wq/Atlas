@@ -30,7 +30,7 @@ public sealed record AtlasLicenseInfo(
 public sealed class AtlasLicenseService
 {
     public const string CreatorFeature = "creator";
-    private const string PublicKeyPem = """
+    public const string DefaultPublicKeyPem = """
         -----BEGIN PUBLIC KEY-----
         MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDpV+t9vu4eMTZL7zR9dCWuAXDNbZ
         QqhUAjnRYh2sf+RzWiITQinOmMWI9zk76jAEAzxxwKomdt01RDWnXjkXIg==
@@ -44,7 +44,7 @@ public sealed class AtlasLicenseService
 
     public AtlasLicenseService(string? publicKeyPem = null, string? licenseFilePath = null, string? deviceId = null)
     {
-        _publicKeyPem = string.IsNullOrWhiteSpace(publicKeyPem) ? PublicKeyPem : publicKeyPem;
+        _publicKeyPem = string.IsNullOrWhiteSpace(publicKeyPem) ? DefaultPublicKeyPem : publicKeyPem;
         _licenseFilePath = string.IsNullOrWhiteSpace(licenseFilePath) ? LicenseFilePath : licenseFilePath;
         _deviceId = string.IsNullOrWhiteSpace(deviceId) ? MachineIdentityService.CurrentDeviceId : deviceId;
     }

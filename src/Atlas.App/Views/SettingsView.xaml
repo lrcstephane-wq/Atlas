@@ -20,6 +20,7 @@
 <StackPanel>
      <TextBlock Text="ATLAS" Style="{StaticResource NavSection}"/>
      <Button x:Name="LicenseSettingsButton" Content="Licence" Tag="LicensePanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     <Button x:Name="ContentSettingsButton" Content="Contenus Atlas" Tag="ContentPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button x:Name="CustomerFurnitureSettingsButton" Content="Catalogue Client" Tag="CustomerFurnitureSettingsPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}" Visibility="{Binding CanManageCustomerFurniture, Converter={StaticResource BoolVisibility}}"/>
      <StackPanel Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
      <TextBlock Text="GÉNÉRAL" Style="{StaticResource NavSection}"/>
@@ -86,6 +87,44 @@
         <TextBox Text="{Binding GeneratedLicenseCode, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="105" VerticalContentAlignment="Top" Margin="0,10,0,0"/>
         <Button Content="Copier le code" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,9,0,0" Click="CopyGeneratedLicense_OnClick"/>
         <TextBlock x:Name="LicenseGeneratorStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
+       </StackPanel>
+      </Border>
+     </StackPanel>
+    </ScrollViewer>
+    <ScrollViewer x:Name="ContentPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+     <StackPanel>
+      <TextBlock Text="Contenus Atlas" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="Le catalogue, le dictionnaire et les référentiels métier évoluent indépendamment de l’application." Style="{StaticResource Caption}" Margin="0,5,0,16" TextWrapping="Wrap"/>
+      <Border Style="{StaticResource Card}">
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <StackPanel>
+         <TextBlock Text="CONTENU OFFICIEL INSTALLÉ" Style="{StaticResource Eyebrow}"/>
+         <TextBlock Text="{Binding InstalledContentVersion}" FontSize="24" FontWeight="SemiBold" Margin="0,8,0,0"/>
+         <TextBlock Text="{Binding InstalledContentModules}" Style="{StaticResource Caption}" Margin="0,5,0,0"/>
+         <TextBlock Text="{Binding InstalledContentDate, StringFormat='Installé : {0}'}" Style="{StaticResource Caption}" Margin="0,3,0,0"/>
+        </StackPanel>
+        <Border Grid.Column="1" Background="#30383D" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="5" Padding="16,11" VerticalAlignment="Center"><StackPanel><TextBlock Text="DONNÉES DU SITE CONSERVÉES" Style="{StaticResource Eyebrow}"/><TextBlock Text="Meubles, Tags Client, Univers Client et réglages ne sont jamais remplacés." Style="{StaticResource Caption}" MaxWidth="330" TextWrapping="Wrap" Margin="0,5,0,0"/></StackPanel></Border>
+       </Grid>
+      </Border>
+      <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+       <StackPanel>
+        <TextBlock Text="INSTALLER UNE MISE À JOUR DE CONTENU" Style="{StaticResource Eyebrow}"/>
+        <TextBlock Text="Sélectionnez le fichier .atlaspack reçu d’Idéo. Atlas contrôle sa signature, crée une sauvegarde puis installe les nouveautés." Style="{StaticResource Caption}" Margin="0,5,0,12" TextWrapping="Wrap"/>
+        <Button Content="Choisir et installer un pack…" HorizontalAlignment="Left" Click="InstallContentPackage_OnClick"/>
+        <TextBlock x:Name="ContentInstallStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}" Margin="0,14,0,0" Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}">
+       <StackPanel>
+        <TextBlock Text="PUBLICATION IDÉO" Style="{StaticResource Eyebrow}"/>
+        <TextBlock Text="Génère un pack signé avec l’état actuel du catalogue Atlas, du dictionnaire, des tags, des images et des fichiers .TOP." Style="{StaticResource Caption}" Margin="0,5,0,14" TextWrapping="Wrap"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Version du contenu" Style="{StaticResource FieldLabel}"/><TextBox x:Name="NewContentVersion" Text="2026.11" ToolTip="Exemple : 2026.11 ou 2026.11.2"/></StackPanel>
+         <StackPanel Grid.Column="2"><TextBlock Text="Version minimale d’Atlas" Style="{StaticResource FieldLabel}"/><TextBox x:Name="MinimumAtlasContentVersion" Text="0.18.0"/></StackPanel>
+        </Grid>
+        <Border Background="#373D41" BorderBrush="#50595E" BorderThickness="1" Padding="10" Margin="0,12,0,0"><TextBlock Text="{Binding LicenseSigningKeyStatus}" Style="{StaticResource Caption}"/></Border>
+        <Button Content="Générer le pack de contenus…" HorizontalAlignment="Left" Margin="0,13,0,0" Click="GenerateContentPackage_OnClick" IsEnabled="{Binding CanGenerateContentPackage}"/>
+        <TextBlock x:Name="ContentGenerationStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
        </StackPanel>
       </Border>
      </StackPanel>
@@ -426,7 +465,7 @@
        <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Border Style="{StaticResource Card}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SearchDictionaryTestBox" ToolTip="Exemple : meuble bas 4 tiroirs Hettich"/><Button Grid.Column="1" Content="Analyser" Margin="8,0,0,0" Click="TestSearchDictionary_OnClick"/></Grid></Border><Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,10,0,0"><ScrollViewer><StackPanel><TextBlock Text="DIAGNOSTIC DE LA DEMANDE" Style="{StaticResource Eyebrow}"/><TextBlock Text="Interprétation" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/><TextBlock x:Name="SearchDictionaryTestResult" Text="Saisissez une demande client." TextWrapping="Wrap"/><TextBlock Text="Expressions reconnues" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/><TextBlock x:Name="SearchTestExpressions" Text="—" TextWrapping="Wrap"/><TextBlock Text="Mots ignorés" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/><TextBlock x:Name="SearchTestIgnored" Text="—" TextWrapping="Wrap"/><TextBlock Text="Texte restant pour la recherche libre" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/><TextBlock x:Name="SearchTestRemaining" Text="—" TextWrapping="Wrap"/><TextBlock Text="Requête normalisée et corrigée" Style="{StaticResource FieldLabel}" Margin="0,14,0,0"/><TextBlock x:Name="SearchTestNormalized" Text="—" TextWrapping="Wrap"/></StackPanel></ScrollViewer></Border></Grid>
       </TabItem>
      </TabControl>
-     <Border Grid.Row="2" Background="#292E31" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="1" Padding="13" Margin="0,12,0,0"><Grid><StackPanel><TextBlock Text="DICTIONNAIRE PARTAGÉ" Style="{StaticResource Eyebrow}"/><TextBlock Text="Le socle Atlas évolue avec l’application. Les ajouts du site et les validations métier sont conservés." Style="{StaticResource Caption}" Margin="0,4,170,0"/></StackPanel><Button Content="Enregistrer les modifications" HorizontalAlignment="Right" VerticalAlignment="Center" Click="SaveSearchDictionary_OnClick"/><TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" VerticalAlignment="Bottom" Margin="0,38,170,0"/></Grid></Border>
+     <Border Grid.Row="2" Background="#292E31" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="1" Padding="13" Margin="0,12,0,0"><Grid><StackPanel><TextBlock Text="DICTIONNAIRE PARTAGÉ" Style="{StaticResource Eyebrow}"/><TextBlock Text="Le socle Atlas se met à jour par pack de contenus. Les ajouts du site et les validations métier sont conservés séparément." Style="{StaticResource Caption}" Margin="0,4,170,0"/></StackPanel><Button Content="Enregistrer les modifications" HorizontalAlignment="Right" VerticalAlignment="Center" Click="SaveSearchDictionary_OnClick"/><TextBlock x:Name="SearchDictionaryStatus" Style="{StaticResource Caption}" VerticalAlignment="Bottom" Margin="0,38,170,0"/></Grid></Border>
     </Grid>
     <ScrollViewer x:Name="TopSolidPanel" Visibility="Collapsed">
 <StackPanel>
