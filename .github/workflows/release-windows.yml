@@ -4,6 +4,8 @@ on:
   push:
     tags: ["v*"]
     branches: ["release/**"]
+  pull_request:
+    branches: ["release/**"]
 
 permissions:
   contents: write
@@ -22,7 +24,7 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $name = "${{ github.ref_name }}"
+          $name = if ("${{ github.event_name }}" -eq "pull_request") { "${{ github.base_ref }}" } else { "${{ github.ref_name }}" }
           $version = $name.Split('/')[-1].TrimStart('v')
           "value=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
