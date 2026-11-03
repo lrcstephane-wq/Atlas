@@ -269,15 +269,15 @@ var launchWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Launch
 var appCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "App.xaml.cs"));
 Assert(launchWindowXaml.Contains("Administrateur") && launchWindowXaml.Contains("Créateur") && launchWindowXaml.Contains("Utilisateur") && launchWindowXaml.Contains("OUVRIR HORIZON"), "Le lancement doit proposer explicitement les trois modes Atlas.");
 Assert(appCode.Contains("OpenAdministratorSessionAsync") && appCode.Contains("LogoutAdministratorAsync") && appCode.Contains("atlas-horizon-user"), "Atlas doit pouvoir ouvrir et fermer une session administrateur sans redémarrage.");
-Assert(catalogXaml.Contains("FilterFacetTemplate") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit intégrer les favoris et conserver des zones défilantes.");
-Assert(catalogXaml.Contains("MinWidth=\"330\"") && catalogXaml.Contains("MaxWidth=\"390\""), "Horizon doit protéger les dimensions du panneau produit.");
-Assert(mainWindowXaml.Contains("ClientUniverseFacets") && mainWindowXaml.Contains("UniformToFill"), "Le menu Horizon doit présenter les univers comme une galerie illustrée.");
-Assert(!mainWindowXaml.Contains("MaxHeight=\"390\"") && mainWindowXaml.Contains("Height=\"108\""), "La galerie des univers doit utiliser toute la hauteur disponible avec des cartes lisibles.");
+Assert(catalogXaml.Contains("FilterPanelTemplate") && catalogXaml.Contains("IsClientFilterPanelPinned") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit proposer des panneaux de filtres recherchables, épinglables et défilants.");
+Assert(catalogXaml.Contains("MinWidth=\"300\"") && catalogXaml.Contains("MaxWidth=\"370\""), "Horizon doit protéger les dimensions du panneau produit.");
+Assert(catalogXaml.Contains("ClientUniverseFacets") && catalogXaml.Contains("UniformToFill"), "Horizon doit présenter les univers comme une galerie illustrée au-dessus du catalogue.");
+Assert(catalogXaml.Contains("UniverseCard") && catalogXaml.Contains("Height=\"82\""), "La galerie des univers doit rester compacte et lisible sans occuper le menu principal.");
 Assert(!catalogXaml.Contains("MaxWidth=\"1820\""), "Horizon doit utiliser toute la largeur disponible en plein écran.");
 Assert(mainWindowXaml.Contains("NavPathIcon") && !mainWindowXaml.Contains("Text=\"⚙\""), "Le menu principal doit utiliser des icônes vectorielles cohérentes.");
 Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains("<views:HorizonShell"), "Horizon doit rester intégré dans la coque Atlas commune.");
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
-Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"225\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
+Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"235\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
 Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsCreatorMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsLicenseRestricted"), "Les modes utilisateur, Créateur et les sessions sans licence doivent conserver leurs périmètres propres.");
 Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("CanUseAdministrativeInterfaces"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
@@ -303,7 +303,7 @@ Assert(settingsXaml.Contains("IDENTIFIANT DE CE POSTE") && settingsXaml.Contains
 Assert(settingsXaml.Contains("Déplacer l’espace Atlas") && settingsXaml.Contains("LocalLibraryRootOverride") && viewModelSource.Contains("AtlasWorkspaceService.CopyAndVerifyAsync"), "L’espace Atlas doit être déplaçable et les chemins communs surchargeables localement.");
 var installerScript = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "deployment", "Installer-Atlas.ps1"));
 Assert(installerScript.Contains("C:\\Ideo_Atlas") && installerScript.Contains("Ideo Solutions\\Atlas") && installerScript.Contains("Application"), "L’installation complète doit créer l’arborescence Atlas et le dossier machine de la licence.");
-Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && mainWindowXaml.Contains("ShowLicensedUniverseNavigation"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
+Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && catalogXaml.Contains("ClientUniverseFacets"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
 Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && viewModelSource.Contains("IsAdministrator || IsLicenseValid"), "L’administrateur doit contourner la licence sans exposer la clé privée aux installations clientes.");
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
 Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
@@ -322,7 +322,7 @@ Assert(settingsCode.Contains("SaveSearchDictionaryAsync") && viewModelSource.Con
 Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Contains("DefaultFurnitureUsages") && viewModelSource.Contains("_catalog.FurnitureTypes = FurnitureTypes.ToList()"), "Les valeurs historiques doivent migrer vers des référentiels configurables et persistés.");
 var customerFurnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureView.xaml"));
 Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("CustomerFurnitureRoot") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions"), "Le Créateur doit disposer d’un espace Mes meubles limité au dossier client et aux repères personnels.");
-Assert(catalogXaml.Contains("ClientSourceFacets") && catalogXaml.Contains("ClientPersonalTagFacets") && catalogXaml.Contains("SourceLabel"), "Horizon doit distinguer la source et filtrer les repères personnels sans mélanger les tags Atlas.");
+Assert(catalogXaml.Contains("CommandParameter=\"Source\"") && catalogXaml.Contains("CommandParameter=\"Tags Client\"") && catalogXaml.Contains("SourceLabel"), "Horizon doit distinguer la source et filtrer les Tags Client sans les mélanger aux tags Atlas.");
 Assert(viewModelSource.Contains("CustomerFurnitureStore") && viewModelSource.Contains("BuildCustomerFurnitureRecord") && viewModelSource.Contains("ManageOwnFurniture"), "Les meubles clients doivent être indexés séparément et réservés au profil Créateur.");
 Assert(viewModelSource.Contains("IsCreatorFeatureLicensed") && viewModelSource.Contains("NewLicenseCreatorEnabled") && viewModelSource.Contains("features: features"), "L’accès Créateur doit exiger à la fois le profil utilisateur et l’option signée dans la licence.");
 var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));

@@ -1,7 +1,7 @@
 <UserControl x:Class="Atlas.App.Views.CustomerFurnitureView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Grid>
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-  <Border Background="{StaticResource SurfaceGradient}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="14" Padding="20,16" Margin="0,0,0,14">
+  <Border Background="{StaticResource SurfaceGradient}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="7" Padding="20,16" Margin="0,0,0,14">
    <Grid><StackPanel><TextBlock Text="HORIZON / CATALOGUE CLIENT" Style="{StaticResource Eyebrow}"/><TextBlock Text="Mes meubles" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/><TextBlock Text="Les fichiers Client restent séparés du catalogue officiel Atlas." Style="{StaticResource Caption}" FontSize="13" Margin="0,3,0,0"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Content="Analyser les emplacements" Command="{Binding SynchronizeCustomerFurnitureCommand}" Style="{StaticResource SecondaryButton}"/><Button Content="Enregistrer" Command="{Binding SaveCustomerFurnitureCommand}" Margin="8,0,0,0"/></StackPanel></Grid>
   </Border>
   <TabControl Grid.Row="1">

@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 44223)
+Total output lines: 2840
+
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -47,7 +50,8 @@ public sealed class MainViewModel : ObservableObject
     private FurnitureFamilyRecord? _selectedFurnitureFamily;
     private CustomerFurnitureItem? _selectedCustomerFurniture;
     private LibraryFilterViewModel? _selectedLibraryFilter;
-    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _showAdvancedClientFilters, _suppressClientFacetRefresh;
+    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _suppressClientFacetRefresh, _isClientFilterPanelOpen, _isClientFilterPanelPinned;
+    private string _activeClientFilterGroup = "Types", _clientFacetSearch = string.Empty;
     private bool _isTopSolidBridgeReady;
     private string _topSolidBridgeFolder = string.Empty;
     private IReadOnlyList<string> _topSolidBridgeFiles = Array.Empty<string>();
@@ -108,7 +112,9 @@ public sealed class MainViewModel : ObservableObject
         SelectVisibleComponentsCommand = new(_ => MarkVisibleComponents(true), _ => CanEdit);
         ClearMarkedComponentsCommand = new(_ => MarkVisibleComponents(false), _ => CanEdit);
         ClearClientFiltersCommand = new(_ => ClearClientFilters());
-        ToggleClientFiltersCommand = new(_ => ShowAdvancedClientFilters = !ShowAdvancedClientFilters);
+        OpenClientFilterPanelCommand = new(group => OpenClientFilterPanel(group?.ToString()));
+        PinClientFilterPanelCommand = new(_ => TogglePinnedClientFilterPanel());
+        CloseClientFilterPanelCommand = new(_ => CloseClientFilterPanel());
         ClearClientSelectionCommand = new(_ => ClearClientSelection(), _ => ClientSelectionCount > 0);
         PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => HasFullHorizonAccess && ClientSelectionCount > 0 && !IsBusy);
         OpenTopSolidBridgeFolderCommand = new(_ => OpenTopSolidBridgeFolder(), _ => IsTopSolidBridgeReady && Directory.Exists(TopSolidBridgeFolder));
@@ -150,7 +156,6 @@ public sealed class MainViewModel : ObservableObject
     public bool IsLicenseValid => _licenseInfo.IsValid;
     public bool IsLicenseRestricted => !IsAdministrator && !IsLicenseValid;
     public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
-    public bool ShowLicensedAdvancedClientFilters => HasFullHorizonAccess && ShowAdvancedClientFilters;
     public string LicenseCustomer => string.IsNullOrWhiteSpace(_licenseInfo.Customer) ? "Non renseigné" : _licenseInfo.Customer;
     public string LicenseValidUntil => _licenseInfo.ValidUntil is { } date ? date.ToString("dd/MM/yyyy") : "—";
     public string DeviceId => MachineIdentityService.CurrentDeviceId;
@@ -273,11 +278,10 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _currentPage, requestedPage)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(MyFurnitureNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
             OnPropertyChanged(nameof(IsCatalogPage));
-            OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
+            if (!IsCatalogPage) CloseClientFilterPanel();
         }
     }
     public bool IsCatalogPage => CurrentPage.Equals("Catalog", StringComparison.OrdinalIgnoreCase);
-    public bool ShowLicensedUniverseNavigation => IsCatalogPage && HasFullHorizonAccess;
     public string DashboardNavBackground => NavBackground("Dashboard");
     public string ComponentsNavBackground => NavBackground("Components");
     public string FurnitureNavBackground => NavBackground("Furniture");
@@ -308,7 +312,46 @@ public sealed class MainViewModel : ObservableObject
     public bool ShowAdministrativeSessionActions => IsAdministrativeMode && IsNavigationExpanded;
     public bool ShowAuthenticatedSessionActions => !IsUserMode && IsNavigationExpanded;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
-    public bool ShowAdvancedClientFilters { get => _showAdvancedClientFilters; set { if (SetProperty(ref _showAdvancedClientFilters, value)) OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters)); } }
+    public bool IsClientFilterPanelOpen { get => _isClientFilterPanelOpen; set => SetProperty(ref _isClientFilterPanelOpen, value); }
+    public bool IsClientFilterPanelPinned { get => _isClientFilterPanelPinned; private set => SetProperty(ref _isClientFilterPanelPinned, value); }
+    public string ActiveClientFilterGroup
+    {
+        get => _activeClientFilterGroup;
+        private set
+        {
+            if (!SetProperty(ref _activeClientFilterGroup, value)) return;
+            ClientFacetSearch = string.Empty;
+            OnPropertyChanged(nameof(ActiveClientFilterTitle));
+            OnPropertyChanged(nameof(ActiveClientFilterOptions));
+            OnPropertyChanged(nameof(ActiveClientFilterSelectionLabel));
+        }
+    }
+    public string ActiveClientFilterTitle => ActiveClientFilterGroup switch
+    {
+        "Types" => "Type de meuble", "Usages" => "Usage", "Familles" => "Famille",
+        "Tags Atlas" => "Tags Atlas", "Univers Client" => "Univers Client", "Tags Client" => "Tags Client",
+        "Source" => "Source", "Formes" => "Forme", "Construction" => "Construction",
+        "Assemblage" => "Assemblage", "Dos" => "Dos", _ => ActiveClientFilterGroup
+    };
+    public string ActiveClientFilterSelectionLabel
+    {
+        get
+        {
+            var count = ClientFacetGroup(ActiveClientFilterGroup).Count(option => option.IsSelected);
+            return count == 0 ? "Aucune sélection" : count == 1 ? "1 filtre actif" : $"{count} filtres actifs";
+        }
+    }
+    public string ClientFacetSearch
+    {
+        get => _clientFacetSearch;
+        set
+        {
+            if (!SetProperty(ref _clientFacetSearch, value)) return;
+            OnPropertyChanged(nameof(ActiveClientFilterOptions));
+        }
+    }
+    public IEnumerable<CatalogFacetViewModel> ActiveClientFilterOptions => ClientFacetGroup(ActiveClientFilterGroup)
+        .Where(option => string.IsNullOrWhiteSpace(ClientFacetSearch) || option.Label.Contains(ClientFacetSearch.Trim(), StringComparison.OrdinalIgnoreCase));
     public bool IsFamilyMode => CreationMode == "Family";
     public string EnvironmentLabel => Settings.Environment == CatalogEnvironment.NonConfigure ? "ENV. À CONFIGURER" : $"ENV. {Settings.Environment}";
     public int ComponentCount => Components.Count(item => !item.IsDemo);
@@ -316,7 +359,6 @@ public sealed class MainViewModel : ObservableObject
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
     public int ClientResultCount => ClientFurnitureView.Cast<object>().Count();
     public bool HasClientResults => ClientResultCount > 0;
-    public int ActiveClientFilterCount => ClientFacetGroups().Sum(group => group.Count(option => option.IsSelected));
     public int ClientSelectionCount => ClientFurnitureCards.Count(item => item.IsChosen);
     public string ClientSelectionLabel => ClientSelectionCount == 0 ? "Aucun meuble sélectionné" : ClientSelectionCount == 1 ? "1 meuble sélectionné" : $"{ClientSelectionCount} meubles sélectionnés";
     public bool IsTopSolidBridgeReady { get => _isTopSolidBridgeReady; private set => SetProperty(ref _isTopSolidBridgeReady, value); }
@@ -326,8 +368,8 @@ public sealed class MainViewModel : ObservableObject
     public string ClientSearchInterpretation { get; private set; } = string.Empty;
     public bool HasClientSearchInterpretation => !string.IsNullOrWhiteSpace(ClientSearchInterpretation);
     public bool HasClientFavorites => ClientFavoriteFacets.Count > 0;
+    public IEnumerable<CatalogFacetViewModel> SelectedClientFacets => ClientFacetGroups().SelectMany(group => group).Where(option => option.IsSelected);
     public string ClientResultLabel => ClientResultCount <= 1 ? $"{ClientResultCount} meuble trouvé" : $"{ClientResultCount} meubles trouvés";
-    public string ClientFilterButtonLabel => ActiveClientFilterCount == 0 ? "Filtres techniques" : $"Filtres techniques · {ActiveClientFilterCount}";
     public int HealthIssueCount => Components.Count(item => !item.IsNameCompliant || item.IsMissing) + Furniture.Count(item => item.ComponentIds.Count == 0);
     public int MarkedComponentCount => ComponentCards.Count(item => item.IsMarked);
     public string VisibleComponentLabel => $"{ComponentView.Cast<object>().Count():N0} affichés sur {ScopedComponentCards().Count():N0}";
@@ -532,7 +574,9 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SelectVisibleComponentsCommand { get; }
     public RelayCommand ClearMarkedComponentsCommand { get; }
     public RelayCommand ClearClientFiltersCommand { get; }
-    public RelayCommand ToggleClientFiltersCommand { get; }
+    public RelayCommand OpenClientFilterPanelCommand { get; }
+    public RelayCommand PinClientFilterPanelCommand { get; }
+    public RelayCommand CloseClientFilterPanelCommand { get; }
     public RelayCommand ClearClientSelectionCommand { get; }
     public RelayCommand PrepareTopSolidBridgeCommand { get; }
     public RelayCommand OpenTopSolidBridgeFolderCommand { get; }
@@ -649,13 +693,11 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsLicenseValid));
         OnPropertyChanged(nameof(IsLicenseRestricted));
         OnPropertyChanged(nameof(HasFullHorizonAccess));
-        OnPropertyChanged(nameof(ShowLicensedUniverseNavigation));
         OnPropertyChanged(nameof(CanUseAdministrativeInterfaces));
         OnPropertyChanged(nameof(CanManageCustomerFurniture));
         OnPropertyChanged(nameof(IsCreatorFeatureLicensed));
         OnPropertyChanged(nameof(LicenseFeaturesLabel));
         OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
-        OnPropertyChanged(nameof(ShowLicensedAdvancedClientFilters));
         OnPropertyChanged(nameof(LicenseCustomer));
         OnPropertyChanged(nameof(LicenseValidUntil));
         OnPropertyChanged(nameof(LicensedDeviceId));
@@ -666,7 +708,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LicenseSigningKeyStatus));
         if (IsLicenseRestricted)
         {
-            ShowAdvancedClientFilters = false;
+            CloseClientFilterPanel();
             ClearClientFilters();
             ClearClientSelection();
             InvalidateTopSolidBridge();
@@ -1006,8 +1048,46 @@ public sealed class MainViewModel : ObservableObject
         yield return ClientBackFacets;
     }
 
+    private ObservableCollection<CatalogFacetViewModel> ClientFacetGroup(string group) => group switch
+    {
+        "Source" => ClientSourceFacets,
+        "Types" => ClientTypeFacets,
+        "Usages" => ClientUsageFacets,
+        "Familles" => ClientFamilyFacets,
+        "Tags Atlas" => ClientTagFacets,
+        "Univers Client" => ClientCustomUniverseFacets,
+        "Tags Client" => ClientPersonalTagFacets,
+        "Formes" => ClientFormFacets,
+        "Construction" => ClientConstructionFacets,
+        "Assemblage" => ClientAssemblyFacets,
+        "Dos" => ClientBackFacets,
+        _ => ClientTypeFacets
+    };
+
+    private void OpenClientFilterPanel(string? group)
+    {
+        if (!HasFullHorizonAccess || string.IsNullOrWhiteSpace(group)) return;
+        ActiveClientFilterGroup = group;
+        if (!IsClientFilterPanelPinned) IsClientFilterPanelOpen = true;
+    }
+
+    private void TogglePinnedClientFilterPanel()
+    {
+        IsClientFilterPanelPinned = !IsClientFilterPanelPinned;
+        IsClientFilterPanelOpen = false;
+    }
+
+    private void CloseClientFilterPanel()
+    {
+        IsClientFilterPanelOpen = false;
+        IsClientFilterPanelPinned = false;
+    }
+
     private void ClientFacetChanged()
     {
+        OnPropertyChanged(nameof(ActiveClientFilterOptions));
+        OnPropertyChanged(nameof(ActiveClientFilterSelectionLabel));
+        OnPropertyChanged(nameof(SelectedClientFacets));
         if (!_suppressClientFacetRefresh) RefreshClientFurnitureView();
     }
 
@@ -1020,6 +1100,7 @@ public sealed class MainViewModel : ObservableObject
             ClientSearch = string.Empty;
         }
         finally { _suppressClientFacetRefresh = false; }
+        OnPropertyChanged(nameof(SelectedClientFacets));
         RefreshClientFurnitureView();
     }
 
@@ -1070,332 +1151,7 @@ public sealed class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var sourceFiles = selected.Select(card => (card.DisplayName, Path: card.SourcePath)).ToArray();
-            var missing = sourceFiles.Where(item => string.IsNullOrWhiteSpace(item.Path) || !File.Exists(item.Path)).Select(item => item.DisplayName).ToArray();
-            if (missing.Length > 0)
-            {
-                AtlasDialog.Warning(
-                    "La passerelle ne peut pas être préparée car certains fichiers .TOP sont introuvables.",
-                    "Fichiers manquants",
-                    string.Join(Environment.NewLine, missing.Take(8)) + (missing.Length > 8 ? $"{Environment.NewLine}… et {missing.Length - 8} autre(s)" : string.Empty));
-                return;
-            }
-
-            Directory.CreateDirectory(dialog.FolderName);
-            var copies = new List<string>();
-            foreach (var source in sourceFiles)
-            {
-                var destination = NextAvailableFileName(dialog.FolderName, Path.GetFileName(source.Path));
-                File.Copy(source.Path, destination, false);
-                copies.Add(destination);
-            }
-
-            TopSolidBridgeFolder = dialog.FolderName;
-            TopSolidBridgeFiles = copies;
-            IsTopSolidBridgeReady = copies.Count > 0;
-            OnPropertyChanged(nameof(TopSolidBridgeCountLabel));
-            OpenTopSolidBridgeFolderCommand.RaiseCanExecuteChanged();
-            StatusText = $"Passerelle prête · {copies.Count} copie(s) créée(s) dans {dialog.FolderName}";
-        }
-        catch (Exception exception)
-        {
-            InvalidateTopSolidBridge();
-            ShowError(exception);
-        }
-        finally { IsBusy = false; }
-    }
-
-    private static string NextAvailableFileName(string folder, string fileName)
-    {
-        var candidate = Path.Combine(folder, fileName);
-        if (!File.Exists(candidate)) return candidate;
-        var stem = Path.GetFileNameWithoutExtension(fileName);
-        var extension = Path.GetExtension(fileName);
-        for (var index = 2; ; index++)
-        {
-            candidate = Path.Combine(folder, $"{stem} ({index}){extension}");
-            if (!File.Exists(candidate)) return candidate;
-        }
-    }
-
-    private void InvalidateTopSolidBridge()
-    {
-        IsTopSolidBridgeReady = false;
-        TopSolidBridgeFiles = Array.Empty<string>();
-        OnPropertyChanged(nameof(TopSolidBridgeCountLabel));
-        OpenTopSolidBridgeFolderCommand.RaiseCanExecuteChanged();
-    }
-
-    private void OpenTopSolidBridgeFolder()
-    {
-        try
-        {
-            if (!Directory.Exists(TopSolidBridgeFolder))
-            {
-                AtlasDialog.Warning("Le dossier préparé n’existe plus.", "Passerelle TopSolid");
-                InvalidateTopSolidBridge();
-                return;
-            }
-            Process.Start(new ProcessStartInfo("explorer.exe", TopSolidBridgeFolder) { UseShellExecute = true });
-        }
-        catch (Exception exception) { ShowError(exception); }
-    }
-
-    public void CompleteTopSolidBridgeDrop()
-    {
-        StatusText = $"Transfert remis à TopSolid · {TopSolidBridgeFiles.Count} fichier(s).";
-        ClearClientSelection();
-    }
-
-    private void ComponentCardOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(ComponentCardViewModel.IsMarked)) return;
-        foreach (var filter in LibraryFilters) filter.MarkedCount = filter.Name == "Toutes les bibliothèques" ? ComponentCards.Count(item => item.IsMarked) : ComponentCards.Count(item => item.IsMarked && NormalizeBucket(item.Library) == filter.Name);
-        OnPropertyChanged(nameof(LibraryFilters)); OnPropertyChanged(nameof(MarkedComponentCount)); AddMarkedComponentsCommand.RaiseCanExecuteChanged();
-    }
-
-    private void RefreshComponentView() { ComponentView.Refresh(); OnPropertyChanged(nameof(VisibleComponentLabel)); }
-    private void RefreshFurnitureView() { FurnitureView.Refresh(); OnPropertyChanged(nameof(VisibleFurnitureCount)); }
-    private void RefreshClientFurnitureView()
-    {
-        UpdateClientSearchScores();
-        ClientFurnitureView.Refresh();
-        OnPropertyChanged(nameof(PublishedCount));
-        OnPropertyChanged(nameof(ClientResultCount));
-        OnPropertyChanged(nameof(HasClientResults));
-        OnPropertyChanged(nameof(ClientResultLabel));
-        OnPropertyChanged(nameof(ActiveClientFilterCount));
-        OnPropertyChanged(nameof(ClientFilterButtonLabel));
-        if (SelectedClientFurnitureCard is null || !ClientFurnitureView.Cast<FurnitureCardViewModel>().Contains(SelectedClientFurnitureCard))
-            SelectedClientFurnitureCard = ClientFurnitureView.Cast<FurnitureCardViewModel>().FirstOrDefault();
-        ScheduleUnknownSearchObservation();
-    }
-
-    private void UpdateClientSearchScores()
-    {
-        if (string.IsNullOrWhiteSpace(ClientSearch))
-        {
-            foreach (var card in ClientFurnitureCards) card.SearchScore = 0d;
-            ClientSearchInterpretation = string.Empty;
-            _activeSearchIntent = new SearchIntent();
-        }
-        else
-        {
-            var dynamicTags = _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label)
-                .Concat(PersonalTags.Select(tag => tag.Label)).Distinct(StringComparer.OrdinalIgnoreCase);
-            _activeSearchIntent = SearchDictionaryService.Interpret(ClientSearch, _searchDictionary, dynamicTags);
-            foreach (var card in ClientFurnitureCards) card.SearchScore = EvaluateClientSearch(card.Record, _activeSearchIntent);
-            ClientSearchInterpretation = $"Atlas a compris : {_activeSearchIntent.Summary}";
-        }
-        OnPropertyChanged(nameof(ClientSearchInterpretation));
-        OnPropertyChanged(nameof(HasClientSearchInterpretation));
-    }
-
-    private double EvaluateClientSearch(FurnitureRecord furniture, SearchIntent intent)
-    {
-        var softMatches = 0;
-        foreach (var constraint in intent.Constraints)
-        {
-            var matches = MatchesSearchConstraint(furniture, constraint);
-            if (constraint.IsStrict && !matches) return 0d;
-            if (matches) softMatches++;
-        }
-        var textScore = string.IsNullOrWhiteSpace(intent.RemainingQuery)
-            ? 1d
-            : CatalogSearchEngine.Score(intent.RemainingQuery, SearchFieldsFor(furniture));
-        if (!string.IsNullOrWhiteSpace(intent.RemainingQuery) && textScore < 0.58d) return 0d;
-        var constraintScore = intent.Constraints.Count == 0 ? 0d : (double)softMatches / intent.Constraints.Count;
-        return Math.Min(1.22d, 0.62d + textScore * 0.35d + constraintScore * 0.25d);
-    }
-
-    private bool MatchesSearchConstraint(FurnitureRecord furniture, SearchConstraint constraint)
-    {
-        var tags = ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label)
-            .Concat(furniture.PersonalTags ?? []).ToArray();
-        var usages = FurnitureUsagesFor(furniture).ToArray();
-        var matches = constraint.Target switch
-        {
-            SearchConceptTarget.DoorCount => SearchDictionaryService.QuantityMatches(furniture.NombrePortes, constraint),
-            SearchConceptTarget.DrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirs, constraint),
-            SearchConceptTarget.InnerDrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirsAnglaise, constraint),
-            SearchConceptTarget.FlapCount => SearchDictionaryService.QuantityMatches(furniture.NombreAbattants, constraint),
-            SearchConceptTarget.LiftUpCount => SearchDictionaryService.QuantityMatches(furniture.NombreRelevants, constraint),
-            SearchConceptTarget.ShelfCount => SearchDictionaryService.QuantityMatches(furniture.NombreRayons, constraint),
-            SearchConceptTarget.OpenNicheCount => SearchDictionaryService.QuantityMatches(furniture.NombreNichesOuvertes, constraint),
-            SearchConceptTarget.Hanging => furniture.Penderie,
-            SearchConceptTarget.HorizontalSeparation => furniture.SeparationHorizontale,
-            SearchConceptTarget.VerticalSeparation => furniture.SeparationVerticale,
-            SearchConceptTarget.FurnitureType => FurnitureTypeMatches(furniture.TypeMeuble, constraint.Value),
-            SearchConceptTarget.FurnitureUsage => usages.Any(value => ValueMatches(value, constraint.Value)) || SearchFieldsContain(furniture, constraint.Value),
-            SearchConceptTarget.FurnitureTag => tags.Any(value => ValueMatches(value, constraint.Value)),
-            SearchConceptTarget.FurnitureForm => ValueMatches(furniture.Forme, constraint.Value),
-            SearchConceptTarget.Construction => ValueMatches(furniture.PrincipleConstruction, constraint.Value),
-            SearchConceptTarget.Assembly => ValueMatches(furniture.TypeAssemblage, constraint.Value),
-            SearchConceptTarget.BackPosition => ValueMatches(furniture.PositionDos, constraint.Value),
-            SearchConceptTarget.SpatialRelation => true,
-            SearchConceptTarget.GenericText => SearchFieldsContain(furniture, constraint.Value),
-            _ => false
-        };
-        return constraint.Mode == SearchConstraintMode.Exclude && !SearchDictionaryService.IsQuantityTarget(constraint.Target)
-            ? !matches
-            : matches;
-    }
-
-    private static bool ValueMatches(string? actual, string expected) =>
-        CatalogSearchEngine.Normalize(actual).Equals(CatalogSearchEngine.Normalize(expected), StringComparison.Ordinal) ||
-        CatalogSearchEngine.Normalize(actual).Contains(CatalogSearchEngine.Normalize(expected), StringComparison.Ordinal);
-
-    private static bool FurnitureTypeMatches(string? actual, string expected)
-    {
-        if (ValueMatches(actual, expected)) return true;
-        var actualValue = CatalogSearchEngine.Normalize(actual);
-        var expectedValue = CatalogSearchEngine.Normalize(expected);
-        return (expectedValue is "colonne" or "armoire") && (actualValue is "colonne" or "demi colonne" or "armoire");
-    }
-
-    private bool SearchFieldsContain(FurnitureRecord furniture, string value) =>
-        CatalogSearchEngine.Score(value, SearchFieldsFor(furniture)) >= 0.74d;
-
-    private IEnumerable<CatalogSearchField> SearchFieldsFor(FurnitureRecord furniture)
-    {
-        var tags = string.Join(' ', ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label));
-        var personalTags = string.Join(' ', furniture.PersonalTags);
-        var structure = new List<string>
-        {
-            furniture.PrincipleConstruction, furniture.SensMontage, furniture.TypeAssemblage, furniture.PositionDos,
-            furniture.TypologiePorte, furniture.TypologieTiroir, furniture.TypologieAbattant, furniture.TypologieRelevant
-        };
-        if (furniture.SeparationHorizontale) structure.Add("séparation horizontale");
-        if (furniture.SeparationVerticale) structure.Add("séparation verticale");
-        if (furniture.Porte) structure.Add($"porte {furniture.NombrePortes}");
-        if (furniture.Tiroir) structure.Add($"tiroir {furniture.NombreTiroirs}");
-        if (furniture.TiroirAnglaise) structure.Add($"tiroir à l'anglaise {furniture.NombreTiroirsAnglaise}");
-        if (furniture.Abattant) structure.Add($"abattant {furniture.NombreAbattants}");
-        if (furniture.Relevant) structure.Add($"relevant {furniture.NombreRelevants}");
-        if (furniture.Rayon) structure.Add($"rayon {furniture.NombreRayons}");
-        if (furniture.Penderie) structure.Add("penderie");
-        if (furniture.NicheOuverte) structure.Add($"niche ouverte {furniture.NombreNichesOuvertes}");
-        var linkedComponents = (furniture.ComponentLines ?? [])
-            .Select(line => Components.FirstOrDefault(component => component.Id.Equals(line.ComponentId, StringComparison.OrdinalIgnoreCase)))
-            .Where(component => component is not null)
-            .SelectMany(component => new[]
-            {
-                component!.DisplayName, component.TechnicalName, component.Function, component.Description, component.UsageNotes,
-                component.EffectiveFamilyName, component.LibraryName, component.TypeCode, component.VariantCode, component.RangeCode,
-                component.ConstructionCode, component.CapabilitiesCsv, component.CompatibilityCsv
-            });
-        yield return new CatalogSearchField(furniture.DisplayName, 1d);
-        yield return new CatalogSearchField(furniture.Reference, 0.85d);
-        yield return new CatalogSearchField($"{furniture.TypeMeuble} {furniture.Family} {string.Join(' ', FurnitureUsagesFor(furniture))} {tags} {personalTags} {(furniture.IsCustomerFurniture ? "mes meubles meuble utilisateur" : "atlas")}", 0.95d);
-        yield return new CatalogSearchField($"{string.Join(' ', furniture.Universes)} {furniture.Forme}", 0.72d);
-        yield return new CatalogSearchField(string.Join(' ', structure.Where(value => !string.IsNullOrWhiteSpace(value))), 0.86d);
-        yield return new CatalogSearchField($"{furniture.Description} {furniture.UseCasesCsv} {furniture.UsageSpecifique}", 0.74d);
-        yield return new CatalogSearchField(string.Join(' ', linkedComponents), 0.82d);
-        yield return new CatalogSearchField($"{furniture.ConceptionDate:dd MM yyyy} {furniture.Status}", 0.62d);
-    }
-
-    private IEnumerable<string> ClientSearchVocabulary() => ClientFurnitureCards.Where(item => item.Record.Status == RecordStatus.Publiee).SelectMany(item =>
-        SearchFieldsFor(item.Record).Select(field => field.Text)).Concat(Settings.SearchSynonyms.SelectMany(item => new[] { item.Canonical, item.AliasesCsv }));
-
-    public void RefreshHorizonSearchSettings()
-    {
-        RebuildClientFacets();
-        RefreshClientFurnitureView();
-    }
-
-    public SearchIntent InterpretSearch(string query) => SearchDictionaryService.Interpret(query, _searchDictionary,
-        _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label).Concat(PersonalTags.Select(tag => tag.Label)));
-
-    public async Task<bool> SaveSearchDictionaryAsync()
-    {
-        try
-        {
-            _searchDictionary.Concepts = SearchConcepts.ToList();
-            _searchDictionary.Synonyms = SearchSynonyms.ToList();
-            _searchDictionary.Expressions = SearchExpressions.ToList();
-            _searchDictionary.IgnoredTerms = SearchIgnoredTerms.ToList();
-            _searchDictionary.UnknownQueries = SearchUnknownQueries.ToList();
-            SearchDictionaryService.MergeOfficial(_searchDictionary);
-            await _searchDictionaryStore.SaveAsync(_searchDictionary);
-            ReloadSearchDictionaryCollections();
-            RefreshHorizonSearchSettings();
-            return true;
-        }
-        catch (Exception exception) { ShowError(exception); return false; }
-    }
-
-    public void AddSearchConcept()
-    {
-        SearchConcepts.Add(new SearchConceptRecord
-        {
-            Label = "Nouveau concept", Category = "Autre", Target = SearchConceptTarget.GenericText,
-            IsOfficial = false, IsActive = true, IsStrict = false
-        });
-    }
-
-    public bool DeleteSearchConcept(SearchConceptRecord concept)
-    {
-        if (concept.IsOfficial) return false;
-        return SearchConcepts.Remove(concept);
-    }
-
-    public SearchSynonymEntry AddSearchSynonym(string conceptId = "")
-    {
-        var item = new SearchSynonymEntry
-        {
-            ConceptId = conceptId,
-            ConceptLabel = ConceptLabel(conceptId),
-            Term = "Nouveau synonyme",
-            IsActive = true
-        };
-        SearchSynonyms.Add(item);
-        return item;
-    }
-
-    public bool DeleteSearchSynonym(SearchSynonymEntry item)
-    {
-        if (item.IsOfficial) return false;
-        return SearchSynonyms.Remove(item);
-    }
-
-    public SearchExpressionRecord AddSearchExpression()
-    {
-        var item = new SearchExpressionRecord { Phrase = "Nouvelle expression", IsActive = true };
-        SearchExpressions.Add(item);
-        return item;
-    }
-
-    public bool DeleteSearchExpression(SearchExpressionRecord item)
-    {
-        if (item.IsOfficial) return false;
-        return SearchExpressions.Remove(item);
-    }
-
-    public SearchIgnoredTermRecord AddSearchIgnoredTerm()
-    {
-        var item = new SearchIgnoredTermRecord { Term = "Nouveau mot", IsActive = true };
-        SearchIgnoredTerms.Add(item);
-        return item;
-    }
-
-    public bool DeleteSearchIgnoredTerm(SearchIgnoredTermRecord item)
-    {
-        if (item.IsOfficial) return false;
-        return SearchIgnoredTerms.Remove(item);
-    }
-
-    public async Task ClearUnknownSearchQueriesAsync()
-    {
-        SearchUnknownQueries.Clear();
-        _searchDictionary.UnknownQueries.Clear();
-        await _searchDictionaryStore.SaveAsync(_searchDictionary);
-    }
-
-    private void ReloadSearchDictionaryCollections()
-    {
-        SearchConcepts.Clear();
-        foreach (var concept in _searchDictionary.Concepts.OrderBy(item => item.Category, StringComparer.CurrentCultureIgnoreCase)
-                     .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)) SearchConcepts.Add(concept);
+            var sourceFiles = selected.Select(card …4223 tokens truncated…ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)) SearchConcepts.Add(concept);
         SearchSynonyms.Clear();
         foreach (var item in _searchDictionary.Synonyms.OrderBy(item => ConceptLabel(item.ConceptId), StringComparer.CurrentCultureIgnoreCase)
                      .ThenBy(item => item.Term, StringComparer.CurrentCultureIgnoreCase))
