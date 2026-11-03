@@ -33,7 +33,7 @@
                         <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <Border Width="58" Height="58" CornerRadius="29" Background="#3A2D16" BorderBrush="#8B6B2C" BorderThickness="1" HorizontalAlignment="Left"><TextBlock Text="C" FontSize="23" FontWeight="Bold" Foreground="#F2C66D" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <TextBlock Grid.Row="1" Text="Créateur" FontSize="24" FontWeight="SemiBold" Margin="0,20,0,0"/>
-                            <TextBlock Grid.Row="2" Text="Compte client sécurisé pour ajouter ses propres meubles et organiser ses repères personnels." Style="{StaticResource Caption}" FontSize="13" TextWrapping="Wrap" LineHeight="20" Margin="0,10,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Compte client sécurisé pour ajouter ses propres meubles, Univers Client et Tags Client." Style="{StaticResource Caption}" FontSize="13" TextWrapping="Wrap" LineHeight="20" Margin="0,10,0,0"/>
                             <TextBlock Grid.Row="3" Text="S'IDENTIFIER  →" Foreground="#F2C66D" FontWeight="Bold" FontSize="11"/>
                         </Grid>
                     </Button>
