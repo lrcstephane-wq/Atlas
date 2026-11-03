@@ -1,6 +1,7 @@
 using Atlas.Core.Models;
 using Atlas.Core.Services;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 static void Assert(bool condition, string message)
 {
@@ -139,6 +140,47 @@ finally
     if (Directory.Exists(dictionaryTestRoot)) Directory.Delete(dictionaryTestRoot, true);
 }
 
+var legacyLayersRoot = Path.Combine(Path.GetTempPath(), $"atlas-legacy-layers-{Guid.NewGuid():N}");
+try
+{
+    Directory.CreateDirectory(Path.Combine(legacyLayersRoot, "Data"));
+    Directory.CreateDirectory(Path.Combine(legacyLayersRoot, "Configuration"));
+    var legacyCatalog = DemoCatalogFactory.Create();
+    legacyCatalog.Revision = 42;
+    legacyCatalog.Settings.LibraryRoot = @"Z:\Bibliotheque historique";
+    legacyCatalog.Furniture.Add(new FurnitureRecord { Id = "legacy-furniture", Reference = "000000777", DisplayName = "Meuble historique" });
+    await File.WriteAllTextAsync(Path.Combine(legacyLayersRoot, "Data", "catalog.atlas.json"), JsonSerializer.Serialize(legacyCatalog));
+    var migratedCatalogStore = new SharedCatalogStore(legacyLayersRoot);
+    var migratedCatalog = await migratedCatalogStore.LoadAsync();
+    Assert(migratedCatalog.Revision == 42 && migratedCatalog.Settings.LibraryRoot.Contains("historique")
+           && migratedCatalog.Furniture.Any(item => item.Id == "legacy-furniture")
+           && File.Exists(migratedCatalogStore.OfficialCatalogPath) && File.Exists(migratedCatalogStore.CatalogPath),
+        "Le catalogue d’une installation existante doit être réparti automatiquement sans perdre ses meubles, sa révision ni ses chemins.");
+
+    var legacyDictionary = new SearchDictionaryDocument();
+    SearchDictionaryService.MergeOfficial(legacyDictionary);
+    legacyDictionary.Synonyms.Add(new SearchSynonymEntry { Id = "legacy-client-synonym", ConceptId = "element-rayon", Term = "tablette historique", IsOfficial = false });
+    await File.WriteAllTextAsync(Path.Combine(legacyLayersRoot, "Configuration", "search-dictionary.atlas.json"), JsonSerializer.Serialize(legacyDictionary));
+    var migratedDictionaryStore = new SearchDictionaryStore(legacyLayersRoot);
+    var migratedDictionary = await migratedDictionaryStore.LoadAsync();
+    Assert(migratedDictionary.Synonyms.Any(item => item.Id == "legacy-client-synonym" && !item.IsOfficial)
+           && File.Exists(migratedDictionaryStore.FilePath),
+        "Les ajouts au dictionnaire d’un site existant doivent migrer dans la couche du site.");
+
+    var legacyTaxonomy = new ComponentTaxonomy { Tags = [new ComponentTagRecord { Id = "legacy-tag", Label = "Tag historique" }] };
+    await File.WriteAllTextAsync(Path.Combine(legacyLayersRoot, "Configuration", "component-taxonomy.json"), JsonSerializer.Serialize(legacyTaxonomy));
+    var migratedTaxonomy = await ComponentTaxonomyStore.LoadAsync(legacyLayersRoot);
+    Assert(migratedTaxonomy.Tags.Any(item => item.Id == "legacy-tag")
+           && File.Exists(ComponentTaxonomyStore.GetOfficialPath(legacyLayersRoot)),
+        "La taxonomie existante doit devenir le premier socle officiel sans perdre ses tags.");
+    Assert(Directory.EnumerateFiles(Path.Combine(legacyLayersRoot, "Backups"), "*before-content-layers*").Count() >= 3,
+        "Chaque ancien fichier métier doit être sauvegardé avant sa migration vers les nouvelles couches.");
+}
+finally
+{
+    if (Directory.Exists(legacyLayersRoot)) Directory.Delete(legacyLayersRoot, true);
+}
+
 var brandTag = new ComponentTagRecord { Id = "tag-blum", Label = "Blum", Category = "Marque" };
 taxonomy.Tags.Add(brandTag);
 taxonomy.Families[0].Types.Add(new ComponentTypeRecord { Name = "Coulissant", TagIds = [brandTag.Id] });
@@ -174,6 +216,81 @@ try
 finally
 {
     if (Directory.Exists(taxonomyTestRoot)) Directory.Delete(taxonomyTestRoot, true);
+}
+
+var contentTestRoot = Path.Combine(Path.GetTempPath(), $"atlas-content-{Guid.NewGuid():N}");
+try
+{
+    var authorRoot = Path.Combine(contentTestRoot, "author");
+    var clientRoot = Path.Combine(contentTestRoot, "client");
+    var authorFurniture = Path.Combine(contentTestRoot, "author-furniture");
+    var clientFurniture = Path.Combine(contentTestRoot, "client-furniture");
+    Directory.CreateDirectory(authorFurniture);
+    Directory.CreateDirectory(clientFurniture);
+    await File.WriteAllTextAsync(Path.Combine(authorFurniture, "000000999.top"), "opaque-top");
+    await File.WriteAllTextAsync(Path.Combine(authorFurniture, "000000999.top.png"), "preview");
+
+    var clientCatalogStore = new SharedCatalogStore(clientRoot);
+    var clientCatalog = await clientCatalogStore.LoadAsync();
+    clientCatalog.Settings.FurnitureRoot = clientFurniture;
+    clientCatalog.Furniture.Add(new FurnitureRecord { Id = "client-site-furniture", Reference = "USR-TEST", DisplayName = "Meuble propre au site" });
+    await clientCatalogStore.SaveAsync(clientCatalog, clientCatalog.Revision, "Client");
+    var clientDictionaryStore = new SearchDictionaryStore(clientRoot);
+    var clientDictionary = await clientDictionaryStore.LoadAsync();
+    clientDictionary.Synonyms.Add(new SearchSynonymEntry { Id = "client-synonym", ConceptId = "element-rayon", Term = "planche maison", IsOfficial = false });
+    await clientDictionaryStore.SaveAsync(clientDictionary);
+    var clientTaxonomy = await ComponentTaxonomyStore.LoadAsync(clientRoot);
+    clientTaxonomy.Tags.Add(new ComponentTagRecord { Id = "client-tag", Label = "Tag du site" });
+    await ComponentTaxonomyStore.SaveAsync(clientRoot, clientTaxonomy);
+
+    var officialCatalog = DemoCatalogFactory.Create();
+    officialCatalog.Furniture.Add(new FurnitureRecord
+    {
+        Id = "official-pack-furniture", Reference = "000000999", DisplayName = "Meuble du pack",
+        SourceRelativePath = "000000999.top", ImageRelativePath = "000000999.top.png", Status = RecordStatus.Publiee
+    });
+    var officialDictionary = new SearchDictionaryDocument();
+    SearchDictionaryService.MergeOfficial(officialDictionary);
+    officialDictionary.Synonyms.Add(new SearchSynonymEntry { Id = "official-pack-synonym", ConceptId = "element-rayon", Term = "tablette de pack" });
+    var officialTaxonomy = new ComponentTaxonomy { Tags = [new ComponentTagRecord { Id = "official-tag", Label = "Tag Atlas" }] };
+
+    using var contentSigningKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+    var packagePath = Path.Combine(contentTestRoot, "Contenus-Atlas-test.atlaspack");
+    var authorPackageService = new AtlasContentPackageService(authorRoot, contentSigningKey.ExportSubjectPublicKeyInfoPem());
+    await authorPackageService.CreateAsync(packagePath, "2026.11-test", "0.18.0", officialCatalog, officialDictionary, officialTaxonomy, new AtlasReferenceData(),
+        authorRoot, authorFurniture, contentSigningKey.ExportECPrivateKeyPem());
+    var packageInfo = await authorPackageService.InspectAsync(packagePath);
+    Assert(packageInfo.ContentVersion == "2026.11-test" && packageInfo.FurnitureCount == officialCatalog.Furniture.Count,
+        "Un pack signé doit être contrôlable avant son installation.");
+
+    var clientPackageService = new AtlasContentPackageService(clientRoot, contentSigningKey.ExportSubjectPublicKeyInfoPem());
+    await clientPackageService.InstallAsync(packagePath, clientFurniture, new Version(0, 18, 0));
+    var mergedCatalog = await clientCatalogStore.LoadAsync();
+    var mergedDictionary = await clientDictionaryStore.LoadAsync();
+    var mergedTaxonomy = await ComponentTaxonomyStore.LoadAsync(clientRoot);
+    Assert(mergedCatalog.Furniture.Any(item => item.Id == "official-pack-furniture") && mergedCatalog.Furniture.Any(item => item.Id == "client-site-furniture"),
+        "Une mise à jour officielle doit ajouter ses meubles sans supprimer les adaptations du site.");
+    Assert(mergedDictionary.Synonyms.Any(item => item.Id == "official-pack-synonym" && item.IsOfficial)
+           && mergedDictionary.Synonyms.Any(item => item.Id == "client-synonym" && !item.IsOfficial),
+        "Le dictionnaire Atlas et le vocabulaire du site doivent rester dans deux couches distinctes.");
+    Assert(mergedTaxonomy.Tags.Any(item => item.Id == "official-tag") && mergedTaxonomy.Tags.Any(item => item.Id == "client-tag"),
+        "Les Tags Atlas d’un pack ne doivent pas écraser les tags propres au site.");
+    Assert(File.Exists(Path.Combine(clientFurniture, "000000999.top")) && File.Exists(Path.Combine(clientFurniture, "000000999.top.png")),
+        "Les fichiers TopSolid et leurs aperçus doivent rejoindre le dossier de meubles configuré chez le client.");
+    Assert((await clientPackageService.ReadInstalledStateAsync()).ContentVersion == "2026.11-test",
+        "Atlas doit mémoriser la version de contenu installée indépendamment de la version applicative.");
+
+    var invalidSignatureRejected = false;
+    using (var otherKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+    {
+        try { await new AtlasContentPackageService(clientRoot, otherKey.ExportSubjectPublicKeyInfoPem()).InspectAsync(packagePath); }
+        catch (CryptographicException) { invalidSignatureRejected = true; }
+    }
+    Assert(invalidSignatureRejected, "Un pack qui n’est pas signé par Idéo doit être refusé.");
+}
+finally
+{
+    if (Directory.Exists(contentTestRoot)) Directory.Delete(contentTestRoot, true);
 }
 
 var generatedSecret = Guid.NewGuid().ToString("N");
@@ -319,6 +436,10 @@ var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "S
 Assert(settingsXaml.Contains("LicensePanel") && settingsXaml.Contains("Vérifier et installer la licence") && settingsXaml.Contains("Date de fin de validité"), "Les paramètres doivent permettre au client d’installer son code et à l’administrateur de choisir librement l’échéance.");
 Assert(settingsXaml.Contains("Autoriser le module Créateur") && settingsXaml.Contains("LicenseFeaturesLabel"), "Le générateur doit permettre d’inclure explicitement le module Créateur et d’afficher les options signées.");
 Assert(settingsXaml.Contains("IDENTIFIANT DE CE POSTE") && settingsXaml.Contains("NewLicenseDeviceId") && viewModelSource.Contains("deviceId: NewLicenseDeviceId"), "La licence doit être générée pour l’identifiant transmis par un poste précis.");
+Assert(settingsXaml.Contains("Contenus Atlas") && settingsXaml.Contains("Choisir et installer un pack") && settingsXaml.Contains("Générer le pack de contenus"),
+    "Les paramètres doivent permettre d’installer et de générer les contenus métier sans republier l’application.");
+Assert(viewModelSource.Contains("InstallContentPackageAsync") && viewModelSource.Contains("GenerateContentPackageAsync"),
+    "L’application doit exposer les deux parcours séparés d’installation client et de publication Idéo.");
 Assert(settingsXaml.Contains("Déplacer l’espace Atlas") && settingsXaml.Contains("LocalLibraryRootOverride") && viewModelSource.Contains("AtlasWorkspaceService.CopyAndVerifyAsync"), "L’espace Atlas doit être déplaçable et les chemins communs surchargeables localement.");
 var installerScript = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "deployment", "Installer-Atlas.ps1"));
 Assert(installerScript.Contains("C:\\Ideo_Atlas") && installerScript.Contains("Ideo Solutions\\Atlas") && installerScript.Contains("Application"), "L’installation complète doit créer l’arborescence Atlas et le dossier machine de la licence.");

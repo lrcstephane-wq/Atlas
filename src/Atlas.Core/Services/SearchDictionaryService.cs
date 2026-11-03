@@ -13,32 +13,185 @@ public sealed class SearchDictionaryStore(string sharedRoot)
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public string FilePath => Path.Combine(sharedRoot, "Configuration", "search-dictionary.atlas.json");
+    public string LegacyFilePath => Path.Combine(sharedRoot, "Configuration", "search-dictionary.atlas.json");
+    public string FilePath => Path.Combine(sharedRoot, "Configuration", "search-dictionary.site.atlas.json");
+    public string OfficialFilePath => Path.Combine(sharedRoot, "Content", "Official", "search-dictionary.atlas.json");
 
     public async Task<SearchDictionaryDocument> LoadAsync(IEnumerable<SearchSynonymRecord>? legacy = null, CancellationToken cancellationToken = default)
     {
-        SearchDictionaryDocument document;
-        if (File.Exists(FilePath))
-        {
-            await using var stream = File.Open(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            document = await JsonSerializer.DeserializeAsync<SearchDictionaryDocument>(stream, JsonOptions, cancellationToken) ?? new();
-        }
-        else document = new();
-
-        SearchDictionaryService.MergeOfficial(document, legacy);
-        await SaveAsync(document, cancellationToken);
-        return document;
+        var official = await ReadOfficialAsync(cancellationToken);
+        var site = await ReadSiteOrMigrateAsync(official, legacy, cancellationToken);
+        return Compose(official, site);
     }
 
     public async Task SaveAsync(SearchDictionaryDocument document, CancellationToken cancellationToken = default)
     {
+        var official = await ReadOfficialAsync(cancellationToken);
+        var site = BuildSiteOverlay(official, document);
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        document.SchemaVersion = Math.Max(1, document.SchemaVersion);
         var temporary = FilePath + $".{Guid.NewGuid():N}.tmp";
         await using (var stream = File.Create(temporary))
-            await JsonSerializer.SerializeAsync(stream, document, JsonOptions, cancellationToken);
+            await JsonSerializer.SerializeAsync(stream, site, JsonOptions, cancellationToken);
         File.Move(temporary, FilePath, true);
     }
+
+    private async Task<SearchDictionaryDocument> ReadOfficialAsync(CancellationToken cancellationToken)
+    {
+        if (File.Exists(OfficialFilePath))
+        {
+            await using var stream = File.Open(OfficialFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var stored = await JsonSerializer.DeserializeAsync<SearchDictionaryDocument>(stream, JsonOptions, cancellationToken) ?? new();
+            MarkOfficial(stored);
+            return stored;
+        }
+        var builtIn = new SearchDictionaryDocument();
+        SearchDictionaryService.MergeOfficial(builtIn);
+        MarkOfficial(builtIn);
+        return builtIn;
+    }
+
+    private async Task<SearchDictionarySiteOverlay> ReadSiteOrMigrateAsync(SearchDictionaryDocument official,
+        IEnumerable<SearchSynonymRecord>? legacy, CancellationToken cancellationToken)
+    {
+        if (File.Exists(FilePath))
+        {
+            await using var stream = File.Open(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var site = await JsonSerializer.DeserializeAsync<SearchDictionarySiteOverlay>(stream, JsonOptions, cancellationToken) ?? new();
+            NormalizeSite(site);
+            return site;
+        }
+
+        SearchDictionaryDocument combined;
+        if (File.Exists(LegacyFilePath))
+        {
+            await using var stream = File.Open(LegacyFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            combined = await JsonSerializer.DeserializeAsync<SearchDictionaryDocument>(stream, JsonOptions, cancellationToken) ?? new();
+            SearchDictionaryService.MergeOfficial(combined, legacy);
+            Directory.CreateDirectory(Path.Combine(sharedRoot, "Backups"));
+            File.Copy(LegacyFilePath, Path.Combine(sharedRoot, "Backups", $"search-dictionary-before-content-layers-{DateTime.Now:yyyyMMdd-HHmmss}.atlas.json"), false);
+        }
+        else
+        {
+            combined = Clone(official);
+            if (legacy is not null) SearchDictionaryService.MergeOfficial(combined, legacy);
+        }
+        var migrated = BuildSiteOverlay(official, combined);
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        var temporary = FilePath + $".{Guid.NewGuid():N}.tmp";
+        await using (var output = File.Create(temporary)) await JsonSerializer.SerializeAsync(output, migrated, JsonOptions, cancellationToken);
+        File.Move(temporary, FilePath, true);
+        return migrated;
+    }
+
+    private static void NormalizeSite(SearchDictionarySiteOverlay site)
+    {
+        site.Concepts ??= []; site.Synonyms ??= []; site.Expressions ??= []; site.IgnoredTerms ??= []; site.UnknownQueries ??= [];
+        site.OfficialActiveStates ??= new(StringComparer.OrdinalIgnoreCase);
+        site.OfficialConceptCustomAliases ??= new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static SearchDictionaryDocument Compose(SearchDictionaryDocument official, SearchDictionarySiteOverlay site)
+    {
+        var result = Clone(official);
+        ApplyState(result.Concepts, "concept", site.OfficialActiveStates);
+        ApplyState(result.Synonyms, "synonym", site.OfficialActiveStates);
+        ApplyState(result.Expressions, "expression", site.OfficialActiveStates);
+        ApplyState(result.IgnoredTerms, "ignored", site.OfficialActiveStates);
+        foreach (var concept in result.Concepts)
+            if (site.OfficialConceptCustomAliases.TryGetValue(concept.Id, out var aliases)) concept.CustomAliasesCsv = aliases;
+        result.Concepts.AddRange(Clone(site.Concepts));
+        result.Synonyms.AddRange(Clone(site.Synonyms));
+        result.Expressions.AddRange(Clone(site.Expressions));
+        result.IgnoredTerms.AddRange(Clone(site.IgnoredTerms));
+        result.UnknownQueries = Clone(site.UnknownQueries);
+        result.SchemaVersion = Math.Max(result.SchemaVersion, 2);
+        return result;
+    }
+
+    private static SearchDictionarySiteOverlay BuildSiteOverlay(SearchDictionaryDocument official, SearchDictionaryDocument document)
+    {
+        var result = new SearchDictionarySiteOverlay
+        {
+            Concepts = Clone(document.Concepts.Where(item => !item.IsOfficial).ToList()),
+            Synonyms = Clone(document.Synonyms.Where(item => !item.IsOfficial).ToList()),
+            Expressions = Clone(document.Expressions.Where(item => !item.IsOfficial).ToList()),
+            IgnoredTerms = Clone(document.IgnoredTerms.Where(item => !item.IsOfficial).ToList()),
+            UnknownQueries = Clone(document.UnknownQueries)
+        };
+        CaptureState(official.Concepts, document.Concepts, "concept", result.OfficialActiveStates);
+        CaptureState(official.Synonyms, document.Synonyms, "synonym", result.OfficialActiveStates);
+        CaptureState(official.Expressions, document.Expressions, "expression", result.OfficialActiveStates);
+        CaptureState(official.IgnoredTerms, document.IgnoredTerms, "ignored", result.OfficialActiveStates);
+        var officialAliases = official.Concepts.ToDictionary(item => item.Id, item => item.CustomAliasesCsv ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        foreach (var concept in document.Concepts.Where(item => item.IsOfficial))
+            if (!officialAliases.TryGetValue(concept.Id, out var aliases) || !string.Equals(aliases, concept.CustomAliasesCsv ?? string.Empty, StringComparison.Ordinal))
+                result.OfficialConceptCustomAliases[concept.Id] = concept.CustomAliasesCsv ?? string.Empty;
+        return result;
+    }
+
+    private static void CaptureState<T>(IEnumerable<T> official, IEnumerable<T> current, string prefix,
+        IDictionary<string, bool> states) where T : BindableModel
+    {
+        var baseline = official.ToDictionary(item => Id(item), item => Active(item), StringComparer.OrdinalIgnoreCase);
+        foreach (var item in current.Where(item => IsOfficial(item)))
+            if (baseline.TryGetValue(Id(item), out var active) && active != Active(item)) states[$"{prefix}:{Id(item)}"] = Active(item);
+    }
+
+    private static void ApplyState<T>(IEnumerable<T> values, string prefix, IReadOnlyDictionary<string, bool> states) where T : BindableModel
+    {
+        foreach (var item in values)
+            if (states.TryGetValue($"{prefix}:{Id(item)}", out var active)) SetActive(item, active);
+    }
+
+    private static string Id<T>(T item) => item switch
+    {
+        SearchConceptRecord value => value.Id,
+        SearchSynonymEntry value => value.Id,
+        SearchExpressionRecord value => value.Id,
+        SearchIgnoredTermRecord value => value.Id,
+        _ => string.Empty
+    };
+
+    private static bool Active<T>(T item) => item switch
+    {
+        SearchConceptRecord value => value.IsActive,
+        SearchSynonymEntry value => value.IsActive,
+        SearchExpressionRecord value => value.IsActive,
+        SearchIgnoredTermRecord value => value.IsActive,
+        _ => true
+    };
+
+    private static bool IsOfficial<T>(T item) => item switch
+    {
+        SearchConceptRecord value => value.IsOfficial,
+        SearchSynonymEntry value => value.IsOfficial,
+        SearchExpressionRecord value => value.IsOfficial,
+        SearchIgnoredTermRecord value => value.IsOfficial,
+        _ => false
+    };
+
+    private static void SetActive<T>(T item, bool active)
+    {
+        switch (item)
+        {
+            case SearchConceptRecord value: value.IsActive = active; break;
+            case SearchSynonymEntry value: value.IsActive = active; break;
+            case SearchExpressionRecord value: value.IsActive = active; break;
+            case SearchIgnoredTermRecord value: value.IsActive = active; break;
+        }
+    }
+
+    private static void MarkOfficial(SearchDictionaryDocument document)
+    {
+        document.Concepts ??= []; document.Synonyms ??= []; document.Expressions ??= []; document.IgnoredTerms ??= []; document.UnknownQueries ??= [];
+        foreach (var item in document.Concepts) item.IsOfficial = true;
+        foreach (var item in document.Synonyms) item.IsOfficial = true;
+        foreach (var item in document.Expressions) item.IsOfficial = true;
+        foreach (var item in document.IgnoredTerms) item.IsOfficial = true;
+        document.UnknownQueries.Clear();
+    }
+
+    private static T Clone<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, JsonOptions), JsonOptions)!;
 }
 
 public static class SearchDictionaryService

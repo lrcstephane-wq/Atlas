@@ -38,6 +38,8 @@ public sealed class MainViewModel : ObservableObject
     private AtlasCatalog _catalog = new();
     private CustomerFurnitureCatalog _customerCatalog = new();
     private ComponentTaxonomy _taxonomy = new();
+    private AtlasReferenceData _referenceData = new();
+    private AtlasInstalledContentState _installedContentState = new();
     private string _currentPage = "Dashboard", _componentSearch = "", _furnitureSearch = "", _clientSearch = "", _statusText = "Initialisation…", _updateLabel = "Rechercher une mise à jour";
     private string _sharedRoot, _activeFamilyFilter = "Toutes", _selectedComponentType = "Tous les types", _selectedClientUniverse = "Tous les univers", _selectedClientType = "Tous les types", _selectedClientFamily = "Toutes les familles", _selectedClientTag = "Tous les tags", _selectedFurnitureStatus = "Tous les statuts";
     private string _currentFurnitureStep = "Identity", _creationMode = "Quick", _newUniverseName = "";
@@ -170,6 +172,10 @@ public sealed class MainViewModel : ObservableObject
     public string LicenseFeaturesLabel => IsCreatorFeatureLicensed ? "Module Créateur inclus" : "Aucun module complémentaire";
     public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot)) || File.Exists(LegacyLicenseSigningKeyPath);
     public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible uniquement sur ce poste administrateur." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
+    public string InstalledContentVersion => _installedContentState.ContentVersion;
+    public string InstalledContentDate => _installedContentState.InstalledUtc is { } date ? date.LocalDateTime.ToString("dd/MM/yyyy HH:mm") : "Socle issu de l’installation";
+    public string InstalledContentModules => _installedContentState.Modules == AtlasContentModules.None ? "Catalogue local initial" : ContentModulesLabel(_installedContentState.Modules);
+    public bool CanGenerateContentPackage => IsAdministrator && HasLicenseSigningKey;
     public ObservableCollection<ComponentRecord> Components { get; } = [];
     public ObservableCollection<ComponentCardViewModel> ComponentCards { get; } = [];
     public ObservableCollection<FurnitureRecord> Furniture { get; } = [];
@@ -233,16 +239,16 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<CatalogEnvironment> Environments { get; } = Enum.GetValues<CatalogEnvironment>();
     public IReadOnlyList<RecordStatus> Statuses { get; } = Enum.GetValues<RecordStatus>();
     public IReadOnlyList<string> RoleProfiles { get; } = ["Lecture seule", "Créateur", "Éditeur", "Éditeur + validateur", "Administrateur"];
-    public IReadOnlyList<string> FurnitureForms { get; } = ["Droit", "Angle", "Courbe", "Trapèze", "Pan coupé", "Sous rampant"];
-    public IReadOnlyList<string> ConstructionPrinciples { get; } = ["Non applicable", "Montant filant", "Traverse filante"];
-    public IReadOnlyList<string> BackPositions { get; } = ["Non applicable", "Sans dos", "Appliqué", "Rainuré", "Intérieur"];
-    public IReadOnlyList<string> AssemblyTypes { get; } = ["Sans assemblage", "Vis", "Tourillons", "Tourillons + vis", "Excentrique", "Tourillons + excentriques", "Clamex", "Cabineo", "Vis auto-tourillonnante"];
-    public IReadOnlyList<string> TagCategories { get; } = ["Fonction", "Marque", "Gamme", "Implantation", "Technologie", "Système", "Autre"];
-    public IReadOnlyList<string> DoorTypes { get; } = ["Applique", "Semi-applique", "Encastrée"];
-    public IReadOnlyList<string> DrawerTypes { get; } = ["Applique", "Encastré"];
+    public IReadOnlyList<string> FurnitureForms => _referenceData.FurnitureForms;
+    public IReadOnlyList<string> ConstructionPrinciples => _referenceData.ConstructionPrinciples;
+    public IReadOnlyList<string> BackPositions => _referenceData.BackPositions;
+    public IReadOnlyList<string> AssemblyTypes => _referenceData.AssemblyTypes;
+    public IReadOnlyList<string> TagCategories => _referenceData.TagCategories;
+    public IReadOnlyList<string> DoorTypes => _referenceData.DoorTypes;
+    public IReadOnlyList<string> DrawerTypes => _referenceData.DrawerTypes;
     public IReadOnlyList<KeyValuePair<SearchConceptTarget, string>> SearchConceptTargetOptions { get; } = Enum.GetValues<SearchConceptTarget>()
         .Select(target => new KeyValuePair<SearchConceptTarget, string>(target, new SearchConceptRecord { Target = target }.TargetLabel)).ToList();
-    public IReadOnlyList<string> SearchConceptCategories { get; } = ["Éléments", "Usages", "Types", "Formes", "Construction", "Assemblages", "Tags", "Expressions", "Autre"];
+    public IReadOnlyList<string> SearchConceptCategories => _referenceData.SearchConceptCategories;
     public IReadOnlyList<string> CatalogUniverses => _catalog.UniverseDefinitions
         .Where(item => item.IsActive)
         .OrderBy(item => item.SortOrder)
@@ -622,6 +628,40 @@ public sealed class MainViewModel : ObservableObject
         RefreshLicenseState();
     }
 
+    public async Task<AtlasContentPackageInfo> InspectContentPackageAsync(string packagePath)
+        => await new AtlasContentPackageService(SharedRoot).InspectAsync(packagePath);
+
+    public async Task InstallContentPackageAsync(string packagePath)
+    {
+        if (string.IsNullOrWhiteSpace(packagePath) || !File.Exists(packagePath)) throw new FileNotFoundException("Le pack de contenus est introuvable.", packagePath);
+        IsBusy = true;
+        try
+        {
+            var current = System.Version.TryParse(Version, out var parsed) ? parsed : new System.Version(0, 18, 0);
+            _installedContentState = await new AtlasContentPackageService(SharedRoot).InstallAsync(packagePath, EffectiveFurnitureRoot, current);
+            await ReloadAsync(false);
+            OnPropertyChanged(nameof(InstalledContentVersion));
+            OnPropertyChanged(nameof(InstalledContentDate));
+            OnPropertyChanged(nameof(InstalledContentModules));
+            StatusText = $"Contenus Atlas {_installedContentState.ContentVersion} installés.";
+        }
+        finally { IsBusy = false; }
+    }
+
+    public async Task GenerateContentPackageAsync(string outputPath, string contentVersion, string minimumApplicationVersion = "0.18.0")
+    {
+        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut générer un pack officiel.");
+        if (!HasLicenseSigningKey) throw new FileNotFoundException("La clé privée Idéo est absente.");
+        if (!await SaveAsync()) throw new InvalidOperationException("Le catalogue n’a pas pu être enregistré avant la génération du pack.");
+        if (!await SaveSearchDictionaryAsync()) throw new InvalidOperationException("Le dictionnaire n’a pas pu être enregistré avant la génération du pack.");
+        _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot);
+        var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
+        if (!File.Exists(privateKeyPath) && File.Exists(LegacyLicenseSigningKeyPath)) privateKeyPath = LegacyLicenseSigningKeyPath;
+        await new AtlasContentPackageService(SharedRoot).CreateAsync(outputPath, contentVersion, minimumApplicationVersion,
+            _catalog, _searchDictionary, _taxonomy, _referenceData, SharedRoot, EffectiveFurnitureRoot, File.ReadAllText(privateKeyPath));
+        StatusText = $"Pack de contenus Atlas {contentVersion.Trim()} généré.";
+    }
+
     public async Task CheckAutoUpdateAsync() { if (Settings.AutoUpdate) await CheckUpdateAsync(true); }
 
     public async Task AddUserAsync(string login, string displayName, string password, string roleProfile)
@@ -684,6 +724,7 @@ public sealed class MainViewModel : ObservableObject
         File.Copy(sourcePath, targetPath, true);
         OnPropertyChanged(nameof(HasLicenseSigningKey));
         OnPropertyChanged(nameof(LicenseSigningKeyStatus));
+        OnPropertyChanged(nameof(CanGenerateContentPackage));
         StatusText = "Clé privée Idéo installée. Le générateur de licences est opérationnel.";
     }
 
@@ -705,6 +746,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SessionLabel));
         OnPropertyChanged(nameof(HasLicenseSigningKey));
         OnPropertyChanged(nameof(LicenseSigningKeyStatus));
+        OnPropertyChanged(nameof(CanGenerateContentPackage));
         if (IsLicenseRestricted)
         {
             CloseClientFilterPanel();
@@ -721,6 +763,8 @@ public sealed class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
+            _installedContentState = await new AtlasContentPackageService(SharedRoot).ReadInstalledStateAsync();
+            _referenceData = await new AtlasReferenceDataStore(SharedRoot).LoadAsync();
             _catalog = await _store.LoadAsync(); _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot); NormalizeCatalog();
             _searchDictionary = await _searchDictionaryStore.LoadAsync(_catalog.Settings.SearchSynonyms);
             ReloadSearchDictionaryCollections();
@@ -734,10 +778,25 @@ public sealed class MainViewModel : ObservableObject
             RebuildComponentCards(); RebuildClientCards();
             SelectedComponentCard = ComponentCards.FirstOrDefault(); SelectedFurniture = Furniture.FirstOrDefault(); SelectedFurnitureFamily = FurnitureFamilies.FirstOrDefault();
             SelectedClientFurnitureCard = ClientFurnitureCards.FirstOrDefault(item => item.Record.Status == RecordStatus.Publiee);
+            OnPropertyChanged(nameof(InstalledContentVersion));
+            OnPropertyChanged(nameof(InstalledContentDate));
+            OnPropertyChanged(nameof(InstalledContentModules));
+            foreach (var property in new[] { nameof(FurnitureForms), nameof(ConstructionPrinciples), nameof(BackPositions), nameof(AssemblyTypes), nameof(TagCategories), nameof(DoorTypes), nameof(DrawerTypes), nameof(SearchConceptCategories) }) OnPropertyChanged(property);
             NotifySummary(); StatusText = showMessage ? "Catalogue rechargé." : LastModification;
         }
         catch (Exception exception) { ShowError(exception); }
         finally { IsBusy = false; }
+    }
+
+    private static string ContentModulesLabel(AtlasContentModules modules)
+    {
+        var labels = new List<string>();
+        if (modules.HasFlag(AtlasContentModules.Catalog)) labels.Add("catalogue");
+        if (modules.HasFlag(AtlasContentModules.SearchDictionary)) labels.Add("dictionnaire");
+        if (modules.HasFlag(AtlasContentModules.Taxonomy)) labels.Add("tags et règles");
+        if (modules.HasFlag(AtlasContentModules.ReferenceData)) labels.Add("référentiels");
+        if (modules.HasFlag(AtlasContentModules.WorkspaceAssets) || modules.HasFlag(AtlasContentModules.FurnitureAssets)) labels.Add("fichiers et images");
+        return string.Join(" · ", labels);
     }
 
     private void NormalizeCatalog()
@@ -1395,7 +1454,6 @@ public sealed class MainViewModel : ObservableObject
             _searchDictionary.Expressions = SearchExpressions.ToList();
             _searchDictionary.IgnoredTerms = SearchIgnoredTerms.ToList();
             _searchDictionary.UnknownQueries = SearchUnknownQueries.ToList();
-            SearchDictionaryService.MergeOfficial(_searchDictionary);
             await _searchDictionaryStore.SaveAsync(_searchDictionary);
             ReloadSearchDictionaryCollections();
             RefreshHorizonSearchSettings();

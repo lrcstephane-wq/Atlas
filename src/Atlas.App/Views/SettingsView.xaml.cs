@@ -260,8 +260,68 @@ public partial class SettingsView : UserControl
 
     private void ShowSettingsPanel(string target)
     {
-        foreach (var panel in new FrameworkElement[] { LicensePanel, CustomerFurnitureSettingsPanel, GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
+        foreach (var panel in new FrameworkElement[] { LicensePanel, ContentPanel, CustomerFurnitureSettingsPanel, GeneralPanel, UsersPanel, LibrariesPanel, TaxonomyPanel, CompatibilityPanel, FurniturePanel, ValidationPanel, CapabilitiesPanel, ClientPanel, ClientSearchPanel, TopSolidPanel, SystemPanel })
             panel.Visibility = panel.Name == target ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void InstallContentPackage_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var dialog = new OpenFileDialog
+        {
+            Title = "Choisir une mise à jour de contenus Atlas",
+            Filter = "Packs de contenus Atlas (*.atlaspack)|*.atlaspack|Tous les fichiers (*.*)|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            ContentInstallStatus.Text = "Contrôle de la signature et du contenu…";
+            var info = await vm.InspectContentPackageAsync(dialog.FileName);
+            var details = $"{info.FurnitureCount} meuble(s) · {info.SearchRuleCount} règle(s) de recherche · {info.TagCount} tag(s).";
+            if (!AtlasDialog.Confirm($"Installer le contenu Atlas {info.ContentVersion} ?", "Mise à jour des contenus", details))
+            {
+                ContentInstallStatus.Text = "Installation annulée.";
+                return;
+            }
+            ContentInstallStatus.Text = "Sauvegarde puis installation en cours…";
+            await vm.InstallContentPackageAsync(dialog.FileName);
+            ContentInstallStatus.Text = $"Contenus Atlas {info.ContentVersion} installés. {details}";
+            AtlasDialog.Info($"Le contenu Atlas {info.ContentVersion} est maintenant actif.", "Contenus mis à jour");
+        }
+        catch (Exception exception)
+        {
+            ContentInstallStatus.Text = exception.Message;
+            AtlasDialog.Error(exception.Message, "Pack non installé", "Les contenus précédents ont été conservés.");
+        }
+    }
+
+    private async void GenerateContentPackage_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var version = NewContentVersion.Text.Trim();
+        if (string.IsNullOrWhiteSpace(version)) { ContentGenerationStatus.Text = "Renseignez la version du contenu."; return; }
+        var dialog = new SaveFileDialog
+        {
+            Title = "Générer le pack officiel Atlas",
+            Filter = "Pack de contenus Atlas (*.atlaspack)|*.atlaspack",
+            FileName = $"Contenus-Atlas-{version}.atlaspack",
+            AddExtension = true,
+            DefaultExt = ".atlaspack"
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            ContentGenerationStatus.Text = "Enregistrement et préparation du pack…";
+            await vm.GenerateContentPackageAsync(dialog.FileName, version, MinimumAtlasContentVersion.Text.Trim());
+            ContentGenerationStatus.Text = $"Pack {Path.GetFileName(dialog.FileName)} généré et signé.";
+            AtlasDialog.Info("Le pack de contenus est prêt à être transmis aux clients.", "Pack généré");
+        }
+        catch (Exception exception)
+        {
+            ContentGenerationStatus.Text = exception.Message;
+            AtlasDialog.Error(exception.Message, "Pack non généré");
+        }
     }
 
     private void InstallLicense_OnClick(object sender, RoutedEventArgs e)

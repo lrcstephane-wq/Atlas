@@ -7,16 +7,25 @@ public static class ComponentTaxonomyStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
 
-    public static string GetPath(string sharedRoot) => Path.Combine(sharedRoot, "Configuration", "component-taxonomy.json");
+    public static string GetLegacyPath(string sharedRoot) => Path.Combine(sharedRoot, "Configuration", "component-taxonomy.json");
+    public static string GetPath(string sharedRoot) => Path.Combine(sharedRoot, "Configuration", "component-taxonomy.site.json");
+    public static string GetOfficialPath(string sharedRoot) => Path.Combine(sharedRoot, "Content", "Official", "component-taxonomy.json");
 
     public static async Task<ComponentTaxonomy> LoadAsync(string sharedRoot, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sharedRoot)) return new();
         Directory.CreateDirectory(Path.Combine(sharedRoot, "Configuration"));
-        var path = GetPath(sharedRoot);
-        if (!File.Exists(path)) return await MigrateLegacyAsync(sharedRoot, cancellationToken);
-        await using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        var taxonomy = await JsonSerializer.DeserializeAsync<ComponentTaxonomy>(stream, Options, cancellationToken) ?? new();
+        await EnsureLayeredAsync(sharedRoot, cancellationToken);
+        var official = await ReadAsync<ComponentTaxonomy>(GetOfficialPath(sharedRoot), cancellationToken) ?? new();
+        var site = await ReadAsync<ComponentTaxonomySiteOverlay>(GetPath(sharedRoot), cancellationToken) ?? new();
+        site.Families ??= []; site.RemovedFamilyIds ??= []; site.Tags ??= []; site.RemovedTagIds ??= [];
+        Normalize(official);
+        var taxonomy = new ComponentTaxonomy
+        {
+            SchemaVersion = Math.Max(official.SchemaVersion, 2),
+            Families = Merge(official.Families, site.Families, site.RemovedFamilyIds, item => item.Id),
+            Tags = Merge(official.Tags, site.Tags, site.RemovedTagIds, item => item.Id)
+        };
         Normalize(taxonomy);
         return taxonomy;
     }
@@ -25,13 +34,19 @@ public static class ComponentTaxonomyStore
     {
         if (string.IsNullOrWhiteSpace(sharedRoot)) throw new InvalidOperationException("Le dossier partagé Atlas n’est pas renseigné.");
         Normalize(taxonomy);
-        Directory.CreateDirectory(Path.Combine(sharedRoot, "Configuration"));
-        var path = GetPath(sharedRoot);
-        var temporary = path + $".{Environment.MachineName}.{Guid.NewGuid():N}.tmp";
-        taxonomy.Families = taxonomy.Families.OrderBy(x => x.LibraryName, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        taxonomy.Tags = taxonomy.Tags.OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
-        await using (var stream = File.Create(temporary)) await JsonSerializer.SerializeAsync(stream, taxonomy, Options, cancellationToken);
-        File.Move(temporary, path, true);
+        await EnsureLayeredAsync(sharedRoot, cancellationToken);
+        var official = await ReadAsync<ComponentTaxonomy>(GetOfficialPath(sharedRoot), cancellationToken) ?? new();
+        Normalize(official);
+        var overlay = new ComponentTaxonomySiteOverlay
+        {
+            Families = Differences(official.Families, taxonomy.Families, item => item.Id),
+            RemovedFamilyIds = Removed(official.Families, taxonomy.Families, item => item.Id),
+            Tags = Differences(official.Tags, taxonomy.Tags, item => item.Id),
+            RemovedTagIds = Removed(official.Tags, taxonomy.Tags, item => item.Id)
+        };
+        overlay.Families = overlay.Families.OrderBy(x => x.LibraryName, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        overlay.Tags = overlay.Tags.OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
+        await WriteAtomicAsync(GetPath(sharedRoot), overlay, cancellationToken);
     }
 
     public static int SyncDetectedFamilies(ComponentTaxonomy taxonomy, IEnumerable<ComponentRecord> components)
@@ -129,11 +144,71 @@ public static class ComponentTaxonomyStore
         taxonomy.SchemaVersion = Math.Max(taxonomy.SchemaVersion, 2);
     }
 
-    private static async Task<ComponentTaxonomy> MigrateLegacyAsync(string sharedRoot, CancellationToken cancellationToken)
+    private static async Task EnsureLayeredAsync(string sharedRoot, CancellationToken cancellationToken)
     {
-        var taxonomy = new ComponentTaxonomy();
-        foreach (var legacy in await CapabilityTagStore.LoadAsync(sharedRoot, cancellationToken))
-            taxonomy.Tags.Add(new ComponentTagRecord { Id = legacy.Id, Label = legacy.Label, Description = legacy.Description, IsActive = legacy.IsActive });
-        return taxonomy;
+        var officialPath = GetOfficialPath(sharedRoot);
+        if (File.Exists(officialPath)) return;
+        ComponentTaxonomy taxonomy;
+        var legacyPath = GetLegacyPath(sharedRoot);
+        if (File.Exists(legacyPath))
+        {
+            taxonomy = await ReadAsync<ComponentTaxonomy>(legacyPath, cancellationToken) ?? new();
+            Directory.CreateDirectory(Path.Combine(sharedRoot, "Backups"));
+            File.Copy(legacyPath, Path.Combine(sharedRoot, "Backups", $"component-taxonomy-before-content-layers-{DateTime.Now:yyyyMMdd-HHmmss}.json"), false);
+        }
+        else
+        {
+            taxonomy = new ComponentTaxonomy();
+            foreach (var legacy in await CapabilityTagStore.LoadAsync(sharedRoot, cancellationToken))
+                taxonomy.Tags.Add(new ComponentTagRecord { Id = legacy.Id, Label = legacy.Label, Description = legacy.Description, IsActive = legacy.IsActive });
+        }
+        Normalize(taxonomy);
+        await WriteAtomicAsync(officialPath, taxonomy, cancellationToken);
+        if (!File.Exists(GetPath(sharedRoot))) await WriteAtomicAsync(GetPath(sharedRoot), new ComponentTaxonomySiteOverlay(), cancellationToken);
+    }
+
+    private static List<T> Merge<T>(IEnumerable<T> official, IEnumerable<T> changed, IEnumerable<string> removed, Func<T, string> key)
+    {
+        var blocked = removed.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var overrides = changed.GroupBy(key, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+        var result = new List<T>();
+        foreach (var item in official)
+        {
+            var id = key(item);
+            if (blocked.Contains(id)) continue;
+            result.Add(Clone(overrides.Remove(id, out var replacement) ? replacement : item));
+        }
+        result.AddRange(overrides.Values.Select(item => Clone(item)));
+        return result;
+    }
+
+    private static List<T> Differences<T>(IEnumerable<T> official, IEnumerable<T> current, Func<T, string> key)
+    {
+        var baseline = official.ToDictionary(key, item => JsonValue(item), StringComparer.OrdinalIgnoreCase);
+        return current.Where(item => !baseline.TryGetValue(key(item), out var json) || json != JsonValue(item)).Select(item => Clone(item)).ToList();
+    }
+
+    private static List<string> Removed<T>(IEnumerable<T> official, IEnumerable<T> current, Func<T, string> key)
+    {
+        var present = current.Select(key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return official.Select(key).Where(id => !present.Contains(id)).ToList();
+    }
+
+    private static string JsonValue<T>(T value) => JsonSerializer.Serialize(value, Options);
+    private static T Clone<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, Options), Options)!;
+
+    private static async Task<T?> ReadAsync<T>(string path, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path)) return default;
+        await using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        return await JsonSerializer.DeserializeAsync<T>(stream, Options, cancellationToken);
+    }
+
+    private static async Task WriteAtomicAsync<T>(string path, T value, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + $".{Guid.NewGuid():N}.tmp";
+        await using (var stream = File.Create(temporary)) await JsonSerializer.SerializeAsync(stream, value, Options, cancellationToken);
+        File.Move(temporary, path, true);
     }
 }
