@@ -140,6 +140,47 @@ finally
     if (Directory.Exists(dictionaryTestRoot)) Directory.Delete(dictionaryTestRoot, true);
 }
 
+var legacyLayersRoot = Path.Combine(Path.GetTempPath(), $"atlas-legacy-layers-{Guid.NewGuid():N}");
+try
+{
+    Directory.CreateDirectory(Path.Combine(legacyLayersRoot, "Data"));
+    Directory.CreateDirectory(Path.Combine(legacyLayersRoot, "Configuration"));
+    var legacyCatalog = DemoCatalogFactory.Create();
+    legacyCatalog.Revision = 42;
+    legacyCatalog.Settings.LibraryRoot = @"Z:\Bibliotheque historique";
+    legacyCatalog.Furniture.Add(new FurnitureRecord { Id = "legacy-furniture", Reference = "000000777", DisplayName = "Meuble historique" });
+    await File.WriteAllTextAsync(Path.Combine(legacyLayersRoot, "Data", "catalog.atlas.json"), JsonSerializer.Serialize(legacyCatalog));
+    var migratedCatalogStore = new SharedCatalogStore(legacyLayersRoot);
+    var migratedCatalog = await migratedCatalogStore.LoadAsync();
+    Assert(migratedCatalog.Revision == 42 && migratedCatalog.Settings.LibraryRoot.Contains("historique")
+           && migratedCatalog.Furniture.Any(item => item.Id == "legacy-furniture")
+           && File.Exists(migratedCatalogStore.OfficialCatalogPath) && File.Exists(migratedCatalogStore.CatalogPath),
+        "Le catalogue d’une installation existante doit être réparti automatiquement sans perdre ses meubles, sa révision ni ses chemins.");
+
+    var legacyDictionary = new SearchDictionaryDocument();
+    SearchDictionaryService.MergeOfficial(legacyDictionary);
+    legacyDictionary.Synonyms.Add(new SearchSynonymEntry { Id = "legacy-client-synonym", ConceptId = "element-rayon", Term = "tablette historique", IsOfficial = false });
+    await File.WriteAllTextAsync(Path.Combine(legacyLayersRoot, "Configuration", "search-dictionary.atlas.json"), JsonSerializer.Serialize(legacyDictionary));
+    var migratedDictionaryStore = new SearchDictionaryStore(legacyLayersRoot);
+    var migratedDictionary = await migratedDictionaryStore.LoadAsync();
+    Assert(migratedDictionary.Synonyms.Any(item => item.Id == "legacy-client-synonym" && !item.IsOfficial)
+           && File.Exists(migratedDictionaryStore.FilePath),
+        "Les ajouts au dictionnaire d’un site existant doivent migrer dans la couche du site.");
+
+    var legacyTaxonomy = new ComponentTaxonomy { Tags = [new ComponentTagRecord { Id = "legacy-tag", Label = "Tag historique" }] };
+    await File.WriteAllTextAsync(Path.Combine(legacyLayersRoot, "Configuration", "component-taxonomy.json"), JsonSerializer.Serialize(legacyTaxonomy));
+    var migratedTaxonomy = await ComponentTaxonomyStore.LoadAsync(legacyLayersRoot);
+    Assert(migratedTaxonomy.Tags.Any(item => item.Id == "legacy-tag")
+           && File.Exists(ComponentTaxonomyStore.GetOfficialPath(legacyLayersRoot)),
+        "La taxonomie existante doit devenir le premier socle officiel sans perdre ses tags.");
+    Assert(Directory.EnumerateFiles(Path.Combine(legacyLayersRoot, "Backups"), "*before-content-layers*").Count() >= 3,
+        "Chaque ancien fichier métier doit être sauvegardé avant sa migration vers les nouvelles couches.");
+}
+finally
+{
+    if (Directory.Exists(legacyLayersRoot)) Directory.Delete(legacyLayersRoot, true);
+}
+
 var brandTag = new ComponentTagRecord { Id = "tag-blum", Label = "Blum", Category = "Marque" };
 taxonomy.Tags.Add(brandTag);
 taxonomy.Families[0].Types.Add(new ComponentTypeRecord { Name = "Coulissant", TagIds = [brandTag.Id] });
