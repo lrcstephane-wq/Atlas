@@ -408,10 +408,35 @@ public sealed class FurnitureRecord : BindableModel
 
 public sealed class CustomerFurnitureCatalog
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
+    // Conservés pour migrer automatiquement les installations antérieures.
     public string FurnitureRoot { get; set; } = string.Empty;
     public List<PersonalTagRecord> PersonalTags { get; set; } = [];
+    public List<CustomerFurnitureLocation> Locations { get; set; } = [];
+    public List<PersonalTagRecord> ClientUniverses { get; set; } = [];
+    public List<PersonalTagRecord> ClientTags { get; set; } = [];
     public List<CustomerFurnitureItem> Furniture { get; set; } = [];
+    public List<CustomerFurnitureExclusion> Exclusions { get; set; } = [];
+}
+
+public sealed class CustomerFurnitureLocation : BindableModel
+{
+    private string _name = string.Empty;
+    private string _rootPath = string.Empty;
+    private bool _isActive = true;
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
+    public string Name { get => _name; set => Set(ref _name, value?.Trim() ?? string.Empty); }
+    public string RootPath { get => _rootPath; set => Set(ref _rootPath, value?.Trim() ?? string.Empty); }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    [JsonIgnore] public string Status => Directory.Exists(RootPath) ? "Disponible" : "Inaccessible";
+}
+
+public sealed class CustomerFurnitureExclusion
+{
+    public string LocationId { get; set; } = string.Empty;
+    public string RelativeTopPath { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public DateTimeOffset ExcludedUtc { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class PersonalTagRecord : BindableModel
@@ -429,11 +454,16 @@ public sealed class CustomerFurnitureItem : BindableModel
     private string _imageRelativePath = string.Empty;
 
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string LocationId { get; set; } = string.Empty;
     public string DisplayName { get => _displayName; set => Set(ref _displayName, value?.Trim() ?? string.Empty); }
     public string Description { get => _description; set => Set(ref _description, value ?? string.Empty); }
     public string RelativeTopPath { get => _relativeTopPath; set => Set(ref _relativeTopPath, value ?? string.Empty); }
     public string ImageRelativePath { get => _imageRelativePath; set => Set(ref _imageRelativePath, value ?? string.Empty); }
     public List<string> PersonalTagIds { get; set; } = [];
+    public List<string> AtlasUniverseIds { get; set; } = [];
+    public List<string> ClientUniverseIds { get; set; } = [];
+    public List<string> AtlasTagIds { get; set; } = [];
+    public List<string> ClientTagIds { get; set; } = [];
     public DateTimeOffset FirstSeenUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset LastSeenUtc { get; set; } = DateTimeOffset.UtcNow;
 }

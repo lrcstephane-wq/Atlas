@@ -210,6 +210,36 @@ public sealed class CustomerPersonalTagOptionViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
+public sealed class CustomerTaxonomyOptionViewModel : INotifyPropertyChanged
+{
+    private bool _isSelected;
+    private readonly Action<CustomerTaxonomyOptionViewModel> _changed;
+
+    public CustomerTaxonomyOptionViewModel(string id, string label, bool isSelected, Action<CustomerTaxonomyOptionViewModel> changed)
+    {
+        Id = id;
+        Label = label;
+        _isSelected = isSelected;
+        _changed = changed;
+    }
+
+    public string Id { get; }
+    public string Label { get; }
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new(nameof(IsSelected)));
+            _changed(this);
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
 public sealed class LibraryFilterViewModel : INotifyPropertyChanged
 {
     private int _markedCount;
