@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Atlas.App;
 using Atlas.App.Views;
+using Atlas.App.ViewModels;
 using Atlas.Core.Models;
 using Atlas.Core.Services;
 
@@ -57,7 +58,14 @@ internal static class Program
             foreach (var size in new[] { (1366, 768), (1920, 1080) })
             {
                 Console.WriteLine($"Rendu Catalogue Forge {size.Item1} × {size.Item2}…");
-                RenderFurnitureCatalog(vm, output, size.Item1, size.Item2);
+                RenderFurnitureCatalog(vm, output, size.Item1, size.Item2, false);
+                RenderFurnitureCatalog(vm, output, size.Item1, size.Item2, true);
+            }
+            vm.CurrentPage = "Furniture";
+            foreach (var size in new[] { (1366, 768), (1920, 1080) })
+            {
+                Console.WriteLine($"Rendu Forge {size.Item1} × {size.Item2}…");
+                RenderForge(vm, output, size.Item1, size.Item2);
             }
             Console.WriteLine("Captures Horizon terminées.");
         }
@@ -145,9 +153,10 @@ internal static class Program
         encoder.Save(stream);
     }
 
-    private static void RenderFurnitureCatalog(MainViewModel vm, string output, int width, int height)
+    private static void RenderFurnitureCatalog(MainViewModel vm, string output, int width, int height, bool cards)
     {
         var window = new FurnitureCatalogWindow(vm);
+        if (window.DataContext is FurnitureCatalogViewModel catalog) catalog.IsCardView = cards;
         var view = (FrameworkElement)window.Content;
         view.Width = width;
         view.Height = height;
@@ -158,7 +167,24 @@ internal static class Program
         bitmap.Render(view);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(output, $"catalogue-forge-{width}x{height}.png"));
+        using var stream = File.Create(Path.Combine(output, $"catalogue-forge-{(cards ? "cartes" : "liste")}-{width}x{height}.png"));
+        encoder.Save(stream);
+    }
+
+    private static void RenderForge(MainViewModel vm, string output, int width, int height)
+    {
+        var window = new MainWindow(vm);
+        var view = (FrameworkElement)window.Content;
+        view.Width = width;
+        view.Height = height;
+        view.Measure(new Size(width, height));
+        view.Arrange(new Rect(0, 0, width, height));
+        view.UpdateLayout();
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(view);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(output, $"forge-identite-{width}x{height}.png"));
         encoder.Save(stream);
     }
 }

@@ -11,6 +11,7 @@ public sealed class FurnitureCatalogWindowState
     public double Width { get; set; } = 1280;
     public double Height { get; set; } = 780;
     public bool IsMaximized { get; set; }
+    public bool IsCardView { get; set; }
 }
 
 public static class FurnitureCatalogWindowStateStore
