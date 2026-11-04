@@ -88,7 +88,7 @@ public static class CatalogSearchEngine
             var alternatives = ExpandToken(queryToken, synonymGroups);
             var best = document.Fields.Max(field => alternatives.Max(alternative =>
                 field.Tokens.Max(candidate => LiveSimilarity(alternative, candidate, protectedVocabulary.Contains(alternative))) * field.Weight));
-            if (best < MinimumSimilarity(queryToken.Length)) return 0d;
+            if (best < MinimumLiveSimilarity(queryToken.Length)) return 0d;
             total += Math.Min(1d, best);
         }
 
@@ -143,6 +143,8 @@ public static class CatalogSearchEngine
         <= 8 => 0.66d,
         _ => 0.62d
     };
+
+    private static double MinimumLiveSimilarity(int length) => length <= 3 ? 0.93d : MinimumSimilarity(length);
 
     private static double Similarity(string left, string right)
     {
