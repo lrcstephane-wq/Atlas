@@ -160,7 +160,11 @@ public static class CatalogSearchEngine
     {
         if (query == candidate) return 1d;
         if (query.Length >= 3 && candidate.Length > query.Length && candidate.StartsWith(query, StringComparison.Ordinal)) return 0.93d;
-        return isProtected ? 0d : Similarity(query, candidate);
+        if (isProtected) return 0d;
+        var singularCandidate = candidate.EndsWith('s') ? candidate[..^1] : candidate;
+        if (query.Length >= 4 && singularCandidate.Length == query.Length + 1
+            && singularCandidate.AsSpan(1).SequenceEqual(query.AsSpan())) return 0.88d;
+        return Similarity(query, candidate);
     }
 
     private static int DamerauLevenshtein(string source, string target)
