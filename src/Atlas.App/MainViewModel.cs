@@ -1140,8 +1140,10 @@ public sealed class MainViewModel : ObservableObject
 
     private static IEnumerable<(string Label, int Count)> CountValues(IEnumerable<string> values) =>
         values.Where(value => !string.IsNullOrWhiteSpace(value))
-            .GroupBy(value => value.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(group => (group.Key, group.Count()));
+            .Select(value => (Label: value.Trim(), Key: CatalogSearchEngine.Normalize(value)))
+            .Where(value => value.Key.Length > 0)
+            .GroupBy(value => value.Key, StringComparer.Ordinal)
+            .Select(group => (group.First().Label, group.Count()));
 
     private static IEnumerable<string> FurnitureUsagesFor(FurnitureRecord item) =>
         (item.Usages ?? []).Concat(string.IsNullOrWhiteSpace(item.UsageSpecifique) ? [] : [item.UsageSpecifique])
@@ -2621,9 +2623,7 @@ public sealed class MainViewModel : ObservableObject
     private static bool MatchesClientFacet(IEnumerable<CatalogFacetViewModel> facets, IEnumerable<string> values)
     {
         var selected = facets.Where(option => option.IsSelected).Select(option => option.Label).ToArray();
-        if (selected.Length == 0) return true;
-        var candidates = values.Where(value => !string.IsNullOrWhiteSpace(value)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return selected.Any(candidates.Contains);
+        return CatalogSearchEngine.MatchesAnyNormalized(selected, values);
     }
 
     private static string NormalizeBucket(string value) => string.IsNullOrWhiteSpace(value) ? "Non classés" : value;

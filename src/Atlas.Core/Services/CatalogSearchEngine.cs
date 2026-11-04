@@ -31,6 +31,19 @@ public static class CatalogSearchEngine
         return builder.ToString().Trim();
     }
 
+    public static bool MatchesAnyNormalized(IEnumerable<string> expectedValues, IEnumerable<string> candidateValues)
+    {
+        var expected = expectedValues
+            .Select(Normalize)
+            .Where(value => value.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+        if (expected.Count == 0) return true;
+
+        return candidateValues
+            .Select(Normalize)
+            .Any(value => value.Length > 0 && expected.Contains(value));
+    }
+
     public static double Score(string query, IEnumerable<CatalogSearchField> fields, IEnumerable<SearchSynonymRecord>? synonyms = null)
     {
         var normalizedQuery = Normalize(query);
