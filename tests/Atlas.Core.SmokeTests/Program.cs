@@ -114,6 +114,13 @@ Assert(typoScore > 0.7d, "La recherche doit tolérer une inversion et une lettre
 Assert(CatalogSearchEngine.Score("lavabo", [new CatalogSearchField("Meuble sous évier")], searchDictionary) > 0.7d, "Un synonyme métier doit retrouver le concept canonique.");
 Assert(CatalogSearchEngine.Score("charniere", [new CatalogSearchField("Meuble sous évier")], searchDictionary) == 0d, "Un terme sans rapport ne doit pas produire de faux résultat.");
 Assert(CatalogSearchEngine.CorrectQuery("meubel evrier", ["meuble", "evier", "cuisine"], searchDictionary) == "meuble evier", "Atlas doit pouvoir expliquer la correction appliquée.");
+var liveSearchDocument = CatalogSearchEngine.Prepare([new CatalogSearchField("Meuble avec tiroirs et vasque", 1d)]);
+Assert(CatalogSearchEngine.Score("vas", liveSearchDocument) > 0.8d,
+    "Le dernier mot incomplet doit produire des résultats dès trois caractères.");
+Assert(CatalogSearchEngine.Score("iroir", liveSearchDocument) > 0.7d,
+    "Une lettre initiale oubliée doit rester reconnue comme une faute probable.");
+Assert(CatalogSearchEngine.Score("miroir", liveSearchDocument, protectedTerms: SearchDictionaryService.ProtectedTerms) == 0d,
+    "Un mot français protégé comme miroir ne doit jamais être transformé en tiroir.");
 Assert(CatalogSearchEngine.MatchesAnyNormalized(["Sans assemblage"], ["Sans assemblage\u00a0"]),
     "Une facette doit accepter les espaces invisibles hérités d’une ancienne saisie.");
 Assert(CatalogSearchEngine.MatchesAnyNormalized(["Micro-ondes"], ["micro ondes"]),
@@ -127,6 +134,19 @@ Assert(structuredDictionary.OfficialVersion == SearchDictionaryService.OfficialV
        && structuredDictionary.Concepts.Count >= 65 && structuredDictionary.Synonyms.Count >= 80
        && structuredDictionary.Expressions.Count >= 40 && structuredDictionary.IgnoredTerms.Count >= 40,
     "Le socle officiel du dictionnaire doit être versionné et suffisamment riche.");
+var liveSinkIntent = SearchDictionaryService.Interpret("vas", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms, liveTyping: true);
+Assert(liveSinkIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Vasque"),
+    "La saisie dynamique vas doit déjà reconnaître le concept Vasque.");
+var missingInitialIntent = SearchDictionaryService.Interpret("iroir", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms, liveTyping: true);
+Assert(missingInitialIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DrawerCount),
+    "La saisie iroir doit être corrigée vers le concept Tiroir.");
+var protectedMirrorIntent = SearchDictionaryService.Interpret("miroir", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms, liveTyping: true);
+Assert(protectedMirrorIntent.Constraints.All(item => item.Target != SearchConceptTarget.DrawerCount)
+       && protectedMirrorIntent.CorrectedQuery == "miroir",
+    "Miroir doit rester un mot distinct et ne jamais déclencher les tiroirs.");
 var sinkDoorIntent = SearchDictionaryService.Interpret("meuble porte sous evier", structuredDictionary);
 Assert(sinkDoorIntent.Constraints.Any(item => item.Target == SearchConceptTarget.DoorCount && item.Mode == SearchConstraintMode.Minimum && item.Quantity == 1),
     "Une porte sans quantité doit signifier au moins une porte.");
@@ -549,6 +569,12 @@ Assert(furnitureXaml.Contains("Width=\"430\"") && furnitureXaml.Contains("Height
        && furnitureXaml.Contains("IMAGE DISPONIBLE") && furnitureXaml.Contains("FICHIER TOPSOLID"),
     "L’aperçu de la fiche meuble doit rester compact et séparer clairement l’image du fichier TopSolid.");
 Assert(viewModelSource.Contains("linkedComponents") && viewModelSource.Contains("component.TechnicalName") && viewModelSource.Contains("furniture.NicheOuverte") && viewModelSource.Contains("furniture.UseCasesCsv"), "La recherche Horizon doit couvrir toute la fiche et les composants liés.");
+Assert(viewModelSource.Contains("CatalogSearchEngine.Prepare(SearchFieldsFor")
+       && viewModelSource.Contains("Task.Delay(180")
+       && viewModelSource.Contains("_lastClientSearchMatches"),
+    "La recherche Horizon doit utiliser un index préparé, temporiser la frappe et réutiliser les candidats précédents.");
+Assert(catalogXaml.Contains("ClientSearchSuggestions") && catalogXaml.Contains("ClientSearchSuggestion_OnClick"),
+    "Horizon doit proposer des complétions métier pendant la saisie.");
 Assert(viewModelSource.Contains("$\"{SelectedFurniture.Reference}.top\"") && viewModelSource.Contains("File.Copy(sourceTop, targetTop, false)"), "Le fichier TopSolid doit être copié sous la référence Atlas sans écraser l’original.");
 Assert(viewModelSource.Contains("Settings.FurnitureRoot") && viewModelSource.Contains("ChooseFurnitureRootCommand") && viewModelSource.Contains("ResolveFurniturePath"), "Les meubles doivent disposer d’un dossier central configurable distinct de la bibliothèque des composants.");
 Assert(catalogXaml.Contains("Grid.Column=\"2\"") && catalogXaml.Contains("ItemsSource=\"{Binding ClientFurnitureView}\""), "La collection et la fiche produit doivent partager la hauteur principale d’Horizon.");
