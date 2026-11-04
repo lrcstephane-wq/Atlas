@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using Atlas.App.ViewModels;
 using Atlas.App.Views;
 using System.ComponentModel;
+using System.Windows.Threading;
 
 namespace Atlas.App;
 
@@ -12,11 +13,19 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private FurnitureCatalogWindow? _furnitureCatalogWindow;
+    private readonly DispatcherTimer _adminLockTimer = new() { Interval = TimeSpan.FromMinutes(1) };
+    private readonly DateTimeOffset _sessionStarted = DateTimeOffset.UtcNow;
+    private DateTimeOffset _lastActivity = DateTimeOffset.UtcNow;
+    private bool _lockingAdminSession;
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent(); DataContext = _viewModel = viewModel;
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessageHook);
         Loaded += async (_, _) => await _viewModel.CheckAutoUpdateAsync();
+        PreviewMouseDown += (_, _) => _lastActivity = DateTimeOffset.UtcNow;
+        PreviewTouchDown += (_, _) => _lastActivity = DateTimeOffset.UtcNow;
+        _adminLockTimer.Tick += AdminLockTimer_OnTick;
+        if (_viewModel.IsAdministrator) _adminLockTimer.Start();
     }
     private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
@@ -55,6 +64,7 @@ public partial class MainWindow : Window
 
     private void Window_OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        _lastActivity = DateTimeOffset.UtcNow;
         if (e.Key != Key.K || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || !_viewModel.CanUseAdministrativeInterfaces) return;
         OpenFurnitureCatalog();
         e.Handled = true;
@@ -62,8 +72,20 @@ public partial class MainWindow : Window
 
     private void Window_OnClosing(object? sender, CancelEventArgs e)
     {
+        _adminLockTimer.Stop();
         _furnitureCatalogWindow?.Close();
         _furnitureCatalogWindow = null;
+    }
+
+    private async void AdminLockTimer_OnTick(object? sender, EventArgs e)
+    {
+        if (_lockingAdminSession || !_viewModel.IsAdministrator) return;
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastActivity < TimeSpan.FromMinutes(15) && now - _sessionStarted < TimeSpan.FromHours(2)) return;
+        _lockingAdminSession = true;
+        _adminLockTimer.Stop();
+        AtlasDialog.Info("La session Administrateur Idéo a été fermée automatiquement.", "Session Idéo verrouillée");
+        await ((App)Application.Current).LogoutAdministratorAsync(this);
     }
 
     private void ClientFacetFavorite_OnClick(object sender, RoutedEventArgs e)

@@ -19,16 +19,31 @@ public sealed class UserAccountStore(string sharedRoot)
     public async Task<IReadOnlyList<UserAccount>> LoadAsync()
     {
         if (!File.Exists(UsersPath)) return [];
-        await using var stream = File.Open(UsersPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        return await JsonSerializer.DeserializeAsync<List<UserAccount>>(stream, JsonOptions) ?? [];
+        List<UserAccount> users;
+        await using (var stream = File.Open(UsersPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            users = await JsonSerializer.DeserializeAsync<List<UserAccount>>(stream, JsonOptions) ?? [];
+        var migrated = false;
+        var forbiddenPersistentPermissions = UserPermissions.Edit | UserPermissions.Validate
+                                             | UserPermissions.Administer | UserPermissions.IdeoAdministrator;
+        foreach (var user in users.Where(user => (user.Permissions & forbiddenPersistentPermissions) != UserPermissions.None))
+        {
+            var wasAdministrator = user.Permissions.HasFlag(UserPermissions.Administer)
+                                   || user.Permissions.HasFlag(UserPermissions.IdeoAdministrator);
+            user.Permissions &= ~forbiddenPersistentPermissions;
+            user.Permissions |= UserPermissions.Read;
+            if (wasAdministrator) user.Permissions |= UserPermissions.ManageSite;
+            migrated = true;
+        }
+        if (migrated) await SaveAsync(users);
+        return users;
     }
 
-    public async Task<UserAccount> CreateFirstAdministratorAsync(string login, string displayName, string password)
+    public async Task<UserAccount> CreateFirstSiteManagerAsync(string login, string displayName, string password)
     {
         var users = (await LoadAsync()).ToList();
-        if (users.Count != 0) throw new InvalidOperationException("Un administrateur existe déjà.");
+        if (users.Count != 0) throw new InvalidOperationException("Un gestionnaire du site existe déjà.");
         var account = CreateAccount(login, displayName, password,
-            UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer);
+            UserPermissions.Read | UserPermissions.ManageSite);
         users.Add(account);
         await SaveAsync(users);
         return account;

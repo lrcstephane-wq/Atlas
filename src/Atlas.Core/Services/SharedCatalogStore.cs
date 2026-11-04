@@ -71,17 +71,10 @@ public sealed class SharedCatalogStore
     public static async Task<LocalBootstrap> LoadBootstrapAsync()
     {
         var path = LocalBootstrapPath;
-        if (!File.Exists(path) && File.Exists(AtlasPaths.LegacyBootstrapPath)) path = AtlasPaths.LegacyBootstrapPath;
         if (!File.Exists(path)) return new LocalBootstrap { SharedRoot = AtlasPaths.DefaultWorkspaceRoot };
         await using var stream = File.OpenRead(path);
         var bootstrap = await JsonSerializer.DeserializeAsync<LocalBootstrap>(stream, JsonOptions) ?? new LocalBootstrap();
         if (string.IsNullOrWhiteSpace(bootstrap.SharedRoot)) bootstrap.SharedRoot = AtlasPaths.DefaultWorkspaceRoot;
-        if (!path.Equals(LocalBootstrapPath, StringComparison.OrdinalIgnoreCase))
-        {
-            try { await SaveBootstrapAsync(bootstrap); }
-            catch (UnauthorizedAccessException) { }
-            catch (IOException) { }
-        }
         return bootstrap;
     }
 

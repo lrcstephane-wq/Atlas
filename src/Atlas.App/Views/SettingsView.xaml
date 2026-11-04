@@ -20,12 +20,14 @@
 <StackPanel>
      <TextBlock Text="ATLAS" Style="{StaticResource NavSection}"/>
      <Button x:Name="LicenseSettingsButton" Content="Licence" Tag="LicensePanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
-     <Button x:Name="ContentSettingsButton" Content="Contenus Atlas" Tag="ContentPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     <Button x:Name="ContentSettingsButton" Content="Contenus Atlas" Tag="ContentPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}" Visibility="{Binding CanInstallContentPackage, Converter={StaticResource BoolVisibility}}"/>
      <Button x:Name="CustomerFurnitureSettingsButton" Content="Catalogue Client" Tag="CustomerFurnitureSettingsPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}" Visibility="{Binding CanManageCustomerFurniture, Converter={StaticResource BoolVisibility}}"/>
-     <StackPanel Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
+     <StackPanel Visibility="{Binding CanManageSite, Converter={StaticResource BoolVisibility}}">
      <TextBlock Text="GÉNÉRAL" Style="{StaticResource NavSection}"/>
      <Button x:Name="GeneralSettingsButton" Content="Espace de travail" Tag="GeneralPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Utilisateurs et droits" Tag="UsersPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
+     </StackPanel>
+     <StackPanel Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}">
      <TextBlock Text="FORGE" Style="{StaticResource NavSection}"/>
      <Button Content="Bibliothèques et indexation" Tag="LibrariesPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
      <Button Content="Tags" Tag="TaxonomyPanel" Click="SettingsNavigation_OnClick" Style="{StaticResource NavButton}"/>
@@ -71,7 +73,7 @@
         <TextBlock x:Name="LicenseInstallStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
        </StackPanel>
       </Border>
-      <Border Style="{StaticResource Card}" Margin="0,14,0,0" Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}">
+      <Border Style="{StaticResource Card}" Margin="0,14,0,0" Visibility="{Binding CanConfigureIdeoTools, Converter={StaticResource BoolVisibility}}">
        <StackPanel>
         <TextBlock Text="GÉNÉRATEUR IDÉO" Style="{StaticResource Eyebrow}"/>
         <TextBlock Text="Crée un code signé pour un site client, valable jusqu’à la date choisie incluse." Style="{StaticResource Caption}" Margin="0,5,0,14"/>
@@ -87,6 +89,16 @@
         <TextBox Text="{Binding GeneratedLicenseCode, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="105" VerticalContentAlignment="Top" Margin="0,10,0,0"/>
         <Button Content="Copier le code" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,9,0,0" Click="CopyGeneratedLicense_OnClick"/>
         <TextBlock x:Name="LicenseGeneratorStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
+        <Border Background="#30383D" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="5" Padding="14" Margin="0,18,0,0"><StackPanel>
+         <TextBlock Text="ACCÈS ADMINISTRATEUR IDÉO À USAGE UNIQUE" Style="{StaticResource Eyebrow}"/>
+         <TextBlock Text="Collez la demande affichée sur le poste client. La réponse sera liée à ce poste, à cette fenêtre et à l’opérateur renseigné." Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,5,0,12"/>
+         <TextBlock Text="Opérateur Idéo" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding IdeoOperatorName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Stéphane ou Thomas"/>
+         <TextBlock Text="Demande du poste client" Style="{StaticResource FieldLabel}" Margin="0,10,0,0"/><TextBox Text="{Binding IdeoAccessRequestCode, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"/>
+         <Button Content="Générer la réponse Idéo" HorizontalAlignment="Left" Margin="0,10,0,0" Click="GenerateIdeoAccess_OnClick"/>
+         <TextBox Text="{Binding GeneratedIdeoAccessCode, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" Margin="0,10,0,0"/>
+         <Button Content="Copier la réponse" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Click="CopyIdeoAccess_OnClick"/>
+         <TextBlock x:Name="IdeoAccessGeneratorStatus" Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        </StackPanel></Border>
        </StackPanel>
       </Border>
      </StackPanel>
@@ -114,7 +126,7 @@
         <TextBlock x:Name="ContentInstallStatus" Style="{StaticResource Caption}" Margin="0,9,0,0" TextWrapping="Wrap"/>
        </StackPanel>
       </Border>
-      <Border Style="{StaticResource Card}" Margin="0,14,0,0" Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}">
+      <Border Style="{StaticResource Card}" Margin="0,14,0,0" Visibility="{Binding CanConfigureIdeoTools, Converter={StaticResource BoolVisibility}}">
        <StackPanel>
         <TextBlock Text="PUBLICATION IDÉO" Style="{StaticResource Eyebrow}"/>
         <TextBlock Text="Génère un pack signé avec l’état actuel du catalogue Atlas, du dictionnaire, des tags, des images et des fichiers .TOP." Style="{StaticResource Caption}" Margin="0,5,0,14" TextWrapping="Wrap"/>
@@ -143,7 +155,7 @@
      <Border Style="{StaticResource Card}">
 <StackPanel>
       <TextBlock Text="Environnement du catalogue" Style="{StaticResource FieldLabel}"/>
-<ComboBox ItemsSource="{Binding Environments}" SelectedItem="{Binding Settings.Environment}" Margin="0,0,0,14" IsEnabled="{Binding IsAdministrator}"/>
+<ComboBox ItemsSource="{Binding Environments}" SelectedItem="{Binding Settings.Environment}" Margin="0,0,0,14" IsEnabled="{Binding CanManageSite}"/>
       <CheckBox Content="Rechercher automatiquement les mises à jour au lancement" IsChecked="{Binding Settings.AutoUpdate}" Margin="0,0,0,18" Visibility="{Binding CanConfigureAutomaticUpdates, Converter={StaticResource BoolVisibility}}"/>
       <TextBlock Text="Espace de données Atlas" Style="{StaticResource FieldLabel}"/>
 <Grid>
@@ -151,7 +163,7 @@
 <ColumnDefinition/>
 <ColumnDefinition Width="Auto"/>
 </Grid.ColumnDefinitions>
-<TextBox Text="{Binding SharedRoot, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsAdministrator}"/>
+<TextBox Text="{Binding SharedRoot, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanManageSite}"/>
 <Button Grid.Column="1" Content="Parcourir" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseSharedRootCommand}" Margin="8,0,0,0"/>
 </Grid>
       <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
@@ -185,7 +197,7 @@
 <DataGridTextColumn Header="Droits" Binding="{Binding Permissions}" Width="1.3*"/>
 </DataGrid.Columns>
 </DataGrid>
-      <StackPanel Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}">
+      <StackPanel Visibility="{Binding CanManageSite, Converter={StaticResource BoolVisibility}}">
        <TextBlock Text="Ajouter un utilisateur" FontWeight="SemiBold" Margin="0,18,0,10"/>
        <Grid>
 <Grid.ColumnDefinitions>
@@ -214,7 +226,7 @@
 </StackPanel>
 <StackPanel Grid.Column="2">
 <TextBlock Text="Profil" Style="{StaticResource FieldLabel}"/>
-<ComboBox x:Name="NewRole" ItemsSource="{Binding RoleProfiles}" SelectedIndex="3"/>
+<ComboBox x:Name="NewRole" ItemsSource="{Binding RoleProfiles}" SelectedIndex="0"/>
 </StackPanel>
 </Grid>
        <TextBlock x:Name="UserError" Foreground="{StaticResource RoseBrush}" Margin="0,8,0,0"/>

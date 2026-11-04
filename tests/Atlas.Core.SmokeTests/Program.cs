@@ -317,8 +317,11 @@ try
     var targetWorkspace = Path.Combine(workspaceTestRoot, "target");
     var manifest = await AtlasWorkspaceService.EnsureAsync(sourceWorkspace, "Site test");
     var accountStore = new UserAccountStore(sourceWorkspace);
-    await accountStore.AddAsync("admin", "Administrateur", generatedSecret, UserPermissions.Administer);
-    Assert((await accountStore.LoadAsync()).Single().IsAdministrator, "Les comptes partagés doivent suivre l’espace Atlas lors de son déplacement.");
+    await accountStore.AddAsync("admin", "Administrateur", generatedSecret,
+        UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer | UserPermissions.IdeoAdministrator);
+    var migratedManager = (await accountStore.LoadAsync()).Single();
+    Assert(migratedManager.IsSiteManager && !migratedManager.IsAdministrator && !migratedManager.CanEdit,
+        "Un ancien administrateur local doit devenir Gestionnaire du site sans conserver la Forge ni le contournement de licence.");
     await AtlasWorkspaceService.CopyAndVerifyAsync(sourceWorkspace, targetWorkspace);
     Assert(AtlasWorkspaceService.IsWorkspace(targetWorkspace) && File.Exists(Path.Combine(targetWorkspace, "Configuration", "users.atlas.json")), "Le déplacement doit conserver l’identité de l’espace et ses comptes.");
 }
@@ -385,6 +388,47 @@ using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
     Directory.Delete(Path.GetDirectoryName(licensePath)!, true);
 }
 
+using (var adminSigningKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+{
+    var now = new DateTimeOffset(2027, 2, 12, 14, 0, 0, TimeSpan.Zero);
+    const string device = "ATL-1111-2222-3333-4444-5555";
+    var challenge = IdeoAdminAccessService.CreateChallenge(device, now);
+    var response = IdeoAdminAccessService.GenerateResponse(challenge.RequestCode, "Stéphane",
+        adminSigningKey.ExportECPrivateKeyPem(), now, TimeSpan.FromMinutes(5));
+    var grant = challenge.ValidateAndConsume(response, adminSigningKey.ExportSubjectPublicKeyInfoPem(), now.AddMinutes(1));
+    Assert(grant.OperatorName == "Stéphane" && challenge.IsConsumed,
+        "Une réponse signée doit ouvrir une seule session Idéo pour la demande et le poste prévus.");
+    var replayRejected = false;
+    try { challenge.ValidateAndConsume(response, adminSigningKey.ExportSubjectPublicKeyInfoPem(), now.AddMinutes(2)); }
+    catch (InvalidOperationException) { replayRejected = true; }
+    Assert(replayRejected, "Une réponse Administrateur Idéo déjà utilisée doit être définitivement refusée.");
+    var otherChallenge = IdeoAdminAccessService.CreateChallenge(device, now);
+    var otherRequestRejected = false;
+    try { otherChallenge.ValidateAndConsume(response, adminSigningKey.ExportSubjectPublicKeyInfoPem(), now.AddMinutes(2)); }
+    catch (UnauthorizedAccessException) { otherRequestRejected = true; }
+    Assert(otherRequestRejected, "Une réponse Idéo ne doit pas fonctionner dans une autre fenêtre, même sur le même poste.");
+}
+
+var assetResolverRoot = Path.Combine(Path.GetTempPath(), $"atlas-assets-{Guid.NewGuid():N}");
+try
+{
+    Directory.CreateDirectory(assetResolverRoot);
+    var resolvedPreview = Path.Combine(assetResolverRoot, "000000123.top.png");
+    await File.WriteAllTextAsync(resolvedPreview, "preview");
+    var movedFurniture = new FurnitureRecord
+    {
+        Reference = "000000123",
+        SourceRelativePath = @"D:\AncienServeur\000000123.top",
+        ImageRelativePath = @"D:\AncienServeur\000000123.top.png"
+    };
+    Assert(FurnitureAssetResolver.ResolveImage(movedFurniture, assetResolverRoot) == resolvedPreview,
+        "L’image doit être retrouvée par son nom lorsque le chemin enregistré provient d’un autre poste ou serveur.");
+}
+finally
+{
+    if (Directory.Exists(assetResolverRoot)) Directory.Delete(assetResolverRoot, true);
+}
+
 var appRoot = Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.App");
 var mainWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWindow.xaml"));
 var catalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CatalogView.xaml"));
@@ -409,6 +453,13 @@ Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Tex
 Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"235\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
 Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsCreatorMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsLicenseRestricted"), "Les modes utilisateur, Créateur et les sessions sans licence doivent conserver leurs périmètres propres.");
+Assert(appCode.Contains("IdeoAdminAccessWindow") && appCode.Contains("UserPermissions.IdeoAdministrator")
+       && !appCode.Contains("CreateFirstAdministratorAsync"),
+    "L’Administrateur Idéo doit être une session éphémère signée et ne jamais être créé comme compte client persistant.");
+var adminAccessServiceSource = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.Core", "Services", "IdeoAdminAccessService.cs"));
+Assert(adminAccessServiceSource.Contains("RandomNumberGenerator.GetBytes(24)") && adminAccessServiceSource.Contains("ValidateAndConsume")
+       && adminAccessServiceSource.Contains("expectedDeviceId") && adminAccessServiceSource.Contains("expectedNonce"),
+    "L’accès Idéo doit être lié au poste, à une demande aléatoire en mémoire et consommé une seule fois.");
 Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("CanUseAdministrativeInterfaces"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
 var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");

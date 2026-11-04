@@ -12,6 +12,7 @@ public partial class LoginWindow : Window
     private readonly LocalBootstrap _bootstrap;
     private bool _firstRun;
     public UserAccount? AuthenticatedUser { get; private set; }
+    public bool IdeoAccessRequested { get; private set; }
     public string SharedRoot => SharedRootBox.Text.Trim();
 
     public LoginWindow(LocalBootstrap bootstrap)
@@ -28,7 +29,7 @@ public partial class LoginWindow : Window
         {
             _firstRun = true;
             TitleText.Text = "Choisir l’espace partagé";
-            HelpText.Text = "Sélectionnez le dossier réseau Atlas avant de créer le premier administrateur.";
+            HelpText.Text = "Sélectionnez le dossier Atlas avant de créer le premier gestionnaire du site.";
             DisplayNameLabel.Visibility = DisplayNameBox.Visibility = Visibility.Visible;
             SubmitButton.Content = "Créer et ouvrir Atlas";
             return;
@@ -40,7 +41,7 @@ public partial class LoginWindow : Window
             var accounts = await new UserAccountStore(SharedRoot).LoadAsync();
             _firstRun = accounts.Count == 0;
             TitleText.Text = _firstRun ? "Créer l’espace Atlas" : "Connexion";
-            HelpText.Text = _firstRun ? "Confirmez l’emplacement puis créez le premier compte administrateur." : "Connexion à l’espace Atlas existant.";
+            HelpText.Text = _firstRun ? "Confirmez l’emplacement puis créez le premier compte Gestionnaire du site." : "Connexion à l’espace Atlas existant.";
             DisplayNameLabel.Visibility = DisplayNameBox.Visibility = _firstRun ? Visibility.Visible : Visibility.Collapsed;
             SubmitButton.Content = _firstRun ? "Créer et ouvrir Atlas" : "Se connecter";
         }
@@ -66,7 +67,7 @@ public partial class LoginWindow : Window
             await SharedCatalogStore.SaveBootstrapAsync(_bootstrap);
             var userStore = new UserAccountStore(SharedRoot);
             AuthenticatedUser = _firstRun
-                ? await userStore.CreateFirstAdministratorAsync(LoginBox.Text, DisplayNameBox.Text, PasswordBox.Password)
+                ? await userStore.CreateFirstSiteManagerAsync(LoginBox.Text, DisplayNameBox.Text, PasswordBox.Password)
                 : await userStore.AuthenticateAsync(LoginBox.Text, PasswordBox.Password);
             if (AuthenticatedUser is null)
             {
@@ -100,6 +101,12 @@ public partial class LoginWindow : Window
     }
 
     private void Close_OnClick(object sender, RoutedEventArgs e) => Close();
+
+    private void IdeoAccess_OnClick(object sender, RoutedEventArgs e)
+    {
+        IdeoAccessRequested = true;
+        Close();
+    }
 
     private static bool IsLegacyWorkspace(string root) =>
         File.Exists(Path.Combine(root, "Configuration", "users.atlas.json")) ||

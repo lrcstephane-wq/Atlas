@@ -355,6 +355,28 @@ public partial class SettingsView : UserControl
         LicenseGeneratorStatus.Text = "Code copié dans le presse-papiers.";
     }
 
+    private void GenerateIdeoAccess_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        try
+        {
+            vm.GenerateIdeoAdminAccessCode();
+            IdeoAccessGeneratorStatus.Text = $"Réponse prête pour {vm.IdeoOperatorName.Trim()}. Elle expirera quelques minutes après sa génération.";
+        }
+        catch (Exception exception)
+        {
+            IdeoAccessGeneratorStatus.Text = exception.Message;
+            AtlasDialog.Warning(exception.Message, "Accès Idéo non généré");
+        }
+    }
+
+    private void CopyIdeoAccess_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || string.IsNullOrWhiteSpace(vm.GeneratedIdeoAccessCode)) return;
+        Clipboard.SetText(vm.GeneratedIdeoAccessCode);
+        IdeoAccessGeneratorStatus.Text = "Réponse Idéo copiée. Elle ne fonctionnera que pour la demande reçue.";
+    }
+
     private void CopyDeviceId_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

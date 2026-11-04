@@ -82,7 +82,7 @@ public partial class FurnitureCatalogWindow : Window
     private async void CardImage_OnLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is not Image image || image.DataContext is not Atlas.Core.Models.FurnitureRecord furniture) return;
-        var imagePath = _mainViewModel.ResolveFurnitureAssetPath(furniture.ImageRelativePath);
+        var imagePath = _mainViewModel.ResolveFurnitureImageAssetPath(furniture);
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath)) return;
         if (_thumbnailCache.TryGetValue(imagePath, out var cached) && cached.TryGetTarget(out var thumbnail))
         {
