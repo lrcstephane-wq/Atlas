@@ -215,7 +215,7 @@ public static class SearchDictionaryService
         document.Expressions ??= [];
         document.IgnoredTerms ??= [];
         document.UnknownQueries ??= [];
-        document.Concepts.RemoveAll(item => item.Id.Equals("expression-rangement-rayons", StringComparison.OrdinalIgnoreCase));
+        document.Concepts.RemoveAll(item => item.Id is "expression-rangement-rayons" or "type-meuble-tv");
 
         // Migration transparente du schéma v1 : les ajouts saisis par le client deviennent de vraies lignes de synonymes.
         foreach (var concept in document.Concepts)
@@ -739,7 +739,6 @@ public static class SearchDictionaryService
         Official("type-ilot", "Îlot", "Types", SearchConceptTarget.GenericText, "îlot", "ilot central, meuble îlot, bloc central", false),
         Official("type-peninsule", "Péninsule", "Types", SearchConceptTarget.GenericText, "péninsule", "presqu île, retour snack, retour cuisine", false),
         Official("type-suspendu", "Meuble suspendu", "Types", SearchConceptTarget.GenericText, "meuble suspendu", "meuble mural, meuble accroché", false),
-        Official("type-meuble-tv", "Meuble TV", "Types", SearchConceptTarget.GenericText, "meuble tv", "banc tv, meuble télévision", false),
         Official("type-banquette", "Banquette", "Types", SearchConceptTarget.GenericText, "banquette", "assise intégrée, banc coffre", false),
 
         Official("forme-angle", "Angle", "Formes", SearchConceptTarget.FurnitureForm, "Angle", "meuble d’angle, coin"),
