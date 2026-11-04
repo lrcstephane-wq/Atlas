@@ -107,6 +107,7 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
     private readonly string _fallbackRoot;
     private bool _thumbnailLoaded;
     private bool _isChosen;
+    private bool _isSearchMatch = true;
     private double _searchScore;
     private string _searchExplanation = string.Empty;
     private BitmapImage? _thumbnail;
@@ -147,6 +148,16 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
             if (Math.Abs(_searchScore - value) < 0.0001d) return;
             _searchScore = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SearchScore)));
+        }
+    }
+    public bool IsSearchMatch
+    {
+        get => _isSearchMatch;
+        set
+        {
+            if (_isSearchMatch == value) return;
+            _isSearchMatch = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSearchMatch)));
         }
     }
     public string SearchExplanation
