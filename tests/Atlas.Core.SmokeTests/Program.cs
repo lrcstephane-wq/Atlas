@@ -508,7 +508,7 @@ Assert(furnitureXaml.Contains("Dupliquer") && furnitureXaml.Contains("Voir dans 
 Assert(furnitureXaml.Contains("Ouvrir le catalogue") && !furnitureXaml.Contains("ItemsSource=\"{Binding FurnitureView}\""), "La fiche meuble doit libérer sa largeur et ouvrir le catalogue dans une fenêtre dédiée.");
 var furnitureCatalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureCatalogWindow.xaml"));
 var furnitureCatalogCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureCatalogWindow.xaml.cs"));
-Assert(furnitureCatalogXaml.Contains("Icon=\"pack://application:,,,/Assets/Atlas.ico\""),
+Assert(furnitureCatalogXaml.Contains("Icon=\"pack://application:,,,/Atlas;component/Assets/Atlas.ico\""),
     "La fenêtre du catalogue de la Forge doit afficher l’icône Atlas dans Windows.");
 Assert(furnitureCatalogXaml.Contains("EnableRowVirtualization=\"True\"") && furnitureCatalogXaml.Contains("VirtualizationMode=\"Recycling\"")
        && furnitureCatalogXaml.Contains("Ouvrir dans la Forge") && furnitureCatalogXaml.Contains("Fiches à compléter"),
@@ -573,7 +573,7 @@ Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Cont
 var customerFurnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureView.xaml"));
 var customerFurnitureCatalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureCatalogWindow.xaml"));
 var customerFurnitureCatalogCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureCatalogWindow.xaml.cs"));
-Assert(customerFurnitureCatalogXaml.Contains("Icon=\"pack://application:,,,/Assets/Atlas.ico\""),
+Assert(customerFurnitureCatalogXaml.Contains("Icon=\"pack://application:,,,/Atlas;component/Assets/Atlas.ico\""),
     "La fenêtre du catalogue personnel doit afficher l’icône Atlas dans Windows.");
 Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions") && customerFurnitureXaml.Contains("CanManageCustomerFurniture"), "Le Gestionnaire doit consulter Mes meubles tandis que les modifications restent réservées au Créateur licencié.");
 Assert(viewModelSource.Contains("CanViewCustomerFurniture => IsAdministrator || IsSiteManagerMode")
