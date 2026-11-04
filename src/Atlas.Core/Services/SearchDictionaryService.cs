@@ -197,6 +197,10 @@ public sealed class SearchDictionaryStore(string sharedRoot)
 public static class SearchDictionaryService
 {
     public const int OfficialVersion = 2;
+    public static IReadOnlySet<string> ProtectedTerms { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "miroir"
+    };
 
     public static IReadOnlyList<SearchConceptRecord> OfficialConcepts { get; } = BuildOfficialConcepts();
     public static IReadOnlyList<SearchSynonymEntry> OfficialSynonyms { get; } = BuildOfficialSynonyms();
@@ -272,16 +276,18 @@ public static class SearchDictionaryService
         document.OfficialVersion = OfficialVersion;
     }
 
-    public static SearchIntent Interpret(string query, IEnumerable<SearchConceptRecord> concepts, IEnumerable<string>? dynamicTags = null)
+    public static SearchIntent Interpret(string query, IEnumerable<SearchConceptRecord> concepts, IEnumerable<string>? dynamicTags = null,
+        IEnumerable<string>? protectedTerms = null, bool liveTyping = false)
     {
         var document = new SearchDictionaryDocument { Concepts = concepts.ToList() };
         document.Synonyms.AddRange(OfficialSynonyms.Select(Clone));
         document.Expressions.AddRange(OfficialExpressions.Select(Clone));
         document.IgnoredTerms.AddRange(OfficialIgnoredTerms.Select(Clone));
-        return Interpret(query, document, dynamicTags);
+        return Interpret(query, document, dynamicTags, protectedTerms, liveTyping);
     }
 
-    public static SearchIntent Interpret(string query, SearchDictionaryDocument document, IEnumerable<string>? dynamicTags = null)
+    public static SearchIntent Interpret(string query, SearchDictionaryDocument document, IEnumerable<string>? dynamicTags = null,
+        IEnumerable<string>? protectedTerms = null, bool liveTyping = false)
     {
         var active = (document.Concepts ?? []).Where(item => item.IsActive).ToList();
         foreach (var tag in dynamicTags ?? [])
@@ -310,7 +316,11 @@ public static class SearchDictionaryService
             .SelectMany(expression => CatalogSearchEngine.Normalize(expression).Split(' ', StringSplitOptions.RemoveEmptyEntries))
             .Concat(NumberWords.Keys).Concat(["sans", "pas", "aucun", "aucune", "minimum", "mini", "maximum", "max", "exactement", "moins", "plus"])
             .Distinct(StringComparer.Ordinal).ToArray();
-        var correctedTokens = rawTokens.Select(token => CorrectToken(token, vocabulary)).ToArray();
+        var protectedVocabulary = ProtectedTerms.Concat(protectedTerms ?? []).Select(CatalogSearchEngine.Normalize)
+            .Where(value => value.Length > 0).ToHashSet(StringComparer.Ordinal);
+        var trailingTokenIsPartial = liveTyping && query.Length > 0 && !char.IsWhiteSpace(query[^1]);
+        var correctedTokens = rawTokens.Select((token, index) => CorrectToken(token, vocabulary, protectedVocabulary,
+            trailingTokenIsPartial && index == rawTokens.Length - 1)).ToArray();
         var occupied = new bool[correctedTokens.Length];
         var strictOccupied = new bool[correctedTokens.Length];
         var constraints = new List<SearchConstraint>();
@@ -510,9 +520,16 @@ public static class SearchDictionaryService
         return true;
     }
 
-    private static string CorrectToken(string token, IReadOnlyCollection<string> vocabulary)
+    private static string CorrectToken(string token, IReadOnlyCollection<string> vocabulary,
+        IReadOnlySet<string> protectedTerms, bool allowPrefix)
     {
-        if (token.Length <= 2 || int.TryParse(token, out _) || vocabulary.Contains(token, StringComparer.Ordinal)) return token;
+        if (token.Length <= 2 || int.TryParse(token, out _) || vocabulary.Contains(token, StringComparer.Ordinal) || protectedTerms.Contains(token)) return token;
+        if (allowPrefix && token.Length >= 3)
+        {
+            var prefix = vocabulary.Where(candidate => candidate.Length > token.Length && candidate.StartsWith(token, StringComparison.Ordinal))
+                .OrderBy(candidate => candidate.Length).ThenBy(candidate => candidate, StringComparer.Ordinal).FirstOrDefault();
+            if (prefix is not null) return prefix;
+        }
         var best = vocabulary.Select(candidate => (Candidate: candidate, Score: Similarity(token, candidate)))
             .OrderByDescending(item => item.Score).ThenBy(item => item.Candidate.Length).FirstOrDefault();
         var threshold = token.Length <= 5 ? 0.74d : token.Length <= 8 ? 0.66d : 0.62d;

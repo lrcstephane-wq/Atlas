@@ -46,6 +46,15 @@ public partial class CatalogView : UserControl
         MoreFiltersPopup.IsOpen = !MoreFiltersPopup.IsOpen;
     }
 
+    private void ClientSearchSuggestion_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: string suggestion } || DataContext is not MainViewModel vm) return;
+        vm.ApplyClientSearchSuggestion(suggestion);
+        ClientSearchBox.Focus();
+        ClientSearchBox.CaretIndex = ClientSearchBox.Text.Length;
+        e.Handled = true;
+    }
+
     private void TopSolidDragCapsule_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart = e.GetPosition(this);

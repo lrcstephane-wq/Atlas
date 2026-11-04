@@ -6,6 +6,20 @@ namespace Atlas.Core.Services;
 
 public sealed record CatalogSearchField(string Text, double Weight = 1d);
 
+public sealed class CatalogSearchDocument
+{
+    internal CatalogSearchDocument(IReadOnlyList<CatalogPreparedField> fields)
+    {
+        Fields = fields;
+        Vocabulary = fields.SelectMany(field => field.Tokens).Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    internal IReadOnlyList<CatalogPreparedField> Fields { get; }
+    public IReadOnlyList<string> Vocabulary { get; }
+}
+
+internal sealed record CatalogPreparedField(string Normalized, string[] Tokens, double Weight);
+
 public static class CatalogSearchEngine
 {
     public static string Normalize(string? value)
@@ -45,31 +59,41 @@ public static class CatalogSearchEngine
     }
 
     public static double Score(string query, IEnumerable<CatalogSearchField> fields, IEnumerable<SearchSynonymRecord>? synonyms = null)
+        => Score(query, Prepare(fields), synonyms);
+
+    public static CatalogSearchDocument Prepare(IEnumerable<CatalogSearchField> fields) => new(fields
+        .Where(field => !string.IsNullOrWhiteSpace(field.Text) && field.Weight > 0)
+        .Select(field =>
+        {
+            var normalized = Normalize(field.Text);
+            return new CatalogPreparedField(normalized, Tokens(normalized), Math.Clamp(field.Weight, 0.1d, 2d));
+        })
+        .Where(field => field.Tokens.Length > 0)
+        .ToArray());
+
+    public static double Score(string query, CatalogSearchDocument document, IEnumerable<SearchSynonymRecord>? synonyms = null,
+        IEnumerable<string>? protectedTerms = null)
     {
         var normalizedQuery = Normalize(query);
         var queryTokens = Tokens(normalizedQuery);
         if (queryTokens.Length == 0) return 1d;
-
-        var searchableFields = fields
-            .Where(field => !string.IsNullOrWhiteSpace(field.Text) && field.Weight > 0)
-            .Select(field => new PreparedField(Normalize(field.Text), Math.Clamp(field.Weight, 0.1d, 2d)))
-            .Where(field => field.Tokens.Length > 0)
-            .ToArray();
-        if (searchableFields.Length == 0) return 0d;
+        if (document.Fields.Count == 0) return 0d;
 
         var synonymGroups = PrepareSynonyms(synonyms);
+        var protectedVocabulary = protectedTerms as IReadOnlySet<string> ?? (protectedTerms ?? []).Select(Normalize)
+            .Where(value => value.Length > 0).ToHashSet(StringComparer.Ordinal);
         double total = 0;
         foreach (var queryToken in queryTokens)
         {
             var alternatives = ExpandToken(queryToken, synonymGroups);
-            var best = searchableFields.Max(field => alternatives.Max(alternative =>
-                field.Tokens.Max(candidate => Similarity(alternative, candidate)) * field.Weight));
-            if (best < MinimumSimilarity(queryToken.Length)) return 0d;
+            var best = document.Fields.Max(field => alternatives.Max(alternative =>
+                field.Tokens.Max(candidate => LiveSimilarity(alternative, candidate, protectedVocabulary.Contains(alternative))) * field.Weight));
+            if (best < MinimumLiveSimilarity(queryToken.Length)) return 0d;
             total += Math.Min(1d, best);
         }
 
         var score = total / queryTokens.Length;
-        if (searchableFields.Any(field => field.Normalized.Contains(normalizedQuery, StringComparison.Ordinal))) score += 0.22d;
+        if (document.Fields.Any(field => field.Normalized.Contains(normalizedQuery, StringComparison.Ordinal))) score += 0.22d;
         return Math.Min(1.22d, score);
     }
 
@@ -120,6 +144,8 @@ public static class CatalogSearchEngine
         _ => 0.62d
     };
 
+    private static double MinimumLiveSimilarity(int length) => length <= 3 ? 0.93d : MinimumSimilarity(length);
+
     private static double Similarity(string left, string right)
     {
         if (left == right) return 1d;
@@ -128,6 +154,17 @@ public static class CatalogSearchEngine
             (right.Length >= 4 && left.StartsWith(right, StringComparison.Ordinal))) return 0.91d;
         var distance = DamerauLevenshtein(left, right);
         return Math.Max(0d, 1d - (double)distance / Math.Max(left.Length, right.Length));
+    }
+
+    private static double LiveSimilarity(string query, string candidate, bool isProtected)
+    {
+        if (query == candidate) return 1d;
+        if (query.Length >= 3 && candidate.Length > query.Length && candidate.StartsWith(query, StringComparison.Ordinal)) return 0.93d;
+        if (isProtected) return 0d;
+        var singularCandidate = candidate.EndsWith('s') ? candidate[..^1] : candidate;
+        if (query.Length >= 4 && singularCandidate.Length == query.Length + 1
+            && singularCandidate.AsSpan(1).SequenceEqual(query.AsSpan())) return 0.88d;
+        return Similarity(query, candidate);
     }
 
     private static int DamerauLevenshtein(string source, string target)
@@ -146,8 +183,4 @@ public static class CatalogSearchEngine
         return matrix[source.Length, target.Length];
     }
 
-    private sealed record PreparedField(string Normalized, double Weight)
-    {
-        public string[] Tokens { get; } = CatalogSearchEngine.Tokens(Normalized);
-    }
 }
