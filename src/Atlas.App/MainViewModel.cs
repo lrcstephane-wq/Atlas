@@ -1585,8 +1585,8 @@ public sealed class MainViewModel : ObservableObject
         var concept = _searchDictionary.Concepts.FirstOrDefault(item =>
             item.Label.Equals(constraint.ConceptLabel, StringComparison.OrdinalIgnoreCase));
         var terms = new[] { constraint.Value }
-            .Concat(concept?.Expressions() ?? [])
-            .Concat(concept is null ? [] : _searchDictionary.Synonyms
+            .Concat(concept?.Expressions() ?? Enumerable.Empty<string>())
+            .Concat(concept is null ? Enumerable.Empty<string>() : _searchDictionary.Synonyms
                 .Where(item => item.IsActive && item.ConceptId.Equals(concept.Id, StringComparison.OrdinalIgnoreCase))
                 .Select(item => item.Term))
             .Where(value => !string.IsNullOrWhiteSpace(value))
