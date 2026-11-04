@@ -200,7 +200,7 @@ public static class SearchDictionaryService
     public const int OfficialVersion = 3;
     public static IReadOnlySet<string> ProtectedTerms { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        "miroir", "rayon", "hayon", "joue", "fond", "chant", "façade", "vasque", "caisse", "socle"
+        "miroir", "rayon", "hayon", "four", "joue", "fond", "chant", "façade", "vasque", "caisse", "socle"
     };
 
     public static IReadOnlyList<SearchConceptRecord> OfficialConcepts { get; } = BuildOfficialConcepts();
