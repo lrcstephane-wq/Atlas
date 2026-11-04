@@ -30,6 +30,29 @@ File.Delete(deploymentPolicyPath);
 var demo = DemoCatalogFactory.Create();
 Assert(demo.Components.Count >= 2 && demo.Furniture.Count >= 1, "Le catalogue de démonstration doit permettre l’aperçu de la V0.1.");
 Assert(demo.Furniture[0].ComponentIds.All(id => demo.Components.Any(component => component.Id == id)), "La composition doit référencer des composants connus.");
+var legacyBlankFurniture = new FurnitureRecord
+{
+    PrincipleConstruction = " ",
+    PositionDos = "",
+    TypeAssemblage = "",
+    Forme = ""
+};
+Assert(FurnitureDefaults.NormalizeStructure(legacyBlankFurniture, new AtlasReferenceData())
+       && legacyBlankFurniture.PrincipleConstruction == "Non applicable"
+       && legacyBlankFurniture.PositionDos == "Non applicable"
+       && legacyBlankFurniture.TypeAssemblage == "Sans assemblage"
+       && legacyBlankFurniture.Forme == "Droit",
+    "Une ancienne fiche dont les listes affichaient une valeur non enregistrée doit être régularisée automatiquement.");
+var duplicatedStructureFurniture = new FurnitureRecord
+{
+    PrincipleConstruction = legacyBlankFurniture.PrincipleConstruction,
+    PositionDos = legacyBlankFurniture.PositionDos,
+    TypeAssemblage = legacyBlankFurniture.TypeAssemblage,
+    Forme = legacyBlankFurniture.Forme
+};
+Assert(!FurnitureDefaults.NormalizeStructure(duplicatedStructureFurniture, new AtlasReferenceData())
+       && duplicatedStructureFurniture.TypeAssemblage == "Sans assemblage",
+    "Une duplication doit conserver les valeurs de structure réellement initialisées.");
 Assert(demo.Furniture[0].Universes.Count > 1, "Un meuble doit pouvoir appartenir à plusieurs univers.");
 Assert(demo.UniverseDefinitions.Count >= 2 && demo.UniverseDefinitions.All(item => !string.IsNullOrWhiteSpace(item.Name)), "Les univers illustrés doivent être persistés comme des fiches administrables.");
 demo.UniverseDefinitions[0].ImageRelativePath = Path.Combine("Images", "Universes", "cuisine.jpg");

@@ -299,14 +299,14 @@ public sealed class FurnitureRecord : BindableModel
     private string _family = string.Empty;
     private string _description = string.Empty;
     private string _useCasesCsv = string.Empty;
-    private string _principleConstruction = string.Empty;
+    private string _principleConstruction = "Non applicable";
     private string _sensMontage = string.Empty;
     private string _familyId = string.Empty;
     private string _typeMeuble = string.Empty;
     private string _usageSpecifique = string.Empty;
     private string _forme = "Droit";
-    private string _positionDos = string.Empty;
-    private string _typeAssemblage = string.Empty;
+    private string _positionDos = "Non applicable";
+    private string _typeAssemblage = "Sans assemblage";
     private string _sourceRelativePath = string.Empty;
     private string _imageRelativePath = string.Empty;
     private DateTime? _conceptionDate = DateTime.Today;
