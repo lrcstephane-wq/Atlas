@@ -364,6 +364,13 @@ try
     var reloadedCustomerCatalog = await customerStore.LoadAsync();
     Assert(reloadedCustomerCatalog.Furniture.Single().ClientTagIds.Contains("michel") && reloadedCustomerCatalog.Furniture.Single().ClientUniverseIds.Contains("sur-mesure"), "Les Univers Client et Tags Client doivent être conservés.");
     Assert(reloadedCustomerCatalog.Exclusions.Single().DisplayName == "Meuble ignoré" && !customerStore.CatalogPath.Contains("catalog.atlas.json", StringComparison.OrdinalIgnoreCase), "Les exclusions doivent rester hors de la base Atlas officielle.");
+    reloadedCustomerCatalog.Locations.Clear();
+    reloadedCustomerCatalog.Furniture.Clear();
+    reloadedCustomerCatalog.FurnitureRoot = string.Empty;
+    await customerStore.SaveAsync(reloadedCustomerCatalog);
+    var withoutLocation = await customerStore.LoadAsync();
+    Assert(withoutLocation.Locations.Count == 0 && string.IsNullOrWhiteSpace(withoutLocation.FurnitureRoot),
+        "Un emplacement Client retiré doit rester retiré après redémarrage et ne pas être recréé par la migration historique.");
 }
 finally
 {
@@ -482,7 +489,8 @@ var adminAccessServiceSource = await File.ReadAllTextAsync(Path.Combine(Director
 Assert(adminAccessServiceSource.Contains("RandomNumberGenerator.GetBytes(24)") && adminAccessServiceSource.Contains("ValidateAndConsume")
        && adminAccessServiceSource.Contains("expectedDeviceId") && adminAccessServiceSource.Contains("expectedNonce"),
     "L’accès Idéo doit être lié au poste, à une demande aléatoire en mémoire et consommé une seule fois.");
-Assert(mainWindowXaml.Contains("AccessAdministrator_Click") && mainWindowXaml.Contains("Logout_Click") && mainWindowXaml.Contains("CanUseAdministrativeInterfaces"), "La coque commune doit exposer l’accès administrateur et la déconnexion tout en masquant les fonctions protégées.");
+Assert(mainWindowXaml.Contains("ChangeRole_Click") && mainWindowXaml.Contains("RoleActionLabel") && appCode.Contains("ChangeRoleAsync"), "La coque commune doit ramener au choix du rôle sans imposer un redémarrage.");
+Assert(mainWindowXaml.Contains("LicenseBannerText") && viewModelSource.Contains("Atlas porte votre conception avec Biblidéo"), "Le bandeau principal doit afficher l’état et l’échéance de la licence plutôt que les informations techniques de l’environnement.");
 var furnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureView.xaml"));
 Assert(viewModelSource.Contains("NextFurnitureReference()") && viewModelSource.Contains("ToString(\"D9\")"), "Les nouveaux meubles doivent recevoir une référence automatique sur neuf chiffres.");
 Assert(viewModelSource.Contains("ValidateFurnitureReference") && viewModelSource.Contains("exactement 9 chiffres") && viewModelSource.Contains("est déjà utilisée par"), "Une référence meuble modifiée doit rester numérique, unique et explicite en cas de conflit.");
@@ -555,8 +563,21 @@ Assert(settingsCode.Contains("AddFurnitureType_OnClick") && settingsCode.Contain
 Assert(settingsCode.Contains("SaveSearchDictionaryAsync") && viewModelSource.Contains("SearchDictionaryService.Interpret") && viewModelSource.Contains("ScheduleUnknownSearchObservation"), "Le dictionnaire doit être persistant, interpréter les intentions et mémoriser les recherches sans résultat.");
 Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Contains("DefaultFurnitureUsages") && viewModelSource.Contains("_catalog.FurnitureTypes = FurnitureTypes.ToList()"), "Les valeurs historiques doivent migrer vers des référentiels configurables et persistés.");
 var customerFurnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureView.xaml"));
-Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("CustomerFurnitureRoot") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions"), "Le Créateur doit disposer d’un espace Mes meubles limité au dossier client et aux repères personnels.");
+var customerFurnitureCatalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureCatalogWindow.xaml"));
+var customerFurnitureCatalogCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureCatalogWindow.xaml.cs"));
+Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions") && customerFurnitureXaml.Contains("CanManageCustomerFurniture"), "Le Gestionnaire doit consulter Mes meubles tandis que les modifications restent réservées au Créateur licencié.");
+Assert(viewModelSource.Contains("CanViewCustomerFurniture => IsAdministrator || IsSiteManagerMode")
+       && viewModelSource.Contains("CanManageCustomerFurniture => IsAdministrator || (IsCreatorMode"),
+    "La consultation du catalogue personnel et sa gestion doivent relever de droits distincts.");
+Assert(customerFurnitureCatalogXaml.Contains("CATALOGUE PERSONNEL") && customerFurnitureCatalogXaml.Contains("Content=\"Liste\"")
+       && customerFurnitureCatalogXaml.Contains("Content=\"Cartes\"") && customerFurnitureCatalogCode.Contains("OpenCustomerFurniture"),
+    "Mes meubles doit proposer un catalogue personnel détachable, en liste ou cartes, ouvrable dans la page principale.");
 Assert(catalogXaml.Contains("CommandParameter=\"Source\"") && catalogXaml.Contains("CommandParameter=\"Tags Client\"") && catalogXaml.Contains("SourceLabel"), "Horizon doit distinguer la source et filtrer les Tags Client sans les mélanger aux tags Atlas.");
+Assert(catalogXaml.Contains("FurnitureCard_OnMouseDoubleClick") && catalogXaml.Contains("FurnitureChoice_OnClick")
+       && catalogXaml.Contains("ClientSelectionItems") && catalogXaml.Contains("PrepareClientSelectionLabel"),
+    "Horizon doit prévisualiser au simple clic, sélectionner au double clic et afficher chaque meuble d’une sélection multiple.");
+Assert(catalogXaml.Contains("MoreFiltersPopup") && !catalogXaml.Contains("<Button.ContextMenu>"),
+    "Les filtres complémentaires doivent utiliser un panneau Atlas lisible sans bande blanche native.");
 Assert(viewModelSource.Contains("CustomerFurnitureStore") && viewModelSource.Contains("BuildCustomerFurnitureRecord") && viewModelSource.Contains("ManageOwnFurniture"), "Les meubles clients doivent être indexés séparément et réservés au profil Créateur.");
 Assert(viewModelSource.Contains("IsCreatorFeatureLicensed") && viewModelSource.Contains("NewLicenseCreatorEnabled") && viewModelSource.Contains("features: features"), "L’accès Créateur doit exiger à la fois le profil utilisateur et l’option signée dans la licence.");
 var componentsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "ComponentsView.xaml"));
