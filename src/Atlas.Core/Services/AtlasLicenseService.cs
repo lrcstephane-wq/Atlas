@@ -54,6 +54,37 @@ public sealed class AtlasLicenseService
     public static string SigningPrivateKeyPath(string sharedRoot) =>
         Path.Combine(AtlasPaths.ConfigurationRoot, "Atlas-Licence-ClePrivee.pem");
 
+    public static string? FindMatchingSigningPrivateKeyPath(string? sharedRoot, string? publicKeyPem = null)
+    {
+        var candidates = new List<string> { SigningPrivateKeyPath(sharedRoot ?? string.Empty) };
+        if (!string.IsNullOrWhiteSpace(sharedRoot))
+            candidates.Add(Path.Combine(sharedRoot, "Configuration", "Atlas-Licence-ClePrivee.pem"));
+        foreach (var path in candidates.Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists))
+        {
+            try
+            {
+                if (PrivateKeyMatchesPublicKey(File.ReadAllText(path), publicKeyPem)) return path;
+            }
+            catch (CryptographicException) { }
+            catch (ArgumentException) { }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return null;
+    }
+
+    public static bool PrivateKeyMatchesPublicKey(string privateKeyPem, string? publicKeyPem = null)
+    {
+        if (string.IsNullOrWhiteSpace(privateKeyPem)) return false;
+        var probe = RandomNumberGenerator.GetBytes(32);
+        using var signer = ECDsa.Create();
+        signer.ImportFromPem(privateKeyPem);
+        var signature = signer.SignData(probe, HashAlgorithmName.SHA256);
+        using var verifier = ECDsa.Create();
+        verifier.ImportFromPem(string.IsNullOrWhiteSpace(publicKeyPem) ? DefaultPublicKeyPem : publicKeyPem);
+        return verifier.VerifyData(probe, signature, HashAlgorithmName.SHA256);
+    }
+
     public AtlasLicenseInfo Read(DateOnly? today = null)
     {
         try { MigrateLegacyLicense(); }

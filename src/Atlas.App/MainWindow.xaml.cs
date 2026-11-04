@@ -25,7 +25,7 @@ public partial class MainWindow : Window
         PreviewMouseDown += (_, _) => _lastActivity = DateTimeOffset.UtcNow;
         PreviewTouchDown += (_, _) => _lastActivity = DateTimeOffset.UtcNow;
         _adminLockTimer.Tick += AdminLockTimer_OnTick;
-        if (_viewModel.IsAdministrator) _adminLockTimer.Start();
+        if (_viewModel.IsAdministrator && !_viewModel.CurrentUser.IsPermanentIdeoDevelopmentSession) _adminLockTimer.Start();
     }
     private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
@@ -79,7 +79,7 @@ public partial class MainWindow : Window
 
     private async void AdminLockTimer_OnTick(object? sender, EventArgs e)
     {
-        if (_lockingAdminSession || !_viewModel.IsAdministrator) return;
+        if (_lockingAdminSession || !_viewModel.IsAdministrator || _viewModel.CurrentUser.IsPermanentIdeoDevelopmentSession) return;
         var now = DateTimeOffset.UtcNow;
         if (now - _lastActivity < TimeSpan.FromMinutes(15) && now - _sessionStarted < TimeSpan.FromHours(2)) return;
         _lockingAdminSession = true;

@@ -75,6 +75,8 @@ Le premier compte créé est un **Gestionnaire du site** : il configure les chem
 
 L’**Administrateur Idéo** n’est jamais enregistré dans `users.atlas.json`. Stéphane ou Thomas génèrent sur un poste interne une réponse valable quelques minutes à partir de la demande affichée par le poste client. La réponse est liée à l’identifiant du poste et au défi aléatoire conservé en mémoire ; elle devient inutilisable dès sa validation. La session se ferme manuellement ou automatiquement après inactivité.
 
+Sur les postes internes de développement, Atlas recherche également la clé privée Idéo dans `C:\Ideo_Atlas\Configuration` puis dans le dossier `Configuration` de l’espace partagé. La clé doit correspondre cryptographiquement à la clé publique intégrée : lorsqu’elle est reconnue, le bouton Administrateur Idéo ouvre directement une session complète et permanente, sans modifier le fonctionnement des postes clients.
+
 Les `.atlaspack` mettent à jour le catalogue Atlas, le dictionnaire, les référentiels, les fichiers `.TOP` et leurs aperçus sans remplacer les ajouts du site. La génération refuse désormais un pack dont un fichier meuble référencé est absent.
 
 ## Compilation

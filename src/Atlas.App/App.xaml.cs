@@ -99,19 +99,32 @@ public partial class App : Application
 
     public async Task<bool> OpenIdeoAdministratorSessionAsync(MainWindow? currentWindow = null)
     {
+        var trustedKeyPath = AtlasLicenseService.FindMatchingSigningPrivateKeyPath(_bootstrap.SharedRoot);
+        if (trustedKeyPath is not null)
+        {
+            await OpenIdeoSessionAsync($"{Environment.UserName} · Développement Idéo", Guid.NewGuid().ToString("N"), true, currentWindow);
+            return true;
+        }
+
         var access = new IdeoAdminAccessWindow { Owner = currentWindow };
         if (access.ShowDialog() != true || access.Grant is null) return false;
+        await OpenIdeoSessionAsync(access.Grant.OperatorName, access.Grant.TokenId, false, currentWindow);
+        return true;
+    }
+
+    private async Task OpenIdeoSessionAsync(string displayName, string tokenId, bool permanentDevelopmentSession, MainWindow? currentWindow)
+    {
         var user = new UserAccount
         {
-            Id = $"ideo-{access.Grant.TokenId}",
+            Id = $"ideo-{tokenId}",
             Login = "ideo",
-            DisplayName = access.Grant.OperatorName,
+            DisplayName = displayName,
             Permissions = UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer
                           | UserPermissions.ManageOwnFurniture | UserPermissions.ManageSite | UserPermissions.IdeoAdministrator,
-            IsActive = true
+            IsActive = true,
+            IsPermanentIdeoDevelopmentSession = permanentDevelopmentSession
         };
         await OpenSessionAsync(user, false, currentWindow);
-        return true;
     }
 
     private Task OpenUserSessionAsync(MainWindow? currentWindow = null)

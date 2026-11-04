@@ -385,6 +385,18 @@ using (var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
     Assert(licenseService.Validate(licenseCode, new DateOnly(2027, 4, 1)).State == AtlasLicenseState.Expired, "La licence doit expirer le lendemain de sa date de fin.");
     Assert(licenseService.Validate(licenseCode + "X", new DateOnly(2027, 3, 1)).State == AtlasLicenseState.Invalid, "Un code modifié doit être refusé.");
     Assert(licenseService.Install(licenseCode, new DateOnly(2027, 3, 1)).IsValid && File.Exists(licensePath), "Un code valide doit être écrit dans Licence.fautpastoucher.");
+    Assert(AtlasLicenseService.PrivateKeyMatchesPublicKey(privateKey, publicKey),
+        "La clé privée Idéo doit être reconnue par une preuve cryptographique et non par son seul nom de fichier.");
+    using (var unrelatedKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+        Assert(!AtlasLicenseService.PrivateKeyMatchesPublicKey(unrelatedKey.ExportECPrivateKeyPem(), publicKey),
+            "Une clé privée étrangère ne doit jamais ouvrir l’accès permanent Idéo.");
+    var sharedKeyRoot = Path.Combine(Path.GetTempPath(), $"atlas-shared-key-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(Path.Combine(sharedKeyRoot, "Configuration"));
+    var sharedKeyPath = Path.Combine(sharedKeyRoot, "Configuration", "Atlas-Licence-ClePrivee.pem");
+    await File.WriteAllTextAsync(sharedKeyPath, privateKey);
+    Assert(AtlasLicenseService.FindMatchingSigningPrivateKeyPath(sharedKeyRoot, publicKey) == sharedKeyPath,
+        "Atlas doit reconnaître la clé Idéo valide lorsqu’elle se trouve dans la configuration partagée.");
+    Directory.Delete(sharedKeyRoot, true);
     Directory.Delete(Path.GetDirectoryName(licensePath)!, true);
 }
 
@@ -456,6 +468,9 @@ Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsCre
 Assert(appCode.Contains("IdeoAdminAccessWindow") && appCode.Contains("UserPermissions.IdeoAdministrator")
        && !appCode.Contains("CreateFirstAdministratorAsync"),
     "L’Administrateur Idéo doit être une session éphémère signée et ne jamais être créé comme compte client persistant.");
+Assert(appCode.Contains("FindMatchingSigningPrivateKeyPath") && appCode.Contains("permanentDevelopmentSession")
+       && mainWindowCode.Contains("IsPermanentIdeoDevelopmentSession"),
+    "Une vraie clé privée Idéo, locale ou partagée, doit ouvrir un accès interne permanent sans désactiver la protection des clients.");
 var adminAccessServiceSource = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.Core", "Services", "IdeoAdminAccessService.cs"));
 Assert(adminAccessServiceSource.Contains("RandomNumberGenerator.GetBytes(24)") && adminAccessServiceSource.Contains("ValidateAndConsume")
        && adminAccessServiceSource.Contains("expectedDeviceId") && adminAccessServiceSource.Contains("expectedNonce"),
