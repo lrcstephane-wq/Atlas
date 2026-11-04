@@ -83,8 +83,8 @@ public sealed class AtlasContentPackageService
             universe.ImageRelativePath = Path.Combine("Images", "Universes", Path.GetFileName(universe.ImageRelativePath));
         foreach (var furniture in packagedCatalog.Furniture)
         {
-            if (Path.IsPathRooted(furniture.SourceRelativePath)) furniture.SourceRelativePath = Path.GetFileName(furniture.SourceRelativePath);
-            if (Path.IsPathRooted(furniture.ImageRelativePath)) furniture.ImageRelativePath = Path.GetFileName(furniture.ImageRelativePath);
+            if (!string.IsNullOrWhiteSpace(furniture.SourceRelativePath)) furniture.SourceRelativePath = Path.GetFileName(furniture.SourceRelativePath);
+            if (!string.IsNullOrWhiteSpace(furniture.ImageRelativePath)) furniture.ImageRelativePath = Path.GetFileName(furniture.ImageRelativePath);
         }
         var packagedDictionary = PrepareOfficialDictionary(dictionary);
         var packagedTaxonomy = Clone(taxonomy);
@@ -94,6 +94,8 @@ public sealed class AtlasContentPackageService
             MinimumApplicationVersion = string.IsNullOrWhiteSpace(minimumApplicationVersion) ? "0.18.0" : minimumApplicationVersion.Trim(),
             Modules = modules
         };
+
+        if (modules.HasFlag(AtlasContentModules.FurnitureAssets)) ValidateFurnitureAssets(catalog, furnitureRoot);
 
         await using var output = File.Create(outputPath);
         using var archive = new ZipArchive(output, ZipArchiveMode.Create, true);
@@ -329,7 +331,33 @@ public sealed class AtlasContentPackageService
         return target;
     }
 
-    private static string ResolveSource(string root, string path) => Path.IsPathRooted(path) ? path : Path.Combine(root, path);
+    private static string ResolveSource(string root, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+        var recorded = Path.IsPathRooted(path) ? path : Path.Combine(root, path);
+        if (File.Exists(recorded)) return recorded;
+        return Path.Combine(root, Path.GetFileName(path));
+    }
+
+    private static void ValidateFurnitureAssets(AtlasCatalog catalog, string furnitureRoot)
+    {
+        if (string.IsNullOrWhiteSpace(furnitureRoot)) throw new InvalidOperationException("Le dossier des meubles Atlas doit être configuré avant de générer un pack.");
+        var missing = new List<string>();
+        foreach (var furniture in catalog.Furniture.Where(item => !item.IsDemo))
+        {
+            foreach (var asset in new[]
+                     {
+                         (Label: "TOP", Path: furniture.SourceRelativePath),
+                         (Label: "image", Path: furniture.ImageRelativePath)
+                     }.Where(item => !string.IsNullOrWhiteSpace(item.Path)))
+                if (!File.Exists(ResolveSource(furnitureRoot, asset.Path)))
+                    missing.Add($"{furniture.Reference} · {asset.Label} · {asset.Path}");
+        }
+        if (missing.Count == 0) return;
+        throw new FileNotFoundException("Le pack n’a pas été généré car des fichiers référencés sont introuvables :" + Environment.NewLine
+                                        + string.Join(Environment.NewLine, missing.Take(12))
+                                        + (missing.Count > 12 ? $"{Environment.NewLine}… et {missing.Count - 12} autre(s)." : string.Empty));
+    }
     private static string NormalizeRelative(string value) => value.Replace('\\', '/').TrimStart('/');
     private static string SafeName(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
 

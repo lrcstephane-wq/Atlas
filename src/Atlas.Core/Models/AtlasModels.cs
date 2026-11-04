@@ -29,7 +29,9 @@ public enum UserPermissions
     Edit = 2,
     Validate = 4,
     Administer = 8,
-    ManageOwnFurniture = 16
+    ManageOwnFurniture = 16,
+    ManageSite = 32,
+    IdeoAdministrator = 64
 }
 
 public sealed class UserAccount
@@ -45,9 +47,11 @@ public sealed class UserAccount
     public DateTimeOffset? CreatedUtc { get; set; }
     public DateTimeOffset? LastLoginUtc { get; set; }
 
-    public bool CanEdit => Permissions.HasFlag(UserPermissions.Edit) || Permissions.HasFlag(UserPermissions.Administer);
-    public bool CanValidate => Permissions.HasFlag(UserPermissions.Validate) || Permissions.HasFlag(UserPermissions.Administer);
-    public bool IsAdministrator => Permissions.HasFlag(UserPermissions.Administer);
+    public bool CanEdit => Permissions.HasFlag(UserPermissions.Edit) || IsIdeoAdministrator;
+    public bool CanValidate => Permissions.HasFlag(UserPermissions.Validate) || IsIdeoAdministrator;
+    public bool IsIdeoAdministrator => Permissions.HasFlag(UserPermissions.IdeoAdministrator);
+    public bool IsAdministrator => IsIdeoAdministrator;
+    public bool IsSiteManager => Permissions.HasFlag(UserPermissions.ManageSite) || IsIdeoAdministrator;
     public bool IsCreator => Permissions.HasFlag(UserPermissions.ManageOwnFurniture);
 }
 

@@ -46,7 +46,10 @@ try
     Directory.Delete(staging, true);
     File.Delete(archive);
     File.AppendAllText(logPath, $"{DateTimeOffset.Now:u} Mise à jour installée.\n");
-    Process.Start(new ProcessStartInfo(launch) { UseShellExecute = true });
+    // L’updater est élevé pour remplacer les fichiers dans C:\Ideo_Atlas\Application.
+    // Le redémarrage passe par l’Explorateur afin de retrouver la session utilisateur normale
+    // et ses lecteurs réseau mappés (Z:, Y:, etc.).
+    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{launch}\"") { UseShellExecute = true });
 }
 catch (Exception exception)
 {

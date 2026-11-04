@@ -1,5 +1,5 @@
 #ifndef AtlasVersion
-  #define AtlasVersion "0.18.1"
+  #define AtlasVersion "0.18.2"
 #endif
 
 #ifndef PayloadDir
@@ -132,6 +132,7 @@ begin
   if (CurUninstallStep = usPostUninstall) and RemoveAllLocalData then
   begin
     DelTree(ExpandConstant('{commonappdata}\Ideo Solutions\Atlas'), True, True, True);
+    DelTree(ExpandConstant('{localappdata}\Ideo Solutions\Atlas'), True, True, True);
     DelTree(ExpandConstant('{sd}\Ideo_Atlas'), True, True, True);
   end;
 end;

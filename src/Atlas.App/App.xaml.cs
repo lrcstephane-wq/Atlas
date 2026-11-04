@@ -28,23 +28,33 @@ public partial class App : Application
                 {
                     if (string.IsNullOrWhiteSpace(_bootstrap.SharedRoot) || !AtlasWorkspaceService.IsWorkspace(_bootstrap.SharedRoot))
                     {
-                        AtlasDialog.Warning("L’espace Atlas doit d’abord être créé ou sélectionné par un administrateur.", "Horizon indisponible");
+                        AtlasDialog.Warning("L’espace Atlas doit d’abord être créé ou sélectionné par un Gestionnaire du site.", "Horizon indisponible");
                         continue;
                     }
                     await OpenUserSessionAsync();
                     return;
                 }
 
+                if (launch.SelectedMode == AtlasEntryMode.IdeoAdministrator)
+                {
+                    if (await OpenIdeoAdministratorSessionAsync()) return;
+                    continue;
+                }
+
                 var login = new LoginWindow(_bootstrap);
-                if (login.ShowDialog() != true || login.AuthenticatedUser is null) continue;
+                if (login.ShowDialog() != true || login.AuthenticatedUser is null)
+                {
+                    if (login.IdeoAccessRequested && await OpenIdeoAdministratorSessionAsync()) return;
+                    continue;
+                }
                 if (launch.SelectedMode == AtlasEntryMode.Creator && !login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
                 {
                     AtlasDialog.Warning("Ce compte ne possède pas le profil Créateur.", "Accès refusé");
                     continue;
                 }
-                if (launch.SelectedMode == AtlasEntryMode.Administrator && login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
+                if (launch.SelectedMode == AtlasEntryMode.SiteManager && !login.AuthenticatedUser.IsSiteManager)
                 {
-                    AtlasDialog.Warning("Ce compte doit utiliser l’entrée Créateur.", "Accès refusé");
+                    AtlasDialog.Warning("Ce compte ne possède pas le profil Gestionnaire du site.", "Accès refusé");
                     continue;
                 }
                 await OpenSessionAsync(login.AuthenticatedUser, false);
@@ -63,17 +73,21 @@ public partial class App : Application
         try
         {
             var login = new LoginWindow(_bootstrap) { Owner = currentWindow };
-            if (login.ShowDialog() != true || login.AuthenticatedUser is null) return;
-            if (login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
+            if (login.ShowDialog() != true || login.AuthenticatedUser is null)
             {
-                AtlasDialog.Warning("Ce compte Créateur ne donne pas accès aux interfaces administratives.", "Accès refusé");
+                if (login.IdeoAccessRequested) await OpenIdeoAdministratorSessionAsync(currentWindow);
+                return;
+            }
+            if (!login.AuthenticatedUser.IsSiteManager)
+            {
+                AtlasDialog.Warning("Ce compte ne possède pas le profil Gestionnaire du site.", "Accès refusé");
                 return;
             }
             await OpenSessionAsync(login.AuthenticatedUser, false, currentWindow);
         }
         catch (Exception exception)
         {
-            AtlasDialog.Error(exception.Message, "Connexion administrateur impossible");
+            AtlasDialog.Error(exception.Message, "Connexion sécurisée impossible");
         }
     }
 
@@ -81,6 +95,23 @@ public partial class App : Application
     {
         try { await OpenUserSessionAsync(currentWindow); }
         catch (Exception exception) { AtlasDialog.Error(exception.Message, "Déconnexion impossible"); }
+    }
+
+    public async Task<bool> OpenIdeoAdministratorSessionAsync(MainWindow? currentWindow = null)
+    {
+        var access = new IdeoAdminAccessWindow { Owner = currentWindow };
+        if (access.ShowDialog() != true || access.Grant is null) return false;
+        var user = new UserAccount
+        {
+            Id = $"ideo-{access.Grant.TokenId}",
+            Login = "ideo",
+            DisplayName = access.Grant.OperatorName,
+            Permissions = UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer
+                          | UserPermissions.ManageOwnFurniture | UserPermissions.ManageSite | UserPermissions.IdeoAdministrator,
+            IsActive = true
+        };
+        await OpenSessionAsync(user, false, currentWindow);
+        return true;
     }
 
     private Task OpenUserSessionAsync(MainWindow? currentWindow = null)

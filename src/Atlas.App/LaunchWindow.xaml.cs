@@ -5,7 +5,8 @@ namespace Atlas.App;
 public enum AtlasEntryMode
 {
     None,
-    Administrator,
+    SiteManager,
+    IdeoAdministrator,
     Creator,
     User
 }
@@ -16,9 +17,15 @@ public partial class LaunchWindow : Window
 
     public LaunchWindow() => InitializeComponent();
 
-    private void Administrator_OnClick(object sender, RoutedEventArgs e)
+    private void SiteManager_OnClick(object sender, RoutedEventArgs e)
     {
-        SelectedMode = AtlasEntryMode.Administrator;
+        SelectedMode = AtlasEntryMode.SiteManager;
+        DialogResult = true;
+    }
+
+    private void IdeoAdministrator_OnClick(object sender, RoutedEventArgs e)
+    {
+        SelectedMode = AtlasEntryMode.IdeoAdministrator;
         DialogResult = true;
     }
 

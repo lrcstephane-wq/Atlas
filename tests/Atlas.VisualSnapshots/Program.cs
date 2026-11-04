@@ -44,7 +44,7 @@ internal static class Program
             Console.WriteLine("Écriture du catalogue visuel…");
             await store.SaveAsync(catalog, 0, "Contrôle visuel");
             var bootstrap = new LocalBootstrap { SharedRoot = root };
-            var account = UserAccountStore.CreateAccount("visual", "Contrôle visuel", "Atlas-Visual-2026", UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer);
+            var account = UserAccountStore.CreateAccount("visual", "Contrôle visuel", "Atlas-Visual-2026", UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer | UserPermissions.ManageSite | UserPermissions.IdeoAdministrator);
             var vm = new MainViewModel(store, new UserAccountStore(root), bootstrap, account);
             Console.WriteLine("Initialisation d’Atlas…");
             await vm.InitializeAsync();

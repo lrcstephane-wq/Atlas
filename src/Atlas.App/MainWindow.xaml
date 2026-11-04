@@ -89,7 +89,7 @@
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource PrimaryGradient}"><TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/></Border>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding SessionLabel}" Style="{StaticResource Caption}"/></StackPanel>
-                                <Button Grid.Column="2" Content="↪" Style="{StaticResource IconButton}" ToolTip="Accès administrateur" Click="AccessAdministrator_Click" Visibility="{Binding ShowUserSessionActions, Converter={StaticResource BoolVisibility}}"/>
+                                <Button Grid.Column="2" Content="↪" Style="{StaticResource IconButton}" ToolTip="Accès Gestionnaire ou Administrateur Idéo" Click="AccessAdministrator_Click" Visibility="{Binding ShowUserSessionActions, Converter={StaticResource BoolVisibility}}"/>
                                 <Button Grid.Column="2" Content="↩" Style="{StaticResource IconButton}" ToolTip="Se déconnecter" Click="Logout_Click" Visibility="{Binding ShowAuthenticatedSessionActions, Converter={StaticResource BoolVisibility}}"/>
                             </Grid>
                         </Border>

@@ -25,6 +25,7 @@
      <TextBlock Text="Mot de passe" Style="{StaticResource FieldLabel}"/><PasswordBox x:Name="PasswordBox" Margin="0,0,0,18" KeyDown="PasswordBox_OnKeyDown"/>
      <TextBlock x:Name="ErrorText" Foreground="{StaticResource RoseBrush}" Margin="0,0,0,12"/>
      <Button x:Name="SubmitButton" Content="Se connecter" Click="SubmitButton_OnClick" Height="46"/>
+     <Button Content="Accès Administrateur Idéo" Style="{StaticResource GhostButton}" HorizontalAlignment="Center" Margin="0,10,0,0" Click="IdeoAccess_OnClick"/>
      <TextBlock Text="Vos données restent sur votre infrastructure Atlas." Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,14,0,0"/>
     </StackPanel></ScrollViewer>
    </Grid>

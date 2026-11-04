@@ -179,7 +179,7 @@ public sealed class FurnitureCatalogViewModel : ObservableObject, IDisposable
     private void LoadPreview()
     {
         Preview = null;
-        var imagePath = _main.ResolveFurnitureAssetPath(SelectedFurniture?.ImageRelativePath ?? string.Empty);
+        var imagePath = _main.ResolveFurnitureImageAssetPath(SelectedFurniture);
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath)) return;
         try
         {

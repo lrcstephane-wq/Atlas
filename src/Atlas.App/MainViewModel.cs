@@ -59,6 +59,7 @@ public sealed class MainViewModel : ObservableObject
     private BitmapImage? _furniturePreview;
     private AtlasLicenseInfo _licenseInfo;
     private string _licenseCodeEntry = "", _generatedLicenseCode = "", _newLicenseCustomer = "", _newLicenseDeviceId = "";
+    private string _ideoAccessRequestCode = "", _ideoOperatorName = "", _generatedIdeoAccessCode = "";
     private string _newPersonalTagName = "", _newClientUniverseName = "";
     private CustomerFurnitureLocation? _selectedCustomerFurnitureLocation;
     private bool _newLicenseCreatorEnabled;
@@ -73,7 +74,7 @@ public sealed class MainViewModel : ObservableObject
         _store = store; _userStore = userStore; _bootstrap = bootstrap; _sharedRoot = bootstrap.SharedRoot; CurrentUser = currentUser; IsUserMode = userMode;
         _customerFurnitureStore = new CustomerFurnitureStore(_sharedRoot);
         _licenseInfo = _licenseService.Read();
-        _currentPage = userMode || IsCreatorMode || IsLicenseRestricted ? "Catalog" : "Dashboard";
+        _currentPage = userMode || IsCreatorMode || IsSiteManagerMode || IsLicenseRestricted ? "Catalog" : "Dashboard";
         _horizonPreferencesStore = new HorizonPreferencesStore(_sharedRoot, currentUser.Id);
         _searchDictionaryStore = new SearchDictionaryStore(_sharedRoot);
         FurnitureSteps[0].IsActive = true;
@@ -89,9 +90,9 @@ public sealed class MainViewModel : ObservableObject
         ScanCommand = new(_ => _ = ScanAsync(), _ => CanEdit && !IsBusy);
         ChooseLibraryCommand = new(_ => ChooseLibrary(), _ => CanEdit);
         ChooseFurnitureRootCommand = new(_ => ChooseFurnitureRoot(), _ => CanEdit);
-        ChooseLocalLibraryOverrideCommand = new(_ => ChooseLocalLibraryOverride(), _ => IsAdministrator);
-        ChooseLocalFurnitureOverrideCommand = new(_ => ChooseLocalFurnitureOverride(), _ => IsAdministrator);
-        ClearLocalPathOverridesCommand = new(_ => ClearLocalPathOverrides(), _ => IsAdministrator);
+        ChooseLocalLibraryOverrideCommand = new(_ => ChooseLocalLibraryOverride(), _ => CanManageSite);
+        ChooseLocalFurnitureOverrideCommand = new(_ => ChooseLocalFurnitureOverride(), _ => CanManageSite);
+        ClearLocalPathOverridesCommand = new(_ => ClearLocalPathOverrides(), _ => CanManageSite);
         ChooseCustomerFurnitureRootCommand = new(_ => ChooseCustomerFurnitureRoot(), _ => CanManageCustomerFurniture);
         SynchronizeCustomerFurnitureCommand = new(_ => _ = SynchronizeCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && !IsBusy);
         SaveCustomerFurnitureCommand = new(_ => _ = SaveCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && !IsBusy);
@@ -104,9 +105,9 @@ public sealed class MainViewModel : ObservableObject
         DeleteCustomerFurnitureLocationCommand = new(item => DeleteCustomerFurnitureLocation(item as CustomerFurnitureLocation), _ => CanManageCustomerFurniture);
         ExcludeCustomerFurnitureCommand = new(_ => _ = ExcludeCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && SelectedCustomerFurniture is not null);
         RestoreCustomerFurnitureCommand = new(item => _ = RestoreCustomerFurnitureAsync(item as CustomerFurnitureExclusion), _ => CanManageCustomerFurniture);
-        ChooseSharedRootCommand = new(_ => ChooseSharedRoot(), _ => IsAdministrator);
-        SaveBootstrapCommand = new(_ => _ = SaveBootstrapAsync(), _ => IsAdministrator);
-        MoveWorkspaceCommand = new(_ => _ = MoveWorkspaceAsync(), _ => IsAdministrator && !IsBusy);
+        ChooseSharedRootCommand = new(_ => ChooseSharedRoot(), _ => CanManageSite);
+        SaveBootstrapCommand = new(_ => _ = SaveBootstrapAsync(), _ => CanManageSite);
+        MoveWorkspaceCommand = new(_ => _ = MoveWorkspaceAsync(), _ => CanManageSite && !IsBusy);
         ValidateComponentCommand = new(_ => ValidateComponent(), _ => CanValidate && SelectedComponent is not null);
         SetComponentLayoutCommand = new(value => IsComponentMosaic = value?.ToString() != "List");
         SetFamilyFilterCommand = new(value => ActiveFamilyFilter = value?.ToString() ?? "Toutes");
@@ -146,17 +147,21 @@ public sealed class MainViewModel : ObservableObject
 
     public UserAccount CurrentUser { get; }
     public bool IsUserMode { get; }
-    public bool IsCreatorMode => !IsUserMode && CurrentUser.IsCreator && !CurrentUser.IsAdministrator;
-    public bool IsAdministrativeMode => !IsUserMode && !IsCreatorMode;
-    public bool CanUseAdministrativeInterfaces => IsAdministrativeMode && !IsLicenseRestricted;
+    public bool IsCreatorMode => !IsUserMode && CurrentUser.IsCreator && !CurrentUser.IsSiteManager;
+    public bool IsSiteManagerMode => !IsUserMode && CurrentUser.IsSiteManager && !CurrentUser.IsIdeoAdministrator;
+    public bool IsAdministrativeMode => CurrentUser.IsIdeoAdministrator;
+    public bool CanUseAdministrativeInterfaces => IsAdministrativeMode;
+    public bool CanManageSite => CurrentUser.IsSiteManager;
+    public bool CanInstallContentPackage => CanManageSite;
     public bool IsCreatorFeatureLicensed => _licenseInfo.HasFeature(AtlasLicenseService.CreatorFeature);
-    public bool CanManageCustomerFurniture => IsAdministrator || (IsCreatorMode && IsLicenseValid && IsCreatorFeatureLicensed);
-    public string SessionLabel => IsAdministrator ? "Session administrateur" : IsCreatorMode && IsCreatorFeatureLicensed ? "Mode Créateur" : IsCreatorMode ? "Mode Horizon · option Créateur inactive" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
+    public bool CanManageCustomerFurniture => IsAdministrator || ((IsCreatorMode || IsSiteManagerMode) && IsLicenseValid && IsCreatorFeatureLicensed);
+    public string SessionLabel => IsAdministrator ? $"Administrateur Idéo · {CurrentUser.DisplayName}" : IsSiteManagerMode ? "Gestionnaire du site" : IsCreatorMode && IsCreatorFeatureLicensed ? "Mode Créateur" : IsCreatorMode ? "Mode Horizon · option Créateur inactive" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
     public bool IsAdministrator => CurrentUser.IsAdministrator;
     public bool IsDevelopmentInstallation => _deploymentPolicy.Mode == AtlasDeploymentMode.Development;
     public bool CanConfigureAutomaticUpdates => IsAdministrator && IsDevelopmentInstallation;
+    public bool CanConfigureIdeoTools => IsDevelopmentInstallation && CanManageSite;
     public bool IsLicenseValid => _licenseInfo.IsValid;
     public bool IsLicenseRestricted => !IsAdministrator && !IsLicenseValid;
     public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
@@ -168,17 +173,21 @@ public sealed class MainViewModel : ObservableObject
     public string LicenseStatusColor => IsLicenseValid ? "#2DD4BF" : _licenseInfo.State == AtlasLicenseState.Expired ? "#F59E0B" : "#FB7185";
     public string LicenseCodeEntry { get => _licenseCodeEntry; set => SetProperty(ref _licenseCodeEntry, value); }
     public string GeneratedLicenseCode { get => _generatedLicenseCode; private set => SetProperty(ref _generatedLicenseCode, value); }
+    public string IdeoAccessRequestCode { get => _ideoAccessRequestCode; set => SetProperty(ref _ideoAccessRequestCode, value); }
+    public string IdeoOperatorName { get => _ideoOperatorName; set => SetProperty(ref _ideoOperatorName, value); }
+    public string GeneratedIdeoAccessCode { get => _generatedIdeoAccessCode; private set => SetProperty(ref _generatedIdeoAccessCode, value); }
     public string NewLicenseCustomer { get => _newLicenseCustomer; set => SetProperty(ref _newLicenseCustomer, value); }
     public string NewLicenseDeviceId { get => _newLicenseDeviceId; set => SetProperty(ref _newLicenseDeviceId, value); }
     public DateTime? NewLicenseValidUntil { get => _newLicenseValidUntil; set => SetProperty(ref _newLicenseValidUntil, value); }
     public bool NewLicenseCreatorEnabled { get => _newLicenseCreatorEnabled; set => SetProperty(ref _newLicenseCreatorEnabled, value); }
     public string LicenseFeaturesLabel => IsCreatorFeatureLicensed ? "Module Créateur inclus" : "Aucun module complémentaire";
     public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot)) || File.Exists(LegacyLicenseSigningKeyPath);
+    public bool CanUseIdeoTools => CanConfigureIdeoTools && HasLicenseSigningKey;
     public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible uniquement sur ce poste administrateur." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
     public string InstalledContentVersion => _installedContentState.ContentVersion;
     public string InstalledContentDate => _installedContentState.InstalledUtc is { } date ? date.LocalDateTime.ToString("dd/MM/yyyy HH:mm") : "Socle issu de l’installation";
     public string InstalledContentModules => _installedContentState.Modules == AtlasContentModules.None ? "Catalogue local initial" : ContentModulesLabel(_installedContentState.Modules);
-    public bool CanGenerateContentPackage => IsAdministrator && HasLicenseSigningKey;
+    public bool CanGenerateContentPackage => CanUseIdeoTools;
     public ObservableCollection<ComponentRecord> Components { get; } = [];
     public ObservableCollection<ComponentCardViewModel> ComponentCards { get; } = [];
     public ObservableCollection<FurnitureRecord> Furniture { get; } = [];
@@ -241,7 +250,7 @@ public sealed class MainViewModel : ObservableObject
     public ICollectionView ClientFurnitureView { get; }
     public IReadOnlyList<CatalogEnvironment> Environments { get; } = Enum.GetValues<CatalogEnvironment>();
     public IReadOnlyList<RecordStatus> Statuses { get; } = Enum.GetValues<RecordStatus>();
-    public IReadOnlyList<string> RoleProfiles { get; } = ["Lecture seule", "Créateur", "Éditeur", "Éditeur + validateur", "Administrateur"];
+    public IReadOnlyList<string> RoleProfiles => CanManageSite ? ["Utilisateur", "Créateur", "Gestionnaire du site"] : ["Utilisateur", "Créateur"];
     public IReadOnlyList<string> FurnitureForms => _referenceData.FurnitureForms;
     public IReadOnlyList<string> ConstructionPrinciples => _referenceData.ConstructionPrinciples;
     public IReadOnlyList<string> BackPositions => _referenceData.BackPositions;
@@ -283,6 +292,7 @@ public sealed class MainViewModel : ObservableObject
             else if (IsUserMode && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             else if (IsCreatorMode && string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase) && !CanManageCustomerFurniture) requestedPage = "Catalog";
             else if (IsCreatorMode && !string.Equals(value, "Catalog", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
+            else if (IsSiteManagerMode && !string.Equals(value, "Catalog", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             if (!SetProperty(ref _currentPage, requestedPage)) return;
             foreach (var property in new[] { nameof(DashboardNavBackground), nameof(ComponentsNavBackground), nameof(FurnitureNavBackground), nameof(FutureNavBackground), nameof(CatalogNavBackground), nameof(MyFurnitureNavBackground), nameof(SettingsNavBackground) }) OnPropertyChanged(property);
             OnPropertyChanged(nameof(IsCatalogPage));
@@ -415,7 +425,7 @@ public sealed class MainViewModel : ObservableObject
     public bool IsSelectedFurnitureArchived => SelectedFurniture?.Status == RecordStatus.Archivee;
     public bool HasUnsavedFurnitureChanges => SelectedFurniture is not null && _dirtyFurnitureIds.Contains(SelectedFurniture.Id);
     public bool IsSelectedFurnitureTopMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.SourceRelativePath) || !File.Exists(ResolveFurniturePath(SelectedFurniture.SourceRelativePath)));
-    public bool IsSelectedFurnitureImageMissing => SelectedFurniture is not null && (string.IsNullOrWhiteSpace(SelectedFurniture.ImageRelativePath) || !File.Exists(ResolveFurniturePath(SelectedFurniture.ImageRelativePath)));
+    public bool IsSelectedFurnitureImageMissing => SelectedFurniture is not null && !File.Exists(ResolveFurnitureImagePath(SelectedFurniture));
     public string SelectedFurnitureFileHealth => SelectedFurniture is null ? string.Empty : string.Join(" · ", new[]
     {
         IsSelectedFurnitureTopMissing ? "Fichier .TOP absent ou introuvable" : "Fichier .TOP disponible",
@@ -636,6 +646,7 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task InstallContentPackageAsync(string packagePath)
     {
+        if (!CanInstallContentPackage) throw new UnauthorizedAccessException("Seul un Gestionnaire du site ou un Administrateur Idéo peut installer un Atlaspack.");
         if (string.IsNullOrWhiteSpace(packagePath) || !File.Exists(packagePath)) throw new FileNotFoundException("Le pack de contenus est introuvable.", packagePath);
         IsBusy = true;
         try
@@ -653,7 +664,7 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task GenerateContentPackageAsync(string outputPath, string contentVersion, string minimumApplicationVersion = "0.18.0")
     {
-        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut générer un pack officiel.");
+        if (!CanUseIdeoTools) throw new UnauthorizedAccessException("La génération de packs officiels est réservée aux postes internes Idéo équipés de la clé privée.");
         if (!HasLicenseSigningKey) throw new FileNotFoundException("La clé privée Idéo est absente.");
         if (!await SaveAsync()) throw new InvalidOperationException("Le catalogue n’a pas pu être enregistré avant la génération du pack.");
         if (!await SaveSearchDictionaryAsync()) throw new InvalidOperationException("Le dictionnaire n’a pas pu être enregistré avant la génération du pack.");
@@ -673,13 +684,11 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task AddUserAsync(string login, string displayName, string password, string roleProfile)
     {
-        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut créer un compte.");
+        if (!CanManageSite) throw new UnauthorizedAccessException("Seul un Gestionnaire du site ou un Administrateur Idéo peut créer un compte.");
         var permissions = roleProfile switch
         {
             "Créateur" => UserPermissions.Read | UserPermissions.ManageOwnFurniture,
-            "Éditeur" => UserPermissions.Read | UserPermissions.Edit,
-            "Éditeur + validateur" => UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate,
-            "Administrateur" => UserPermissions.Read | UserPermissions.Edit | UserPermissions.Validate | UserPermissions.Administer,
+            "Gestionnaire du site" => UserPermissions.Read | UserPermissions.ManageSite,
             _ => UserPermissions.Read
         };
         var account = await _userStore.AddAsync(login, displayName, password, permissions); Users.Add(account);
@@ -699,7 +708,7 @@ public sealed class MainViewModel : ObservableObject
 
     public string GenerateLicense()
     {
-        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut générer une licence.");
+        if (!CanUseIdeoTools) throw new UnauthorizedAccessException("La génération de licences est réservée aux postes internes Idéo équipés de la clé privée.");
         if (string.IsNullOrWhiteSpace(NewLicenseCustomer)) throw new InvalidOperationException("Renseignez le nom du client ou du site.");
         if (string.IsNullOrWhiteSpace(NewLicenseDeviceId)) throw new InvalidOperationException("Collez l’identifiant du poste transmis par le client.");
         if (!MachineIdentityService.Normalize(NewLicenseDeviceId).StartsWith("ATL", StringComparison.Ordinal) || MachineIdentityService.Normalize(NewLicenseDeviceId).Length != 23)
@@ -722,7 +731,7 @@ public sealed class MainViewModel : ObservableObject
 
     public void InstallLicenseSigningKey(string sourcePath)
     {
-        if (!IsAdministrator) throw new UnauthorizedAccessException("Seul un administrateur peut installer la clé de signature.");
+        if (!CanConfigureIdeoTools) throw new UnauthorizedAccessException("Une clé privée Idéo ne peut être installée que sur un poste interne configuré en Développement.");
         var privateKeyPem = File.ReadAllText(sourcePath);
         var testCode = AtlasLicenseService.Generate("Contrôle clé Idéo", DateOnly.FromDateTime(DateTime.Today.AddDays(1)), privateKeyPem, "key-check");
         if (!_licenseService.Validate(testCode).IsValid) throw new InvalidDataException("Cette clé privée ne correspond pas à la clé publique intégrée dans Atlas.");
@@ -732,7 +741,18 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasLicenseSigningKey));
         OnPropertyChanged(nameof(LicenseSigningKeyStatus));
         OnPropertyChanged(nameof(CanGenerateContentPackage));
+        OnPropertyChanged(nameof(CanUseIdeoTools));
         StatusText = "Clé privée Idéo installée. Le générateur de licences est opérationnel.";
+    }
+
+    public string GenerateIdeoAdminAccessCode()
+    {
+        if (!CanUseIdeoTools) throw new UnauthorizedAccessException("Le générateur d’accès Idéo est indisponible sur ce poste.");
+        var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
+        if (!File.Exists(privateKeyPath) && File.Exists(LegacyLicenseSigningKeyPath)) privateKeyPath = LegacyLicenseSigningKeyPath;
+        GeneratedIdeoAccessCode = IdeoAdminAccessService.GenerateResponse(IdeoAccessRequestCode, IdeoOperatorName, File.ReadAllText(privateKeyPath));
+        StatusText = $"Réponse Administrateur Idéo générée pour {IdeoOperatorName.Trim()}.";
+        return GeneratedIdeoAccessCode;
     }
 
     private void RefreshLicenseState()
@@ -742,6 +762,8 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFullHorizonAccess));
         OnPropertyChanged(nameof(CanUseAdministrativeInterfaces));
         OnPropertyChanged(nameof(CanManageCustomerFurniture));
+        OnPropertyChanged(nameof(CanManageSite));
+        OnPropertyChanged(nameof(CanInstallContentPackage));
         OnPropertyChanged(nameof(IsCreatorFeatureLicensed));
         OnPropertyChanged(nameof(LicenseFeaturesLabel));
         OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
@@ -754,6 +776,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasLicenseSigningKey));
         OnPropertyChanged(nameof(LicenseSigningKeyStatus));
         OnPropertyChanged(nameof(CanGenerateContentPackage));
+        OnPropertyChanged(nameof(CanUseIdeoTools));
         if (IsLicenseRestricted)
         {
             CloseClientFilterPanel();
@@ -1799,6 +1822,7 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public string ResolveFurnitureAssetPath(string path) => ResolveFurniturePath(path);
+    public string ResolveFurnitureImageAssetPath(FurnitureRecord? furniture) => furniture is null ? string.Empty : ResolveFurnitureImagePath(furniture);
 
     public void AddFurnitureType(string value) => AddVocabularyValue(FurnitureTypes, value, "Ce type de meuble existe déjà.");
 
@@ -2388,19 +2412,17 @@ public sealed class MainViewModel : ObservableObject
 
     private string ResolveFurniturePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
-        if (Path.IsPathRooted(path)) return path;
-        var preferred = Path.Combine(EffectiveFurnitureRoot, path);
-        if (File.Exists(preferred) || string.IsNullOrWhiteSpace(EffectiveLibraryRoot)) return preferred;
-        var legacy = Path.Combine(EffectiveLibraryRoot, path);
-        return File.Exists(legacy) ? legacy : preferred;
+        return FurnitureAssetResolver.ResolveFile(path, EffectiveFurnitureRoot, EffectiveLibraryRoot);
     }
+
+    private string ResolveFurnitureImagePath(FurnitureRecord furniture) =>
+        FurnitureAssetResolver.ResolveImage(furniture, EffectiveFurnitureRoot, EffectiveLibraryRoot);
 
     private void LoadFurniturePreview()
     {
         FurniturePreview = null;
         if (SelectedFurniture is null) return;
-        var imagePath = ResolveFurniturePath(SelectedFurniture.ImageRelativePath);
+        var imagePath = ResolveFurnitureImagePath(SelectedFurniture);
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath)) return;
         try
         {

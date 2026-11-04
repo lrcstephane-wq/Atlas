@@ -153,9 +153,7 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
         {
             if (_thumbnailLoaded) return _thumbnail;
             _thumbnailLoaded = true;
-            if (string.IsNullOrWhiteSpace(Record.ImageRelativePath)) return null;
-            var path = Path.IsPathRooted(Record.ImageRelativePath) ? Record.ImageRelativePath : Path.Combine(_furnitureRoot, Record.ImageRelativePath);
-            if (!File.Exists(path) && !_fallbackRoot.Equals(_furnitureRoot, StringComparison.OrdinalIgnoreCase)) path = Path.Combine(_fallbackRoot, Record.ImageRelativePath);
+            var path = FurnitureAssetResolver.ResolveImage(Record, _furnitureRoot, _fallbackRoot);
             if (!File.Exists(path)) return null;
             try
             {
@@ -172,11 +170,7 @@ public sealed class FurnitureCardViewModel : INotifyPropertyChanged
 
     private string ResolvePath(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-        if (Path.IsPathRooted(value)) return value;
-        var preferred = Path.Combine(_furnitureRoot, value);
-        if (File.Exists(preferred) || _fallbackRoot.Equals(_furnitureRoot, StringComparison.OrdinalIgnoreCase)) return preferred;
-        return Path.Combine(_fallbackRoot, value);
+        return FurnitureAssetResolver.ResolveFile(value, _furnitureRoot, _fallbackRoot);
     }
 }
 
