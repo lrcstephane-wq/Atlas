@@ -31,6 +31,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly CustomerFurnitureStore _customerFurnitureStore;
     private readonly HorizonPreferencesStore _horizonPreferencesStore;
     private readonly SearchDictionaryStore _searchDictionaryStore;
+    private readonly AtlasDeploymentPolicy _deploymentPolicy = AtlasDeploymentPolicyStore.Load();
     private HorizonPreferences _horizonPreferences = new();
     private SearchDictionaryDocument _searchDictionary = new();
     private SearchIntent _activeSearchIntent = new();
@@ -140,7 +141,7 @@ public sealed class MainViewModel : ObservableObject
         RemoveMarkedCompositionCommand = new(_ => RemoveSelectedComposition(), _ => CanEdit && SelectedFurniture is not null && _selectedCompositionLines.Count > 0);
         PublishFurnitureCommand = new(_ => _ = PublishFurnitureAsync(), _ => CanValidate && SelectedFurniture is not null && !IsBusy);
         OpenSharedRootCommand = new(_ => OpenSharedRoot());
-        CheckUpdateCommand = new(_ => _ = CheckUpdateAsync(false), _ => !IsBusy);
+        CheckUpdateCommand = new(_ => _ = CheckUpdateAsync(false), _ => IsAdministrator && !IsBusy);
     }
 
     public UserAccount CurrentUser { get; }
@@ -154,6 +155,8 @@ public sealed class MainViewModel : ObservableObject
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
     public bool IsAdministrator => CurrentUser.IsAdministrator;
+    public bool IsDevelopmentInstallation => _deploymentPolicy.Mode == AtlasDeploymentMode.Development;
+    public bool CanConfigureAutomaticUpdates => IsAdministrator && IsDevelopmentInstallation;
     public bool IsLicenseValid => _licenseInfo.IsValid;
     public bool IsLicenseRestricted => !IsAdministrator && !IsLicenseValid;
     public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
@@ -662,7 +665,11 @@ public sealed class MainViewModel : ObservableObject
         StatusText = $"Pack de contenus Atlas {contentVersion.Trim()} généré.";
     }
 
-    public async Task CheckAutoUpdateAsync() { if (Settings.AutoUpdate) await CheckUpdateAsync(true); }
+    public async Task CheckAutoUpdateAsync()
+    {
+        if (_deploymentPolicy.AllowsAutomaticApplicationUpdates && Settings.AutoUpdate)
+            await CheckUpdateAsync(true);
+    }
 
     public async Task AddUserAsync(string login, string displayName, string password, string roleProfile)
     {
@@ -2911,6 +2918,7 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task CheckUpdateAsync(bool silent)
     {
+        if (!IsAdministrator && !silent) throw new UnauthorizedAccessException("Seul un administrateur peut déclencher une mise à jour d’Atlas.");
         IsBusy = true; UpdateLabel = "Vérification…";
         try
         {
