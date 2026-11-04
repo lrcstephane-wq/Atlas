@@ -146,6 +146,13 @@ Assert(structuredDictionary.OfficialVersion == SearchDictionaryService.OfficialV
        && structuredDictionary.Concepts.Count >= 90 && structuredDictionary.Synonyms.Count >= 120
        && structuredDictionary.Expressions.Count >= 40 && structuredDictionary.IgnoredTerms.Count >= 40,
     "Le socle officiel du dictionnaire doit être versionné et suffisamment riche.");
+foreach (var concept in structuredDictionary.Concepts.Where(item => item.IsOfficial && item.IsActive))
+{
+    var conceptIntent = SearchDictionaryService.Interpret(concept.Label, structuredDictionary,
+        protectedTerms: SearchDictionaryService.ProtectedTerms);
+    Assert(conceptIntent.RecognizedConceptIds.Contains(concept.Id, StringComparer.OrdinalIgnoreCase),
+        $"La notion officielle « {concept.Label} » doit toujours se reconnaître elle-même.");
+}
 var liveSinkIntent = SearchDictionaryService.Interpret("vas", structuredDictionary,
     protectedTerms: SearchDictionaryService.ProtectedTerms, liveTyping: true);
 Assert(liveSinkIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Vasque"),
@@ -202,6 +209,47 @@ Assert(FurnitureSearchMatcher.Evaluate(drawerCandidate, drawerIntent, structured
        && !FurnitureSearchMatcher.Evaluate(plainCandidate, drawerIntent, structuredDictionary,
            SearchDictionaryService.ProtectedTerms).IsMatch,
     "Le filtre métier tiroir doit accepter le meuble avec tiroir et exclure sans seuil le meuble qui n'en a pas.");
+var legacyDrawerFurniture = new FurnitureRecord { DisplayName = "4 Tiroirs différents" };
+var legacyDrawerCandidate = new FurnitureSearchCandidate(legacyDrawerFurniture, [], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("4 Tiroirs différents Bloc Tiroirs Movento")]));
+Assert(FurnitureSearchMatcher.Evaluate(legacyDrawerCandidate, drawerIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Un meuble existant doit rester trouvable par les preuves de son nom et de sa composition même si ses anciens champs structurés sont incomplets.");
+var fourDrawersIntent = SearchDictionaryService.Interpret("4 tiroirs", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms);
+Assert(FurnitureSearchMatcher.Evaluate(legacyDrawerCandidate, fourDrawersIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch
+       && !FurnitureSearchMatcher.Evaluate(drawerCandidate, fourDrawersIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Une quantité explicite doit pouvoir être déduite d'un libellé historique sans inventer cette quantité sur les autres meubles.");
+var collidingDrawerIntent = SearchDictionaryService.Interpret("tiroir", structuredDictionary, ["Tiroir", "Legrabox"],
+    SearchDictionaryService.ProtectedTerms, liveTyping: true);
+Assert(collidingDrawerIntent.Constraints.Count(item => item.Target == SearchConceptTarget.DrawerCount) == 1
+       && collidingDrawerIntent.Constraints.All(item => item.Target != SearchConceptTarget.FurnitureTag),
+    "Un mot ne doit jamais devenir simultanément une notion métier et un tag obligatoire portant le même nom.");
+var legacyWardrobeCandidate = new FurnitureSearchCandidate(new FurnitureRecord { DisplayName = "2 Rayons Penderie" }, [], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("2 Rayons Penderie étagères tringle")]));
+var shelfByRegionalNameIntent = SearchDictionaryService.Interpret("étagère", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms);
+var hangingIntent = SearchDictionaryService.Interpret("penderie", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms);
+Assert(FurnitureSearchMatcher.Evaluate(legacyWardrobeCandidate, shelfByRegionalNameIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch
+       && FurnitureSearchMatcher.Evaluate(legacyWardrobeCandidate, hangingIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Rayon, tablette, étagère et penderie doivent exploiter les preuves textuelles du meuble et de sa composition.");
+var legacyDoorCandidate = new FurnitureSearchCandidate(new FurnitureRecord { DisplayName = "Meuble 2 Portes" }, [], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("Meuble 2 Portes charnières ouvrants")]));
+var doorIntent = SearchDictionaryService.Interpret("porte", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms);
+Assert(FurnitureSearchMatcher.Evaluate(legacyDoorCandidate, doorIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Le mot porte doit retrouver un meuble documenté par son nom ou sa composition, même sur une ancienne fiche.");
+var sinkCandidate = new FurnitureSearchCandidate(new FurnitureRecord { DisplayName = "Meuble évier" }, ["Vasque"], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("Meuble évier vasque")]));
+Assert(FurnitureSearchMatcher.Evaluate(sinkCandidate, liveSinkIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Une recherche d'usage comme vasque doit continuer à exploiter les usages renseignés.");
 var legraboxIntent = SearchDictionaryService.Interpret("Legrabox", structuredDictionary, ["Legrabox"],
     SearchDictionaryService.ProtectedTerms, liveTyping: true);
 var legraboxCandidate = new FurnitureSearchCandidate(drawerFurniture, [], ["Legrabox"], drawerCandidate.Document);
@@ -210,6 +258,15 @@ Assert(FurnitureSearchMatcher.Evaluate(legraboxCandidate, legraboxIntent, struct
        && !FurnitureSearchMatcher.Evaluate(drawerCandidate, legraboxIntent, structuredDictionary,
            SearchDictionaryService.ProtectedTerms).IsMatch,
     "Le tag Legrabox doit être un critère exact : seul un meuble portant réellement ce tag peut rester affiché.");
+var mirrorIntent = SearchDictionaryService.Interpret("miroir", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms);
+var mirrorCandidate = new FurnitureSearchCandidate(new FurnitureRecord { DisplayName = "Porte miroir" }, [], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("Porte miroir façade miroir")]));
+Assert(FurnitureSearchMatcher.Evaluate(mirrorCandidate, mirrorIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch
+       && !FurnitureSearchMatcher.Evaluate(drawerCandidate, mirrorIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Miroir doit trouver un miroir et ne jamais être assimilé à tiroir.");
 var applianceIntent = SearchDictionaryService.Interpret("me faut un meuble micro onde avec un relevant au dessus sotn", structuredDictionary);
 Assert(applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Micro-ondes")
        && applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.LiftUpCount),
@@ -629,9 +686,9 @@ Assert(viewModelSource.Contains("card.IsSearchMatch = evaluation.IsMatch")
        && furnitureSearchMatcherSource.Contains("FurnitureSearchEvaluation.NoMatch")
        && furnitureSearchMatcherSource.Contains("EffectiveQuantity(isPresent, quantity)"),
     "La décision binaire de filtrage doit être indépendante du score de classement et exclure tout meuble non conforme.");
-Assert(settingsXaml.Contains("Concepts métier") && settingsXaml.Contains("SearchConceptGrid")
-       && settingsXaml.Contains("SearchTestMatches"),
-    "Les paramètres doivent permettre d’inspecter les concepts et de tester une demande sur le catalogue réel.");
+Assert(settingsXaml.Contains("Vocabulaire métier") && settingsXaml.Contains("SearchConceptGrid")
+       && settingsXaml.Contains("SearchTestMatches") && settingsXaml.Contains("SearchTestRejected"),
+    "Les paramètres doivent permettre d’inspecter le vocabulaire et d’expliquer les résultats et rejets sur le catalogue réel.");
 Assert(searchDictionaryServiceSource.Contains("stored.OfficialVersion < SearchDictionaryService.OfficialVersion")
        && searchDictionaryServiceSource.Contains("SearchDictionaryService.MergeOfficial(stored)"),
     "Une installation existante doit recevoir le dictionnaire Atlas enrichi sans écraser les ajouts du site.");

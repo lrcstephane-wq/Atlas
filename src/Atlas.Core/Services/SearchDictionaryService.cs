@@ -359,12 +359,15 @@ public static class SearchDictionaryService
                 .Where(item => item.Concept is not null).Select(item => (Concept: item.Concept!, Value: item.Value)))
             .Where(item => !string.IsNullOrWhiteSpace(item.Value))
             .Select(item => (item.Concept, Tokens: CatalogSearchEngine.Normalize(item.Value).Split(' ', StringSplitOptions.RemoveEmptyEntries)))
-            .OrderByDescending(item => item.Tokens.Length).ToArray();
+            .OrderByDescending(item => item.Tokens.Length)
+            .ThenByDescending(item => ConceptPriority(item.Concept)).ToArray();
         foreach (var (concept, termTokens) in terms)
         for (var index = 0; index <= correctedTokens.Length - termTokens.Length; index++)
         {
             if (!MatchesAt(correctedTokens, termTokens, index)) continue;
-            if (Enumerable.Range(index, termTokens.Length).Any(tokenIndex => strictOccupied[tokenIndex])) continue;
+            // Une portion de phrase ne peut déclencher qu'une seule notion. Les expressions composées,
+            // puis les notions Atlas, puis les notions du site et enfin les tags ont priorité.
+            if (Enumerable.Range(index, termTokens.Length).Any(tokenIndex => occupied[tokenIndex])) continue;
             for (var tokenIndex = index; tokenIndex < index + termTokens.Length; tokenIndex++)
             {
                 occupied[tokenIndex] = true;
@@ -523,6 +526,13 @@ public static class SearchDictionaryService
         return true;
     }
 
+    private static int ConceptPriority(SearchConceptRecord concept) => concept.Target switch
+    {
+        SearchConceptTarget.FurnitureTag => 10,
+        _ when concept.IsOfficial => 30,
+        _ => 20
+    };
+
     private static string CorrectToken(string token, IReadOnlyCollection<string> vocabulary,
         IReadOnlySet<string> protectedTerms, bool allowPrefix)
     {
@@ -536,18 +546,17 @@ public static class SearchDictionaryService
                 .OrderBy(candidate => candidate.Length).ThenBy(candidate => candidate, StringComparer.Ordinal).FirstOrDefault();
             if (prefix is not null) return prefix;
         }
-        var ranked = vocabulary.Select(candidate => (Candidate: candidate, Score: Similarity(token, candidate)))
-            .OrderByDescending(item => item.Score).ThenBy(item => item.Candidate.Length).Take(2).ToArray();
+        var ranked = vocabulary.Select(candidate => (Candidate: candidate, Distance: EditDistance(token, candidate)))
+            .OrderBy(item => item.Distance).ThenBy(item => item.Candidate.Length).Take(2).ToArray();
         var best = ranked.FirstOrDefault();
-        var threshold = token.Length <= 5 ? 0.74d : token.Length <= 8 ? 0.66d : 0.62d;
-        if (best.Score < threshold) return token;
-        if (ranked.Length > 1 && best.Score - ranked[1].Score < 0.08d) return token;
+        var maximumDistance = token.Length < 4 ? 0 : token.Length <= 7 ? 1 : 2;
+        if (best.Distance > maximumDistance) return token;
+        if (ranked.Length > 1 && best.Distance == ranked[1].Distance) return token;
         return best.Candidate;
     }
 
-    private static double Similarity(string left, string right)
+    private static int EditDistance(string left, string right)
     {
-        if (left == right) return 1d;
         var matrix = new int[left.Length + 1, right.Length + 1];
         for (var i = 0; i <= left.Length; i++) matrix[i, 0] = i;
         for (var j = 0; j <= right.Length; j++) matrix[0, j] = j;
@@ -559,7 +568,7 @@ public static class SearchDictionaryService
             if (i > 1 && j > 1 && left[i - 1] == right[j - 2] && left[i - 2] == right[j - 1])
                 matrix[i, j] = Math.Min(matrix[i, j], matrix[i - 2, j - 2] + cost);
         }
-        return 1d - (double)matrix[left.Length, right.Length] / Math.Max(left.Length, right.Length);
+        return matrix[left.Length, right.Length];
     }
 
     private static SearchConceptRecord Clone(SearchConceptRecord source) => new()

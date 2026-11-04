@@ -207,6 +207,7 @@ public partial class SettingsView : UserControl
         var intent = preview.Intent;
         SearchTestMatches.Text = $"{preview.MatchCount} sur {preview.TotalCount} meubles publiés"
                                  + (preview.Examples.Count == 0 ? " · aucun exemple" : $" · {string.Join(" · ", preview.Examples)}");
+        SearchTestRejected.Text = preview.RejectedExamples.Count == 0 ? "—" : string.Join(Environment.NewLine, preview.RejectedExamples);
         SearchDictionaryTestResult.Text = $"Atlas comprend : {intent.Summary}";
         SearchTestConstraints.Text = intent.Constraints.Count == 0 ? "Aucun concept métier reconnu" : string.Join(" · ", intent.Constraints.Select(item => item.ConceptLabel));
         SearchTestExpressions.Text = intent.RecognizedExpressions.Count == 0 ? "—" : string.Join(" · ", intent.RecognizedExpressions);
