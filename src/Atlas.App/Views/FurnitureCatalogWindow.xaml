@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:controls="clr-namespace:Atlas.App.Controls"
-        Title="Catalogue de la Forge — Atlas" MinWidth="980" MinHeight="620" Width="1280" Height="780"
+        Title="Catalogue de la Forge — Atlas" Icon="pack://application:,,,/Assets/Atlas.ico" MinWidth="980" MinHeight="620" Width="1280" Height="780"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
         Background="{StaticResource CanvasBrush}" StateChanged="Window_StateChanged"
         PreviewKeyDown="Window_OnPreviewKeyDown" Closing="Window_OnClosing">
