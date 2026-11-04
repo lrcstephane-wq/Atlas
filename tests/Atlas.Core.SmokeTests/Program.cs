@@ -91,6 +91,12 @@ Assert(typoScore > 0.7d, "La recherche doit tolérer une inversion et une lettre
 Assert(CatalogSearchEngine.Score("lavabo", [new CatalogSearchField("Meuble sous évier")], searchDictionary) > 0.7d, "Un synonyme métier doit retrouver le concept canonique.");
 Assert(CatalogSearchEngine.Score("charniere", [new CatalogSearchField("Meuble sous évier")], searchDictionary) == 0d, "Un terme sans rapport ne doit pas produire de faux résultat.");
 Assert(CatalogSearchEngine.CorrectQuery("meubel evrier", ["meuble", "evier", "cuisine"], searchDictionary) == "meuble evier", "Atlas doit pouvoir expliquer la correction appliquée.");
+Assert(CatalogSearchEngine.MatchesAnyNormalized(["Sans assemblage"], ["Sans assemblage\u00a0"]),
+    "Une facette doit accepter les espaces invisibles hérités d’une ancienne saisie.");
+Assert(CatalogSearchEngine.MatchesAnyNormalized(["Micro-ondes"], ["micro ondes"]),
+    "Une facette doit comparer les libellés métier sous leur forme normalisée.");
+Assert(!CatalogSearchEngine.MatchesAnyNormalized(["Sans assemblage"], ["Tourillons + vis"]),
+    "La normalisation d’une facette ne doit pas créer de faux positif.");
 
 var structuredDictionary = new SearchDictionaryDocument();
 SearchDictionaryService.MergeOfficial(structuredDictionary, searchDictionary);
@@ -502,6 +508,8 @@ Assert(furnitureXaml.Contains("Dupliquer") && furnitureXaml.Contains("Voir dans 
 Assert(furnitureXaml.Contains("Ouvrir le catalogue") && !furnitureXaml.Contains("ItemsSource=\"{Binding FurnitureView}\""), "La fiche meuble doit libérer sa largeur et ouvrir le catalogue dans une fenêtre dédiée.");
 var furnitureCatalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureCatalogWindow.xaml"));
 var furnitureCatalogCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "FurnitureCatalogWindow.xaml.cs"));
+Assert(furnitureCatalogXaml.Contains("Icon=\"pack://application:,,,/Assets/Atlas.ico\""),
+    "La fenêtre du catalogue de la Forge doit afficher l’icône Atlas dans Windows.");
 Assert(furnitureCatalogXaml.Contains("EnableRowVirtualization=\"True\"") && furnitureCatalogXaml.Contains("VirtualizationMode=\"Recycling\"")
        && furnitureCatalogXaml.Contains("Ouvrir dans la Forge") && furnitureCatalogXaml.Contains("Fiches à compléter"),
     "Le catalogue de la Forge doit rester fluide sur de gros volumes et proposer recherche, filtres et ouverture explicite.");
@@ -565,6 +573,8 @@ Assert(viewModelSource.Contains("DefaultFurnitureTypes") && viewModelSource.Cont
 var customerFurnitureXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureView.xaml"));
 var customerFurnitureCatalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureCatalogWindow.xaml"));
 var customerFurnitureCatalogCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CustomerFurnitureCatalogWindow.xaml.cs"));
+Assert(customerFurnitureCatalogXaml.Contains("Icon=\"pack://application:,,,/Assets/Atlas.ico\""),
+    "La fenêtre du catalogue personnel doit afficher l’icône Atlas dans Windows.");
 Assert(mainWindowXaml.Contains("CommandParameter=\"MyFurniture\"") && customerFurnitureXaml.Contains("SelectedCustomerPersonalTagOptions") && customerFurnitureXaml.Contains("CanManageCustomerFurniture"), "Le Gestionnaire doit consulter Mes meubles tandis que les modifications restent réservées au Créateur licencié.");
 Assert(viewModelSource.Contains("CanViewCustomerFurniture => IsAdministrator || IsSiteManagerMode")
        && viewModelSource.Contains("CanManageCustomerFurniture => IsAdministrator || (IsCreatorMode"),
