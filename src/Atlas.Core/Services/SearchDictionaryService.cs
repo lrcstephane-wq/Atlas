@@ -41,6 +41,7 @@ public sealed class SearchDictionaryStore(string sharedRoot)
         {
             await using var stream = File.Open(OfficialFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var stored = await JsonSerializer.DeserializeAsync<SearchDictionaryDocument>(stream, JsonOptions, cancellationToken) ?? new();
+            if (stored.OfficialVersion < SearchDictionaryService.OfficialVersion) SearchDictionaryService.MergeOfficial(stored);
             MarkOfficial(stored);
             return stored;
         }
@@ -196,10 +197,10 @@ public sealed class SearchDictionaryStore(string sharedRoot)
 
 public static class SearchDictionaryService
 {
-    public const int OfficialVersion = 2;
+    public const int OfficialVersion = 3;
     public static IReadOnlySet<string> ProtectedTerms { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        "miroir"
+        "miroir", "rayon", "hayon", "joue", "fond", "chant", "façade", "vasque", "caisse", "socle"
     };
 
     public static IReadOnlyList<SearchConceptRecord> OfficialConcepts { get; } = BuildOfficialConcepts();
@@ -483,6 +484,8 @@ public static class SearchDictionaryService
         _ => actual > 0
     };
 
+    public static int EffectiveQuantity(bool isPresent, int quantity) => isPresent ? Math.Max(1, quantity) : 0;
+
     public static bool IsQuantityTarget(SearchConceptTarget target) => target is SearchConceptTarget.DoorCount or SearchConceptTarget.DrawerCount
         or SearchConceptTarget.InnerDrawerCount or SearchConceptTarget.FlapCount or SearchConceptTarget.LiftUpCount
         or SearchConceptTarget.ShelfCount or SearchConceptTarget.OpenNicheCount;
@@ -526,14 +529,20 @@ public static class SearchDictionaryService
         if (token.Length <= 2 || int.TryParse(token, out _) || vocabulary.Contains(token, StringComparer.Ordinal) || protectedTerms.Contains(token)) return token;
         if (allowPrefix && token.Length >= 3)
         {
+            var protectedPrefix = protectedTerms.Where(candidate => candidate.Length > token.Length && candidate.StartsWith(token, StringComparison.Ordinal))
+                .OrderBy(candidate => candidate.Length).ThenBy(candidate => candidate, StringComparer.Ordinal).FirstOrDefault();
+            if (protectedPrefix is not null) return protectedPrefix;
             var prefix = vocabulary.Where(candidate => candidate.Length > token.Length && candidate.StartsWith(token, StringComparison.Ordinal))
                 .OrderBy(candidate => candidate.Length).ThenBy(candidate => candidate, StringComparer.Ordinal).FirstOrDefault();
             if (prefix is not null) return prefix;
         }
-        var best = vocabulary.Select(candidate => (Candidate: candidate, Score: Similarity(token, candidate)))
-            .OrderByDescending(item => item.Score).ThenBy(item => item.Candidate.Length).FirstOrDefault();
+        var ranked = vocabulary.Select(candidate => (Candidate: candidate, Score: Similarity(token, candidate)))
+            .OrderByDescending(item => item.Score).ThenBy(item => item.Candidate.Length).Take(2).ToArray();
+        var best = ranked.FirstOrDefault();
         var threshold = token.Length <= 5 ? 0.74d : token.Length <= 8 ? 0.66d : 0.62d;
-        return best.Score >= threshold ? best.Candidate : token;
+        if (best.Score < threshold) return token;
+        if (ranked.Length > 1 && best.Score - ranked[1].Score < 0.08d) return token;
+        return best.Candidate;
     }
 
     private static double Similarity(string left, string right)
@@ -648,6 +657,24 @@ public static class SearchDictionaryService
         Official("element-porte-escamotable", "Porte escamotable", "Éléments", SearchConceptTarget.GenericText, "porte escamotable", "porte rentrante, porte pocket, façade escamotable"),
         Official("element-tringle-basculante", "Tringle basculante", "Éléments", SearchConceptTarget.GenericText, "tringle basculante", "penderie escamotable, penderie descendante, lift penderie"),
         Official("element-porte-pantalons", "Porte-pantalons", "Éléments", SearchConceptTarget.GenericText, "porte-pantalons", "range pantalons, penderie pantalons"),
+        Official("element-miroir", "Miroir", "Éléments", SearchConceptTarget.GenericText, "miroir", "glace, porte miroir, façade miroir"),
+        Official("element-joue", "Joue", "Éléments", SearchConceptTarget.GenericText, "joue", "joue de finition, panneau de finition, côté décoratif"),
+        Official("element-fileur", "Fileur", "Éléments", SearchConceptTarget.GenericText, "fileur", "filler, bandeau de compensation, compensation latérale"),
+        Official("element-socle", "Socle", "Éléments", SearchConceptTarget.GenericText, "socle", "soubassement, base du meuble"),
+        Official("element-plinthe", "Plinthe", "Éléments", SearchConceptTarget.GenericText, "plinthe", "bandeau bas, cache pieds"),
+        Official("element-facade", "Façade", "Éléments", SearchConceptTarget.GenericText, "façade", "face, devant de meuble, front"),
+        Official("element-poignee", "Poignée", "Éléments", SearchConceptTarget.GenericText, "poignée", "bouton, prise de main, profil poignée, gorge"),
+        Official("element-push", "Ouverture push", "Éléments", SearchConceptTarget.GenericText, "push", "push to open, pousse lâche, sans poignée"),
+        Official("element-coulisse", "Coulisse", "Éléments", SearchConceptTarget.GenericText, "coulisse", "glissière, rail de tiroir, coulissant"),
+        Official("element-charniere", "Charnière", "Éléments", SearchConceptTarget.GenericText, "charnière", "fiche, paumelle, penture"),
+        Official("element-casier", "Casier", "Éléments", SearchConceptTarget.GenericText, "casier", "case, compartiment, alvéole"),
+        Official("element-range-couverts", "Range-couverts", "Éléments", SearchConceptTarget.GenericText, "range-couverts", "bac à couverts, tiroir à couverts, organisateur de couverts"),
+        Official("element-porte-verre", "Porte vitrée", "Éléments", SearchConceptTarget.GenericText, "porte vitrée", "porte en verre, façade vitrée, cadre vitré"),
+        Official("element-tablette-verre", "Tablette en verre", "Éléments", SearchConceptTarget.GenericText, "tablette en verre", "étagère en verre, rayon verre"),
+        Official("element-eclairage", "Éclairage intégré", "Éléments", SearchConceptTarget.GenericText, "éclairage", "led, ruban led, spot intégré, lumière intégrée"),
+        Official("element-plan-travail", "Plan de travail", "Éléments", SearchConceptTarget.GenericText, "plan de travail", "dessus de travail, plateau de travail"),
+        Official("element-credence", "Crédence", "Éléments", SearchConceptTarget.GenericText, "crédence", "dosseret, panneau mural"),
+        Official("element-passe-cables", "Passe-câbles", "Éléments", SearchConceptTarget.GenericText, "passe-câbles", "passe cable, obturateur de câble, goulotte"),
         Official("position-dessus", "Au-dessus", "Positions", SearchConceptTarget.SpatialRelation, "au-dessus", "", false),
         Official("position-dessous", "En dessous", "Positions", SearchConceptTarget.SpatialRelation, "en dessous", "", false),
         Official("position-haut", "En partie haute", "Positions", SearchConceptTarget.SpatialRelation, "en partie haute", "", false),
@@ -679,6 +706,11 @@ public static class SearchDictionaryService
         Official("usage-entretien", "Entretien", "Usages", SearchConceptTarget.GenericText, "entretien", "placard balai, meuble à balais, rangement aspirateur"),
         Official("usage-dossiers", "Dossiers suspendus", "Usages", SearchConceptTarget.GenericText, "dossiers suspendus", "classement suspendu"),
         Official("usage-minibar", "Minibar", "Usages", SearchConceptTarget.GenericText, "minibar", "mini bar"),
+        Official("usage-cave-vin", "Cave à vin", "Usages", SearchConceptTarget.GenericText, "cave à vin", "cave vin, meuble à vin, rangement bouteilles de vin"),
+        Official("usage-chaudiere", "Chaudière", "Usages", SearchConceptTarget.GenericText, "chaudière", "cache chaudière, meuble chaudière"),
+        Official("usage-chauffe-eau", "Chauffe-eau", "Usages", SearchConceptTarget.GenericText, "chauffe-eau", "chauffe eau, ballon d eau, cumulus"),
+        Official("usage-aspirateur", "Aspirateur", "Usages", SearchConceptTarget.GenericText, "aspirateur", "rangement aspirateur, placard ménage"),
+        Official("usage-linge-sale", "Linge sale", "Usages", SearchConceptTarget.GenericText, "linge sale", "panier à linge, bac à linge, corbeille à linge"),
 
         Official("type-bas", "Meuble bas", "Types", SearchConceptTarget.FurnitureType, "Meuble bas", "caisson bas, élément bas", false),
         Official("type-haut", "Meuble haut", "Types", SearchConceptTarget.FurnitureType, "Meuble haut", "élément haut, meuble suspendu", false),
@@ -695,6 +727,11 @@ public static class SearchDictionaryService
         Official("type-bibliotheque", "Bibliothèque", "Types", SearchConceptTarget.GenericText, "bibliothèque", "biblio, rayonnage", false),
         Official("type-dressing", "Dressing", "Types", SearchConceptTarget.GenericText, "dressing", "placard dressing", false),
         Official("type-commode", "Commode", "Types", SearchConceptTarget.GenericText, "commode", "meuble à tiroirs", false),
+        Official("type-ilot", "Îlot", "Types", SearchConceptTarget.GenericText, "îlot", "ilot central, meuble îlot, bloc central", false),
+        Official("type-peninsule", "Péninsule", "Types", SearchConceptTarget.GenericText, "péninsule", "presqu île, retour snack, retour cuisine", false),
+        Official("type-suspendu", "Meuble suspendu", "Types", SearchConceptTarget.GenericText, "meuble suspendu", "meuble mural, meuble accroché", false),
+        Official("type-meuble-tv", "Meuble TV", "Types", SearchConceptTarget.GenericText, "meuble tv", "banc tv, meuble télévision", false),
+        Official("type-banquette", "Banquette", "Types", SearchConceptTarget.GenericText, "banquette", "assise intégrée, banc coffre", false),
 
         Official("forme-angle", "Angle", "Formes", SearchConceptTarget.FurnitureForm, "Angle", "meuble d’angle, coin"),
         Official("forme-sous-rampant", "Sous rampant", "Formes", SearchConceptTarget.FurnitureForm, "Sous rampant", "sous-rampant, mansarde, combles"),

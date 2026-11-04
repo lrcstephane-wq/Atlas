@@ -20,6 +20,7 @@ public partial class SettingsView : UserControl
     private readonly ObservableCollection<CatalogUniverseRecord> _universes = [];
     private ComponentTaxonomy _taxonomy = new();
     private Button? _activeSettingsButton;
+    private ICollectionView? _conceptView;
     private ICollectionView? _synonymView;
     private ICollectionView? _expressionView;
     private ICollectionView? _ignoredTermView;
@@ -47,6 +48,7 @@ public partial class SettingsView : UserControl
             ExpressionConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
             RequestExpectedConceptPicker.SelectedItem = vm.SearchConcepts.FirstOrDefault();
             SearchExpressionGrid.SelectedItem = vm.SearchExpressions.FirstOrDefault();
+            SearchConceptGrid.SelectedItem = vm.SearchConcepts.FirstOrDefault();
             InitializeSearchDictionaryViews(vm);
         }
         if (DataContext is MainViewModel currentVm && (currentVm.IsUserMode || currentVm.IsLicenseRestricted || currentVm.IsCreatorMode && !currentVm.CanManageCustomerFurniture))
@@ -81,6 +83,23 @@ public partial class SettingsView : UserControl
         SynonymSearchBox.Clear();
         SearchSynonymGrid.SelectedItem = item; SearchSynonymGrid.ScrollIntoView(item); NewSynonymTermBox.Clear();
         SearchDictionaryStatus.Text = $"« {term} » sera compris comme « {concept.Label} ».";
+    }
+
+    private void AddSearchConcept_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm) return;
+        var item = vm.AddSearchConcept();
+        ConceptSearchBox.Clear();
+        SearchConceptGrid.SelectedItem = item;
+        SearchConceptGrid.ScrollIntoView(item);
+        SearchDictionaryStatus.Text = "Concept client ajouté. Définissez précisément la donnée qu’il doit contrôler.";
+    }
+
+    private void DeleteSearchConcept_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanEdit: true } vm || SearchConceptGrid.SelectedItem is not SearchConceptRecord item) return;
+        if (!vm.DeleteSearchConcept(item)) { SearchDictionaryStatus.Text = "Un concept Atlas peut être désactivé, mais pas supprimé."; return; }
+        SearchDictionaryStatus.Text = "Concept client supprimé.";
     }
 
     private void DeleteSearchSynonym_OnClick(object sender, RoutedEventArgs e)
@@ -184,8 +203,12 @@ public partial class SettingsView : UserControl
     private void TestSearchDictionary_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
-        var intent = vm.InterpretSearch(SearchDictionaryTestBox.Text);
+        var preview = vm.PreviewSearchQuery(SearchDictionaryTestBox.Text);
+        var intent = preview.Intent;
+        SearchTestMatches.Text = $"{preview.MatchCount} sur {preview.TotalCount} meubles publiés"
+                                 + (preview.Examples.Count == 0 ? " · aucun exemple" : $" · {string.Join(" · ", preview.Examples)}");
         SearchDictionaryTestResult.Text = $"Atlas comprend : {intent.Summary}";
+        SearchTestConstraints.Text = intent.Constraints.Count == 0 ? "Aucun concept métier reconnu" : string.Join(" · ", intent.Constraints.Select(item => item.ConceptLabel));
         SearchTestExpressions.Text = intent.RecognizedExpressions.Count == 0 ? "—" : string.Join(" · ", intent.RecognizedExpressions);
         SearchTestIgnored.Text = intent.IgnoredTerms.Count == 0 ? "—" : string.Join(" · ", intent.IgnoredTerms);
         SearchTestRemaining.Text = string.IsNullOrWhiteSpace(intent.RemainingQuery) ? "Aucun" : intent.RemainingQuery;
@@ -201,6 +224,8 @@ public partial class SettingsView : UserControl
 
     private void InitializeSearchDictionaryViews(MainViewModel vm)
     {
+        _conceptView = CollectionViewSource.GetDefaultView(vm.SearchConcepts);
+        _conceptView.Filter = FilterConcept;
         _synonymView = CollectionViewSource.GetDefaultView(vm.SearchSynonyms);
         _synonymView.Filter = FilterSynonym;
         _expressionView = CollectionViewSource.GetDefaultView(vm.SearchExpressions);
@@ -213,11 +238,16 @@ public partial class SettingsView : UserControl
 
     private void SearchDictionaryFilter_OnChanged(object sender, TextChangedEventArgs e)
     {
+        _conceptView?.Refresh();
         _synonymView?.Refresh();
         _expressionView?.Refresh();
         _ignoredTermView?.Refresh();
         _requestView?.Refresh();
     }
+
+    private bool FilterConcept(object value) => value is SearchConceptRecord item &&
+        MatchesDictionarySearch(ConceptSearchBox.Text, item.Label, item.Category, item.TargetLabel,
+            item.TargetValue, item.OfficialAliasesCsv, item.CustomAliasesCsv, item.OriginLabel);
 
     private bool FilterSynonym(object value) => value is SearchSynonymEntry item &&
         MatchesDictionarySearch(SynonymSearchBox.Text, item.ConceptLabel, item.Term, item.OriginLabel);
