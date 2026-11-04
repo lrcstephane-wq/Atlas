@@ -66,6 +66,7 @@ public sealed class MainViewModel : ObservableObject
     private DateTime? _newLicenseValidUntil = DateTime.Today.AddYears(1);
     private readonly HashSet<FurnitureCompositionLineViewModel> _selectedCompositionLines = [];
     private readonly HashSet<string> _dirtyFurnitureIds = new(StringComparer.OrdinalIgnoreCase);
+    private int _repairedFurnitureDefaultsCount;
     private readonly Dictionary<string, string> _persistedFurnitureReferences = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _persistedFurnitureSnapshots = new(StringComparer.OrdinalIgnoreCase);
 
@@ -838,7 +839,10 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(InstalledContentDate));
             OnPropertyChanged(nameof(InstalledContentModules));
             foreach (var property in new[] { nameof(FurnitureForms), nameof(ConstructionPrinciples), nameof(BackPositions), nameof(AssemblyTypes), nameof(TagCategories), nameof(DoorTypes), nameof(DrawerTypes), nameof(SearchConceptCategories) }) OnPropertyChanged(property);
-            NotifySummary(); StatusText = showMessage ? "Catalogue rechargé." : LastModification;
+            NotifySummary();
+            StatusText = _repairedFurnitureDefaultsCount > 0
+                ? $"{_repairedFurnitureDefaultsCount} fiche(s) meuble complétée(s) automatiquement. Cliquez sur Enregistrer pour conserver la régularisation."
+                : showMessage ? "Catalogue rechargé." : LastModification;
         }
         catch (Exception exception) { ShowError(exception); }
         finally { IsBusy = false; }
@@ -884,8 +888,10 @@ public sealed class MainViewModel : ObservableObject
             _catalog.UniverseDefinitions.Add(new CatalogUniverseRecord { Name = legacyName, SortOrder = _catalog.UniverseDefinitions.Count, Description = DefaultUniverseDescription(legacyName) });
         NormalizeUniverseDefinitions();
         foreach (var item in _catalog.Components) item.NormalizeTags();
+        _repairedFurnitureDefaultsCount = 0;
         foreach (var item in _catalog.Furniture)
         {
+            if (FurnitureDefaults.NormalizeStructure(item, _referenceData)) _repairedFurnitureDefaultsCount++;
             item.Universes ??= []; item.Usages ??= []; item.ComponentIds ??= []; item.ComponentLines ??= []; item.AddedTagIds ??= []; item.RemovedInheritedTagIds ??= [];
             if (item.ComponentLines.Count == 0)
                 item.ComponentLines.AddRange(item.ComponentIds.Distinct(StringComparer.OrdinalIgnoreCase).Select(id => new FurnitureComponentLine { ComponentId = id, Quantity = 1 }));
@@ -894,7 +900,7 @@ public sealed class MainViewModel : ObservableObject
                 item.Usages.AddRange(item.UsageSpecifique.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             item.ConceptionDate ??= DateTime.Today;
         }
-        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 9);
+        _catalog.SchemaVersion = Math.Max(_catalog.SchemaVersion, 10);
     }
 
     private async Task<bool> SaveAsync()
@@ -912,6 +918,7 @@ public sealed class MainViewModel : ObservableObject
                 item.ModifiedBy = CurrentUser.DisplayName;
                 item.ModifiedUtc = now;
             }
+            foreach (var item in Furniture) FurnitureDefaults.NormalizeStructure(item, _referenceData);
             _catalog.Components = Components.ToList(); _catalog.Furniture = Furniture.ToList(); _catalog.FurnitureFamilies = FurnitureFamilies.ToList();
             _catalog.FurnitureTypes = FurnitureTypes.ToList(); _catalog.FurnitureUsages = FurnitureUsages.ToList();
             NormalizeUniverseDefinitions();
@@ -920,6 +927,7 @@ public sealed class MainViewModel : ObservableObject
             foreach (var item in Furniture) _persistedFurnitureReferences[item.Id] = item.Reference;
             CaptureFurnitureSnapshots();
             _dirtyFurnitureIds.Clear();
+            _repairedFurnitureDefaultsCount = 0;
             NotifySelectedFurnitureState();
             return true;
         }
@@ -1742,6 +1750,7 @@ public sealed class MainViewModel : ObservableObject
             Universes = family?.Universes.ToList() ?? [], Usages = string.IsNullOrWhiteSpace(family?.UsageSpecifique) ? [] : [family.UsageSpecifique], ConceptionDate = DateTime.Today, Status = RecordStatus.Brouillon,
             CreatedBy = CurrentUser.DisplayName, CreatedUtc = DateTimeOffset.UtcNow
         };
+        FurnitureDefaults.NormalizeStructure(item, _referenceData);
         Furniture.Add(item); _dirtyFurnitureIds.Add(item.Id); SelectedFurniture = item; FurnitureView.Refresh(); RebuildClientCards(); CurrentPage = "Furniture"; CurrentFurnitureStep = "Identity"; NotifySummary(); NotifySelectedFurnitureState();
     }
 
@@ -1766,6 +1775,7 @@ public sealed class MainViewModel : ObservableObject
             AddedTagIds = source.AddedTagIds.ToList(), RemovedInheritedTagIds = source.RemovedInheritedTagIds.ToList(), Status = RecordStatus.Brouillon,
             CreatedBy = CurrentUser.DisplayName, CreatedUtc = DateTimeOffset.UtcNow
         };
+        FurnitureDefaults.NormalizeStructure(item, _referenceData);
         SyncLegacyComponentIds(item);
         Furniture.Add(item); _dirtyFurnitureIds.Add(item.Id); SelectedFurniture = item; FurnitureView.Refresh(); CurrentFurnitureStep = "Identity"; NotifySummary(); NotifySelectedFurnitureState();
         StatusText = $"Copie créée sous la référence {item.Reference}. Associez son fichier .TOP avant publication.";
