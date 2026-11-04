@@ -673,7 +673,7 @@ Assert(furnitureCatalogCode.Contains("FurnitureCatalogWindowStateStore") && furn
 Assert(furnitureXaml.Contains("Width=\"430\"") && furnitureXaml.Contains("Height=\"170\"")
        && furnitureXaml.Contains("IMAGE DISPONIBLE") && furnitureXaml.Contains("FICHIER TOPSOLID"),
     "L’aperçu de la fiche meuble doit rester compact et séparer clairement l’image du fichier TopSolid.");
-Assert(viewModelSource.Contains("linkedComponents") && viewModelSource.Contains("component.TechnicalName") && viewModelSource.Contains("furniture.NicheOuverte") && viewModelSource.Contains("furniture.UseCasesCsv"), "La recherche Horizon doit couvrir toute la fiche et les composants liés.");
+Assert(viewModelSource.Contains("linkedComponents") && viewModelSource.Contains("item.Component.TechnicalName") && viewModelSource.Contains("furniture.NicheOuverte") && viewModelSource.Contains("furniture.UseCasesCsv"), "La recherche Horizon doit couvrir toute la fiche et les composants liés.");
 Assert(viewModelSource.Contains("CatalogSearchEngine.Prepare(SearchFieldsFor")
        && viewModelSource.Contains("Task.Delay(180")
        && !viewModelSource.Contains("_lastClientSearchMatches"),
