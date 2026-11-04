@@ -638,7 +638,7 @@ public static class SearchDictionaryService
     private static IReadOnlyList<SearchConceptRecord> BuildOfficialConcepts() =>
     [
         Official("element-porte", "Porte", "Éléments", SearchConceptTarget.DoorCount, "", "portes, ouvrant, ouvrants, vantail, vantaux, porte battante, portes battantes"),
-        Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "tiroirs, coulissant de rangement, coulissants de rangement, tiroir simple, tiroirs simples"),
+        Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "tiroirs, iroir, coulissant de rangement, coulissants de rangement, tiroir simple, tiroirs simples"),
         Official("element-tiroir-anglais", "Tiroir à l’anglaise", "Éléments", SearchConceptTarget.InnerDrawerCount, "", "tiroirs à l’anglaise, tiroir anglais, tiroirs anglais, tiroir intérieur, tiroirs intérieurs, coulissant intérieur"),
         Official("element-rayon", "Rayon", "Éléments", SearchConceptTarget.ShelfCount, "", "rayons, tablette, tablettes, étagère, étagères, planche de rangement, planches de rangement"),
         Official("expression-rangement-rayons", "Armoire de rangement", "Expressions", SearchConceptTarget.ShelfCount, "", "placard de rangement, rangement avec étagères"),
