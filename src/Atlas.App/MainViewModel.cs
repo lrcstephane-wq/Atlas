@@ -39,8 +39,6 @@ public sealed class MainViewModel : ObservableObject
     private CancellationTokenSource? _clientSearchRefreshCancellation;
     private readonly Dictionary<string, CatalogSearchDocument> _clientSearchDocuments = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _clientSearchVocabulary = new(StringComparer.Ordinal);
-    private HashSet<string>? _lastClientSearchMatches;
-    private string _lastClientCorrectedQuery = string.Empty;
     private string? _lastEvaluatedClientQuery;
     private AtlasCatalog _catalog = new();
     private CustomerFurnitureCatalog _customerCatalog = new();
@@ -273,9 +271,9 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<string> TagCategories => _referenceData.TagCategories;
     public IReadOnlyList<string> DoorTypes => _referenceData.DoorTypes;
     public IReadOnlyList<string> DrawerTypes => _referenceData.DrawerTypes;
-    public IReadOnlyList<KeyValuePair<SearchConceptTarget, string>> SearchConceptTargetOptions { get; } = Enum.GetValues<SearchConceptTarget>()
-        .Select(target => new KeyValuePair<SearchConceptTarget, string>(target, new SearchConceptRecord { Target = target }.TargetLabel)).ToList();
     public IReadOnlyList<string> SearchConceptCategories => _referenceData.SearchConceptCategories;
+    public IReadOnlyList<SearchTargetOption> SearchConceptTargets { get; } = Enum.GetValues<SearchConceptTarget>()
+        .Select(value => new SearchTargetOption(value, new SearchConceptRecord { Target = value }.TargetLabel)).ToArray();
     public IReadOnlyList<string> CatalogUniverses => _catalog.UniverseDefinitions
         .Where(item => item.IsActive)
         .OrderBy(item => item.SortOrder)
@@ -391,6 +389,7 @@ public sealed class MainViewModel : ObservableObject
     public int FurnitureCount => Furniture.Count(item => !item.IsDemo);
     public int PublishedCount => Furniture.Count(item => item.Status == RecordStatus.Publiee);
     public int ClientResultCount => ClientFurnitureView.Cast<object>().Count();
+    public int ClientPublishedTotal => ClientFurnitureCards.Count(item => item.Record.Status == RecordStatus.Publiee);
     public bool HasClientResults => ClientResultCount > 0;
     public int ClientSelectionCount => ClientFurnitureCards.Count(item => item.IsChosen);
     public string ClientSelectionLabel => ClientSelectionCount == 0 ? "Aucun meuble sélectionné" : ClientSelectionCount == 1 ? "1 meuble sélectionné" : $"{ClientSelectionCount} meubles sélectionnés";
@@ -406,7 +405,9 @@ public sealed class MainViewModel : ObservableObject
     public bool HasClientSearchSuggestions => ClientSearchSuggestions.Count > 0;
     public bool HasClientFavorites => ClientFavoriteFacets.Count > 0;
     public IEnumerable<CatalogFacetViewModel> SelectedClientFacets => ClientFacetGroups().SelectMany(group => group).Where(option => option.IsSelected);
-    public string ClientResultLabel => ClientResultCount <= 1 ? $"{ClientResultCount} meuble trouvé" : $"{ClientResultCount} meubles trouvés";
+    public string ClientResultLabel => ClientResultCount == ClientPublishedTotal
+        ? ClientPublishedTotal <= 1 ? $"{ClientPublishedTotal} meuble publié" : $"{ClientPublishedTotal} meubles publiés"
+        : $"{ClientResultCount} sur {ClientPublishedTotal} meubles publiés";
     public int HealthIssueCount => Components.Count(item => !item.IsNameCompliant || item.IsMissing) + Furniture.Count(item => item.ComponentIds.Count == 0);
     public int MarkedComponentCount => ComponentCards.Count(item => item.IsMarked);
     public string VisibleComponentLabel => $"{ComponentView.Cast<object>().Count():N0} affichés sur {ScopedComponentCards().Count():N0}";
@@ -1397,6 +1398,7 @@ public sealed class MainViewModel : ObservableObject
         UpdateClientSearchScores();
         ClientFurnitureView.Refresh();
         OnPropertyChanged(nameof(PublishedCount));
+        OnPropertyChanged(nameof(ClientPublishedTotal));
         OnPropertyChanged(nameof(ClientResultCount));
         OnPropertyChanged(nameof(HasClientResults));
         OnPropertyChanged(nameof(ClientResultLabel));
@@ -1438,8 +1440,6 @@ public sealed class MainViewModel : ObservableObject
     {
         _clientSearchDocuments.Clear();
         _clientSearchVocabulary.Clear();
-        _lastClientSearchMatches = null;
-        _lastClientCorrectedQuery = string.Empty;
         _lastEvaluatedClientQuery = null;
         foreach (var card in ClientFurnitureCards)
         {
@@ -1502,8 +1502,6 @@ public sealed class MainViewModel : ObservableObject
             foreach (var card in ClientFurnitureCards) { card.SearchScore = 0d; card.SearchExplanation = string.Empty; }
             ClientSearchInterpretation = string.Empty;
             _activeSearchIntent = new SearchIntent();
-            _lastClientSearchMatches = null;
-            _lastClientCorrectedQuery = string.Empty;
         }
         else
         {
@@ -1511,27 +1509,13 @@ public sealed class MainViewModel : ObservableObject
                 .Concat(PersonalTags.Select(tag => tag.Label)).Distinct(StringComparer.OrdinalIgnoreCase);
             var protectedTerms = SearchDictionaryService.ProtectedTerms.Concat(_clientSearchVocabulary).ToHashSet(StringComparer.Ordinal);
             _activeSearchIntent = SearchDictionaryService.Interpret(ClientSearch, _searchDictionary, dynamicTags, protectedTerms, liveTyping: true);
-            var candidates = _lastClientSearchMatches is not null && _activeSearchIntent.CorrectedQuery.Length > _lastClientCorrectedQuery.Length
-                             && _activeSearchIntent.CorrectedQuery.StartsWith(_lastClientCorrectedQuery, StringComparison.Ordinal)
-                ? _lastClientSearchMatches
-                : null;
-            var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var card in ClientFurnitureCards)
             {
-                if (candidates is not null && !candidates.Contains(card.Record.Id))
-                {
-                    card.SearchScore = 0d;
-                    card.SearchExplanation = string.Empty;
-                    continue;
-                }
                 _clientSearchDocuments.TryGetValue(card.Record.Id, out var document);
                 var evaluation = EvaluateClientSearch(card.Record, _activeSearchIntent, document, protectedTerms);
                 card.SearchScore = evaluation.Score;
                 card.SearchExplanation = evaluation.Explanation;
-                if (card.SearchScore >= 0.58d) matches.Add(card.Record.Id);
             }
-            _lastClientSearchMatches = matches;
-            _lastClientCorrectedQuery = _activeSearchIntent.CorrectedQuery;
             var corrected = CatalogSearchEngine.Normalize(ClientSearch).Equals(_activeSearchIntent.CorrectedQuery, StringComparison.Ordinal)
                 ? string.Empty
                 : $"Interprétation « {_activeSearchIntent.CorrectedQuery} » · ";
@@ -1545,17 +1529,11 @@ public sealed class MainViewModel : ObservableObject
     private (double Score, string Explanation) EvaluateClientSearch(FurnitureRecord furniture, SearchIntent intent, CatalogSearchDocument? document,
         IEnumerable<string> protectedTerms)
     {
-        var softMatches = 0;
         var reasons = new List<string>();
         foreach (var constraint in intent.Constraints)
         {
-            var matches = MatchesSearchConstraint(furniture, constraint);
-            if (constraint.IsStrict && !matches) return (0d, string.Empty);
-            if (matches)
-            {
-                softMatches++;
-                reasons.Add(constraint.ConceptLabel);
-            }
+            if (!MatchesSearchConstraint(furniture, constraint, document)) return (0d, string.Empty);
+            reasons.Add(constraint.ConceptLabel);
         }
         var textScore = string.IsNullOrWhiteSpace(intent.RemainingQuery)
             ? 1d
@@ -1563,36 +1541,38 @@ public sealed class MainViewModel : ObservableObject
                 protectedTerms: protectedTerms);
         if (!string.IsNullOrWhiteSpace(intent.RemainingQuery) && textScore < 0.58d) return (0d, string.Empty);
         if (!string.IsNullOrWhiteSpace(intent.RemainingQuery)) reasons.Add($"texte « {intent.RemainingQuery} »");
-        var constraintScore = intent.Constraints.Count == 0 ? 0d : (double)softMatches / intent.Constraints.Count;
-        return (Math.Min(1.22d, 0.62d + textScore * 0.35d + constraintScore * 0.25d),
+        var score = string.IsNullOrWhiteSpace(intent.RemainingQuery) ? 1d : Math.Min(1.22d, 0.72d + textScore * 0.28d);
+        return (score,
             reasons.Count == 0 ? "Correspondance textuelle" : "Trouvé grâce à : " + string.Join(" · ", reasons.Distinct(StringComparer.OrdinalIgnoreCase)));
     }
 
-    private bool MatchesSearchConstraint(FurnitureRecord furniture, SearchConstraint constraint)
+    private bool MatchesSearchConstraint(FurnitureRecord furniture, SearchConstraint constraint, CatalogSearchDocument? document)
     {
         var usages = FurnitureUsagesFor(furniture).ToArray();
+        var searchable = document ?? CatalogSearchEngine.Prepare(SearchFieldsFor(furniture));
         var matches = constraint.Target switch
         {
-            SearchConceptTarget.DoorCount => SearchDictionaryService.QuantityMatches(furniture.NombrePortes, constraint),
-            SearchConceptTarget.DrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirs, constraint),
-            SearchConceptTarget.InnerDrawerCount => SearchDictionaryService.QuantityMatches(furniture.NombreTiroirsAnglaise, constraint),
-            SearchConceptTarget.FlapCount => SearchDictionaryService.QuantityMatches(furniture.NombreAbattants, constraint),
-            SearchConceptTarget.LiftUpCount => SearchDictionaryService.QuantityMatches(furniture.NombreRelevants, constraint),
-            SearchConceptTarget.ShelfCount => SearchDictionaryService.QuantityMatches(furniture.NombreRayons, constraint),
-            SearchConceptTarget.OpenNicheCount => SearchDictionaryService.QuantityMatches(furniture.NombreNichesOuvertes, constraint),
+            SearchConceptTarget.DoorCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Porte, furniture.NombrePortes), constraint),
+            SearchConceptTarget.DrawerCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Tiroir, furniture.NombreTiroirs), constraint),
+            SearchConceptTarget.InnerDrawerCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.TiroirAnglaise, furniture.NombreTiroirsAnglaise), constraint),
+            SearchConceptTarget.FlapCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Abattant, furniture.NombreAbattants), constraint),
+            SearchConceptTarget.LiftUpCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Relevant, furniture.NombreRelevants), constraint),
+            SearchConceptTarget.ShelfCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Rayon, furniture.NombreRayons), constraint),
+            SearchConceptTarget.OpenNicheCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.NicheOuverte, furniture.NombreNichesOuvertes), constraint),
             SearchConceptTarget.Hanging => furniture.Penderie,
             SearchConceptTarget.HorizontalSeparation => furniture.SeparationHorizontale,
             SearchConceptTarget.VerticalSeparation => furniture.SeparationVerticale,
             SearchConceptTarget.FurnitureType => FurnitureTypeMatches(furniture.TypeMeuble, constraint.Value),
-            SearchConceptTarget.FurnitureUsage => usages.Any(value => ValueMatches(value, constraint.Value)) || SearchFieldsContain(furniture, constraint.Value),
+            SearchConceptTarget.FurnitureUsage => usages.Any(value => ValueMatches(value, constraint.Value))
+                || StrictSearchContains(searchable, constraint),
             SearchConceptTarget.FurnitureTag => ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label)
                 .Concat(furniture.PersonalTags ?? []).Any(value => ValueMatches(value, constraint.Value)),
             SearchConceptTarget.FurnitureForm => ValueMatches(furniture.Forme, constraint.Value),
             SearchConceptTarget.Construction => ValueMatches(furniture.PrincipleConstruction, constraint.Value),
             SearchConceptTarget.Assembly => ValueMatches(furniture.TypeAssemblage, constraint.Value),
             SearchConceptTarget.BackPosition => ValueMatches(furniture.PositionDos, constraint.Value),
-            SearchConceptTarget.SpatialRelation => true,
-            SearchConceptTarget.GenericText => SearchFieldsContain(furniture, constraint.Value),
+            SearchConceptTarget.SpatialRelation => StrictSearchContains(searchable, constraint),
+            SearchConceptTarget.GenericText => StrictSearchContains(searchable, constraint),
             _ => false
         };
         return constraint.Mode == SearchConstraintMode.Exclude && !SearchDictionaryService.IsQuantityTarget(constraint.Target)
@@ -1600,9 +1580,27 @@ public sealed class MainViewModel : ObservableObject
             : matches;
     }
 
-    private static bool ValueMatches(string? actual, string expected) =>
-        CatalogSearchEngine.Normalize(actual).Equals(CatalogSearchEngine.Normalize(expected), StringComparison.Ordinal) ||
-        CatalogSearchEngine.Normalize(actual).Contains(CatalogSearchEngine.Normalize(expected), StringComparison.Ordinal);
+    private bool StrictSearchContains(CatalogSearchDocument document, SearchConstraint constraint)
+    {
+        var concept = _searchDictionary.Concepts.FirstOrDefault(item =>
+            item.Label.Equals(constraint.ConceptLabel, StringComparison.OrdinalIgnoreCase));
+        var terms = new[] { constraint.Value }
+            .Concat(concept?.Expressions() ?? Enumerable.Empty<string>())
+            .Concat(concept is null ? Enumerable.Empty<string>() : _searchDictionary.Synonyms
+                .Where(item => item.IsActive && item.ConceptId.Equals(concept.Id, StringComparison.OrdinalIgnoreCase))
+                .Select(item => item.Term))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        return terms.Any(term => CatalogSearchEngine.ContainsExactPhrase(term, document));
+    }
+
+    private static bool ValueMatches(string? actual, string expected)
+    {
+        var actualValue = CatalogSearchEngine.Normalize(actual);
+        var expectedValue = CatalogSearchEngine.Normalize(expected);
+        return actualValue.Equals(expectedValue, StringComparison.Ordinal)
+               || $" {actualValue} ".Contains($" {expectedValue} ", StringComparison.Ordinal);
+    }
 
     private static bool FurnitureTypeMatches(string? actual, string expected)
     {
@@ -1611,9 +1609,6 @@ public sealed class MainViewModel : ObservableObject
         var expectedValue = CatalogSearchEngine.Normalize(expected);
         return (expectedValue is "colonne" or "armoire") && (actualValue is "colonne" or "demi colonne" or "armoire");
     }
-
-    private bool SearchFieldsContain(FurnitureRecord furniture, string value) =>
-        CatalogSearchEngine.Score(value, SearchFieldsFor(furniture)) >= 0.74d;
 
     private IEnumerable<CatalogSearchField> SearchFieldsFor(FurnitureRecord furniture)
     {
@@ -1666,6 +1661,28 @@ public sealed class MainViewModel : ObservableObject
     public SearchIntent InterpretSearch(string query) => SearchDictionaryService.Interpret(query, _searchDictionary,
         _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label).Concat(PersonalTags.Select(tag => tag.Label)));
 
+    public (SearchIntent Intent, int MatchCount, int TotalCount, IReadOnlyList<string> Examples) PreviewSearchQuery(string query)
+    {
+        var protectedTerms = SearchDictionaryService.ProtectedTerms.Concat(_clientSearchVocabulary).ToHashSet(StringComparer.Ordinal);
+        var dynamicTags = _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label)
+            .Concat(PersonalTags.Select(tag => tag.Label)).Distinct(StringComparer.OrdinalIgnoreCase);
+        var intent = SearchDictionaryService.Interpret(query, _searchDictionary, dynamicTags, protectedTerms, liveTyping: true);
+        var published = ClientFurnitureCards.Where(card => card.Record.Status == RecordStatus.Publiee).ToArray();
+        if (string.IsNullOrWhiteSpace(query))
+            return (intent, published.Length, published.Length, published.Select(card => card.DisplayName).Take(8).ToArray());
+        var matches = published.Select(card =>
+            {
+                _clientSearchDocuments.TryGetValue(card.Record.Id, out var document);
+                var evaluation = EvaluateClientSearch(card.Record, intent, document, protectedTerms);
+                return (Card: card, evaluation.Score);
+            })
+            .Where(item => item.Score >= 0.58d)
+            .OrderByDescending(item => item.Score)
+            .ThenBy(item => item.Card.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+        return (intent, matches.Length, published.Length, matches.Take(8).Select(item => item.Card.DisplayName).ToArray());
+    }
+
     public async Task<bool> SaveSearchDictionaryAsync()
     {
         try
@@ -1683,13 +1700,15 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception exception) { ShowError(exception); return false; }
     }
 
-    public void AddSearchConcept()
+    public SearchConceptRecord AddSearchConcept()
     {
-        SearchConcepts.Add(new SearchConceptRecord
+        var item = new SearchConceptRecord
         {
             Label = "Nouveau concept", Category = "Autre", Target = SearchConceptTarget.GenericText,
-            IsOfficial = false, IsActive = true, IsStrict = false
-        });
+            IsOfficial = false, IsActive = true, IsStrict = true
+        };
+        SearchConcepts.Add(item);
+        return item;
     }
 
     public bool DeleteSearchConcept(SearchConceptRecord concept)

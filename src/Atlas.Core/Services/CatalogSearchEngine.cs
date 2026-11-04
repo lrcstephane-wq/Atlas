@@ -59,7 +59,7 @@ public static class CatalogSearchEngine
     }
 
     public static double Score(string query, IEnumerable<CatalogSearchField> fields, IEnumerable<SearchSynonymRecord>? synonyms = null)
-        => Score(query, Prepare(fields), synonyms);
+        => Score(query, Prepare(fields), synonyms, allowFuzzy: true);
 
     public static CatalogSearchDocument Prepare(IEnumerable<CatalogSearchField> fields) => new(fields
         .Where(field => !string.IsNullOrWhiteSpace(field.Text) && field.Weight > 0)
@@ -71,8 +71,15 @@ public static class CatalogSearchEngine
         .Where(field => field.Tokens.Length > 0)
         .ToArray());
 
+    public static bool ContainsExactPhrase(string query, CatalogSearchDocument document)
+    {
+        var normalized = Normalize(query);
+        if (normalized.Length == 0) return true;
+        return document.Fields.Any(field => $" {field.Normalized} ".Contains($" {normalized} ", StringComparison.Ordinal));
+    }
+
     public static double Score(string query, CatalogSearchDocument document, IEnumerable<SearchSynonymRecord>? synonyms = null,
-        IEnumerable<string>? protectedTerms = null)
+        IEnumerable<string>? protectedTerms = null, bool allowFuzzy = false)
     {
         var normalizedQuery = Normalize(query);
         var queryTokens = Tokens(normalizedQuery);
@@ -87,7 +94,7 @@ public static class CatalogSearchEngine
         {
             var alternatives = ExpandToken(queryToken, synonymGroups);
             var best = document.Fields.Max(field => alternatives.Max(alternative =>
-                field.Tokens.Max(candidate => LiveSimilarity(alternative, candidate, protectedVocabulary.Contains(alternative))) * field.Weight));
+                field.Tokens.Max(candidate => LiveSimilarity(alternative, candidate, protectedVocabulary.Contains(alternative), allowFuzzy)) * field.Weight));
             if (best < MinimumLiveSimilarity(queryToken.Length)) return 0d;
             total += Math.Min(1d, best);
         }
@@ -156,15 +163,15 @@ public static class CatalogSearchEngine
         return Math.Max(0d, 1d - (double)distance / Math.Max(left.Length, right.Length));
     }
 
-    private static double LiveSimilarity(string query, string candidate, bool isProtected)
+    private static double LiveSimilarity(string query, string candidate, bool isProtected, bool allowFuzzy)
     {
         if (query == candidate) return 1d;
-        if (query.Length >= 3 && candidate.Length > query.Length && candidate.StartsWith(query, StringComparison.Ordinal)) return 0.93d;
         if (isProtected) return 0d;
+        if (query.Length >= 3 && candidate.Length > query.Length && candidate.StartsWith(query, StringComparison.Ordinal)) return 0.93d;
         var singularCandidate = candidate.EndsWith('s') ? candidate[..^1] : candidate;
         if (query.Length >= 4 && singularCandidate.Length == query.Length + 1
             && singularCandidate.AsSpan(1).SequenceEqual(query.AsSpan())) return 0.88d;
-        return Similarity(query, candidate);
+        return allowFuzzy ? Similarity(query, candidate) : 0d;
     }
 
     private static int DamerauLevenshtein(string source, string target)

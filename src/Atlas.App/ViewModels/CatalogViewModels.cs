@@ -7,6 +7,8 @@ using Atlas.Core.Services;
 
 namespace Atlas.App.ViewModels;
 
+public sealed record SearchTargetOption(SearchConceptTarget Value, string Label);
+
 public sealed class FurnitureStepViewModel : INotifyPropertyChanged
 {
     private bool _isActive;
