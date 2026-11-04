@@ -38,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
     private CancellationTokenSource? _searchObservationCancellation;
     private CancellationTokenSource? _clientSearchRefreshCancellation;
     private readonly Dictionary<string, CatalogSearchDocument> _clientSearchDocuments = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FurnitureSearchCandidate> _clientSearchCandidates = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _clientSearchVocabulary = new(StringComparer.Ordinal);
     private string? _lastEvaluatedClientQuery;
     private AtlasCatalog _catalog = new();
@@ -422,6 +423,8 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _clientSearch, value)) return;
+            _lastEvaluatedClientQuery = null;
+            RefreshClientFurnitureView();
             ScheduleClientSearchRefresh();
         }
     }
@@ -1415,7 +1418,6 @@ public sealed class MainViewModel : ObservableObject
         {
             ClientSearchSuggestions.Clear();
             OnPropertyChanged(nameof(HasClientSearchSuggestions));
-            RefreshClientFurnitureView();
             return;
         }
 
@@ -1431,7 +1433,6 @@ public sealed class MainViewModel : ObservableObject
             await Task.Delay(180, cancellationToken);
             if (!query.Equals(ClientSearch, StringComparison.Ordinal)) return;
             UpdateClientSearchSuggestions();
-            RefreshClientFurnitureView();
         }
         catch (OperationCanceledException) { }
     }
@@ -1439,15 +1440,24 @@ public sealed class MainViewModel : ObservableObject
     private void RebuildClientSearchIndex()
     {
         _clientSearchDocuments.Clear();
+        _clientSearchCandidates.Clear();
         _clientSearchVocabulary.Clear();
         _lastEvaluatedClientQuery = null;
         foreach (var card in ClientFurnitureCards)
         {
             var document = CatalogSearchEngine.Prepare(SearchFieldsFor(card.Record));
             _clientSearchDocuments[card.Record.Id] = document;
+            _clientSearchCandidates[card.Record.Id] = CreateSearchCandidate(card.Record, document);
             _clientSearchVocabulary.UnionWith(document.Vocabulary);
         }
     }
+
+    private FurnitureSearchCandidate CreateSearchCandidate(FurnitureRecord furniture, CatalogSearchDocument document) =>
+        new(furniture,
+            FurnitureUsagesFor(furniture).ToArray(),
+            ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label)
+                .Concat(furniture.PersonalTags ?? []).ToArray(),
+            document);
 
     private void UpdateClientSearchSuggestions()
     {
@@ -1499,7 +1509,7 @@ public sealed class MainViewModel : ObservableObject
         if (string.Equals(_lastEvaluatedClientQuery, ClientSearch, StringComparison.Ordinal)) return;
         if (string.IsNullOrWhiteSpace(ClientSearch))
         {
-            foreach (var card in ClientFurnitureCards) { card.SearchScore = 0d; card.SearchExplanation = string.Empty; }
+            foreach (var card in ClientFurnitureCards) { card.IsSearchMatch = true; card.SearchScore = 0d; card.SearchExplanation = string.Empty; }
             ClientSearchInterpretation = string.Empty;
             _activeSearchIntent = new SearchIntent();
         }
@@ -1511,8 +1521,14 @@ public sealed class MainViewModel : ObservableObject
             _activeSearchIntent = SearchDictionaryService.Interpret(ClientSearch, _searchDictionary, dynamicTags, protectedTerms, liveTyping: true);
             foreach (var card in ClientFurnitureCards)
             {
-                _clientSearchDocuments.TryGetValue(card.Record.Id, out var document);
-                var evaluation = EvaluateClientSearch(card.Record, _activeSearchIntent, document, protectedTerms);
+                if (!_clientSearchCandidates.TryGetValue(card.Record.Id, out var candidate))
+                {
+                    var document = CatalogSearchEngine.Prepare(SearchFieldsFor(card.Record));
+                    candidate = CreateSearchCandidate(card.Record, document);
+                    _clientSearchCandidates[card.Record.Id] = candidate;
+                }
+                var evaluation = FurnitureSearchMatcher.Evaluate(candidate, _activeSearchIntent, _searchDictionary, protectedTerms);
+                card.IsSearchMatch = evaluation.IsMatch;
                 card.SearchScore = evaluation.Score;
                 card.SearchExplanation = evaluation.Explanation;
             }
@@ -1524,90 +1540,6 @@ public sealed class MainViewModel : ObservableObject
         _lastEvaluatedClientQuery = ClientSearch;
         OnPropertyChanged(nameof(ClientSearchInterpretation));
         OnPropertyChanged(nameof(HasClientSearchInterpretation));
-    }
-
-    private (double Score, string Explanation) EvaluateClientSearch(FurnitureRecord furniture, SearchIntent intent, CatalogSearchDocument? document,
-        IEnumerable<string> protectedTerms)
-    {
-        var reasons = new List<string>();
-        foreach (var constraint in intent.Constraints)
-        {
-            if (!MatchesSearchConstraint(furniture, constraint, document)) return (0d, string.Empty);
-            reasons.Add(constraint.ConceptLabel);
-        }
-        var textScore = string.IsNullOrWhiteSpace(intent.RemainingQuery)
-            ? 1d
-            : CatalogSearchEngine.Score(intent.RemainingQuery, document ?? CatalogSearchEngine.Prepare(SearchFieldsFor(furniture)),
-                protectedTerms: protectedTerms);
-        if (!string.IsNullOrWhiteSpace(intent.RemainingQuery) && textScore < 0.58d) return (0d, string.Empty);
-        if (!string.IsNullOrWhiteSpace(intent.RemainingQuery)) reasons.Add($"texte « {intent.RemainingQuery} »");
-        var score = string.IsNullOrWhiteSpace(intent.RemainingQuery) ? 1d : Math.Min(1.22d, 0.72d + textScore * 0.28d);
-        return (score,
-            reasons.Count == 0 ? "Correspondance textuelle" : "Trouvé grâce à : " + string.Join(" · ", reasons.Distinct(StringComparer.OrdinalIgnoreCase)));
-    }
-
-    private bool MatchesSearchConstraint(FurnitureRecord furniture, SearchConstraint constraint, CatalogSearchDocument? document)
-    {
-        var usages = FurnitureUsagesFor(furniture).ToArray();
-        var searchable = document ?? CatalogSearchEngine.Prepare(SearchFieldsFor(furniture));
-        var matches = constraint.Target switch
-        {
-            SearchConceptTarget.DoorCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Porte, furniture.NombrePortes), constraint),
-            SearchConceptTarget.DrawerCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Tiroir, furniture.NombreTiroirs), constraint),
-            SearchConceptTarget.InnerDrawerCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.TiroirAnglaise, furniture.NombreTiroirsAnglaise), constraint),
-            SearchConceptTarget.FlapCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Abattant, furniture.NombreAbattants), constraint),
-            SearchConceptTarget.LiftUpCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Relevant, furniture.NombreRelevants), constraint),
-            SearchConceptTarget.ShelfCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.Rayon, furniture.NombreRayons), constraint),
-            SearchConceptTarget.OpenNicheCount => SearchDictionaryService.QuantityMatches(SearchDictionaryService.EffectiveQuantity(furniture.NicheOuverte, furniture.NombreNichesOuvertes), constraint),
-            SearchConceptTarget.Hanging => furniture.Penderie,
-            SearchConceptTarget.HorizontalSeparation => furniture.SeparationHorizontale,
-            SearchConceptTarget.VerticalSeparation => furniture.SeparationVerticale,
-            SearchConceptTarget.FurnitureType => FurnitureTypeMatches(furniture.TypeMeuble, constraint.Value),
-            SearchConceptTarget.FurnitureUsage => usages.Any(value => ValueMatches(value, constraint.Value))
-                || StrictSearchContains(searchable, constraint),
-            SearchConceptTarget.FurnitureTag => ComponentTaxonomyStore.Resolve(furniture, Components, _taxonomy).Select(tag => tag.Label)
-                .Concat(furniture.PersonalTags ?? []).Any(value => ValueMatches(value, constraint.Value)),
-            SearchConceptTarget.FurnitureForm => ValueMatches(furniture.Forme, constraint.Value),
-            SearchConceptTarget.Construction => ValueMatches(furniture.PrincipleConstruction, constraint.Value),
-            SearchConceptTarget.Assembly => ValueMatches(furniture.TypeAssemblage, constraint.Value),
-            SearchConceptTarget.BackPosition => ValueMatches(furniture.PositionDos, constraint.Value),
-            SearchConceptTarget.SpatialRelation => StrictSearchContains(searchable, constraint),
-            SearchConceptTarget.GenericText => StrictSearchContains(searchable, constraint),
-            _ => false
-        };
-        return constraint.Mode == SearchConstraintMode.Exclude && !SearchDictionaryService.IsQuantityTarget(constraint.Target)
-            ? !matches
-            : matches;
-    }
-
-    private bool StrictSearchContains(CatalogSearchDocument document, SearchConstraint constraint)
-    {
-        var concept = _searchDictionary.Concepts.FirstOrDefault(item =>
-            item.Label.Equals(constraint.ConceptLabel, StringComparison.OrdinalIgnoreCase));
-        var terms = new[] { constraint.Value }
-            .Concat(concept?.Expressions() ?? Enumerable.Empty<string>())
-            .Concat(concept is null ? Enumerable.Empty<string>() : _searchDictionary.Synonyms
-                .Where(item => item.IsActive && item.ConceptId.Equals(concept.Id, StringComparison.OrdinalIgnoreCase))
-                .Select(item => item.Term))
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-        return terms.Any(term => CatalogSearchEngine.ContainsExactPhrase(term, document));
-    }
-
-    private static bool ValueMatches(string? actual, string expected)
-    {
-        var actualValue = CatalogSearchEngine.Normalize(actual);
-        var expectedValue = CatalogSearchEngine.Normalize(expected);
-        return actualValue.Equals(expectedValue, StringComparison.Ordinal)
-               || $" {actualValue} ".Contains($" {expectedValue} ", StringComparison.Ordinal);
-    }
-
-    private static bool FurnitureTypeMatches(string? actual, string expected)
-    {
-        if (ValueMatches(actual, expected)) return true;
-        var actualValue = CatalogSearchEngine.Normalize(actual);
-        var expectedValue = CatalogSearchEngine.Normalize(expected);
-        return (expectedValue is "colonne" or "armoire") && (actualValue is "colonne" or "demi colonne" or "armoire");
     }
 
     private IEnumerable<CatalogSearchField> SearchFieldsFor(FurnitureRecord furniture)
@@ -1653,7 +1585,7 @@ public sealed class MainViewModel : ObservableObject
 
     public void RefreshHorizonSearchSettings()
     {
-        _lastEvaluatedClientQuery = null;
+        RebuildClientSearchIndex();
         RebuildClientFacets();
         RefreshClientFurnitureView();
     }
@@ -1672,11 +1604,16 @@ public sealed class MainViewModel : ObservableObject
             return (intent, published.Length, published.Length, published.Select(card => card.DisplayName).Take(8).ToArray());
         var matches = published.Select(card =>
             {
-                _clientSearchDocuments.TryGetValue(card.Record.Id, out var document);
-                var evaluation = EvaluateClientSearch(card.Record, intent, document, protectedTerms);
-                return (Card: card, evaluation.Score);
+                if (!_clientSearchCandidates.TryGetValue(card.Record.Id, out var candidate))
+                {
+                    var document = CatalogSearchEngine.Prepare(SearchFieldsFor(card.Record));
+                    candidate = CreateSearchCandidate(card.Record, document);
+                    _clientSearchCandidates[card.Record.Id] = candidate;
+                }
+                var evaluation = FurnitureSearchMatcher.Evaluate(candidate, intent, _searchDictionary, protectedTerms);
+                return (Card: card, evaluation.IsMatch, evaluation.Score);
             })
-            .Where(item => item.Score >= 0.58d)
+            .Where(item => item.IsMatch)
             .OrderByDescending(item => item.Score)
             .ThenBy(item => item.Card.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
@@ -2789,7 +2726,7 @@ public sealed class MainViewModel : ObservableObject
         if (!MatchesClientFacet(ClientAssemblyFacets, [card.Record.TypeAssemblage])) return false;
         if (!MatchesClientFacet(ClientBackFacets, [card.Record.PositionDos])) return false;
         if (string.IsNullOrWhiteSpace(ClientSearch)) return true;
-        return card.SearchScore >= 0.58d;
+        return card.IsSearchMatch;
     }
 
     private static bool MatchesClientFacet(IEnumerable<CatalogFacetViewModel> facets, IEnumerable<string> values)

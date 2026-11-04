@@ -189,6 +189,27 @@ Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.
     "La quantité de tiroirs doit rester exacte dans une demande avec une marque.");
 Assert(hettichIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureTag && item.Value == "Hettich"),
     "Une marque active doit devenir un tag obligatoire à côté de la quantité demandée.");
+var drawerFurniture = new FurnitureRecord { DisplayName = "Meuble à tiroirs", Tiroir = true, NombreTiroirs = 2 };
+var plainFurniture = new FurnitureRecord { DisplayName = "Meuble à portes", Porte = true, NombrePortes = 2 };
+var drawerCandidate = new FurnitureSearchCandidate(drawerFurniture, [], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("Meuble à tiroirs tiroir 2")]));
+var plainCandidate = new FurnitureSearchCandidate(plainFurniture, [], [],
+    CatalogSearchEngine.Prepare([new CatalogSearchField("Meuble à portes porte 2")]));
+var drawerIntent = SearchDictionaryService.Interpret("tiroir", structuredDictionary,
+    protectedTerms: SearchDictionaryService.ProtectedTerms, liveTyping: true);
+Assert(FurnitureSearchMatcher.Evaluate(drawerCandidate, drawerIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch
+       && !FurnitureSearchMatcher.Evaluate(plainCandidate, drawerIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Le filtre métier tiroir doit accepter le meuble avec tiroir et exclure sans seuil le meuble qui n'en a pas.");
+var legraboxIntent = SearchDictionaryService.Interpret("Legrabox", structuredDictionary, ["Legrabox"],
+    SearchDictionaryService.ProtectedTerms, liveTyping: true);
+var legraboxCandidate = new FurnitureSearchCandidate(drawerFurniture, [], ["Legrabox"], drawerCandidate.Document);
+Assert(FurnitureSearchMatcher.Evaluate(legraboxCandidate, legraboxIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch
+       && !FurnitureSearchMatcher.Evaluate(drawerCandidate, legraboxIntent, structuredDictionary,
+           SearchDictionaryService.ProtectedTerms).IsMatch,
+    "Le tag Legrabox doit être un critère exact : seul un meuble portant réellement ce tag peut rester affiché.");
 var applianceIntent = SearchDictionaryService.Interpret("me faut un meuble micro onde avec un relevant au dessus sotn", structuredDictionary);
 Assert(applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.FurnitureUsage && item.Value == "Micro-ondes")
        && applianceIntent.Constraints.Any(item => item.Target == SearchConceptTarget.LiftUpCount),
@@ -602,10 +623,12 @@ Assert(viewModelSource.Contains("CatalogSearchEngine.Prepare(SearchFieldsFor")
     "La recherche Horizon doit utiliser un index préparé et temporiser la frappe sans réutiliser une liste devenue incorrecte.");
 Assert(catalogXaml.Contains("ClientSearchSuggestions") && catalogXaml.Contains("ClientSearchSuggestion_OnClick"),
     "Horizon doit proposer des complétions métier pendant la saisie.");
-Assert(viewModelSource.Contains("if (!MatchesSearchConstraint(furniture, constraint, document)")
-       && viewModelSource.Contains("EffectiveQuantity(furniture.Rayon, furniture.NombreRayons)")
-       && viewModelSource.Contains("ClientPublishedTotal"),
-    "Un concept reconnu doit exclure tout meuble non conforme et la quantité doit rester cohérente avec la présence réelle de l’élément.");
+var furnitureSearchMatcherSource = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.Core", "Services", "FurnitureSearchMatcher.cs"));
+Assert(viewModelSource.Contains("card.IsSearchMatch = evaluation.IsMatch")
+       && viewModelSource.Contains("return card.IsSearchMatch")
+       && furnitureSearchMatcherSource.Contains("FurnitureSearchEvaluation.NoMatch")
+       && furnitureSearchMatcherSource.Contains("EffectiveQuantity(isPresent, quantity)"),
+    "La décision binaire de filtrage doit être indépendante du score de classement et exclure tout meuble non conforme.");
 Assert(settingsXaml.Contains("Concepts métier") && settingsXaml.Contains("SearchConceptGrid")
        && settingsXaml.Contains("SearchTestMatches"),
     "Les paramètres doivent permettre d’inspecter les concepts et de tester une demande sur le catalogue réel.");
