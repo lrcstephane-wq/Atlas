@@ -71,7 +71,7 @@
                                 <Button Style="{StaticResource NavButton}" Background="{Binding CatalogNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="Catalog" ToolTip="Horizon — expérience client Atlas">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource HorizonIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Horizon" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
-                                <Button Style="{StaticResource NavButton}" Background="{Binding MyFurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="MyFurniture" ToolTip="Mes meubles" Visibility="{Binding CanManageCustomerFurniture, Converter={StaticResource BoolVisibility}}">
+                                <Button Style="{StaticResource NavButton}" Background="{Binding MyFurnitureNavBackground}" Command="{Binding NavigateCommand}" CommandParameter="MyFurniture" ToolTip="Mes meubles" Visibility="{Binding CanViewCustomerFurniture, Converter={StaticResource BoolVisibility}}">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{StaticResource FurnitureIcon}" Style="{StaticResource NavPathIcon}" Stroke="{StaticResource CyanBrush}"/><TextBlock Grid.Column="1" Text="Mes meubles" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"/></Grid>
                                 </Button>
 
@@ -86,11 +86,12 @@
                         </StackPanel>
 
                         <Border Grid.Row="3" Background="#282D30" BorderBrush="#3D4448" BorderThickness="1" CornerRadius="5" Margin="10" Padding="11">
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource PrimaryGradient}"><TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/></Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding SessionLabel}" Style="{StaticResource Caption}"/></StackPanel>
-                                <Button Grid.Column="2" Content="↪" Style="{StaticResource IconButton}" ToolTip="Accès Gestionnaire ou Administrateur Idéo" Click="AccessAdministrator_Click" Visibility="{Binding ShowUserSessionActions, Converter={StaticResource BoolVisibility}}"/>
-                                <Button Grid.Column="2" Content="↩" Style="{StaticResource IconButton}" ToolTip="Se déconnecter" Click="Logout_Click" Visibility="{Binding ShowAuthenticatedSessionActions, Converter={StaticResource BoolVisibility}}"/>
+                            <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource PrimaryGradient}"><TextBlock Text="ID" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/></Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{Binding CurrentUser.DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding SessionLabel}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                </Grid>
+                                <Button Grid.Row="1" Content="{Binding RoleActionLabel}" Style="{StaticResource GhostButton}" HorizontalAlignment="Stretch" Margin="0,9,0,0" Padding="8,6" Click="ChangeRole_Click" Visibility="{Binding ShowUserSessionActions, Converter={StaticResource BoolVisibility}}" ToolTip="Revenir au choix du rôle"/>
                             </Grid>
                         </Border>
                     </Grid>
@@ -102,12 +103,9 @@
                 <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="32"/></Grid.RowDefinitions>
                 <Border Background="#24282B" BorderBrush="{StaticResource LineSoftBrush}" BorderThickness="0,0,0,1">
                     <Grid Margin="24,0,8,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Background="#343A3D" BorderBrush="#50595E" BorderThickness="1" CornerRadius="12" Padding="11,6"><TextBlock Text="{Binding EnvironmentLabel}" Foreground="{StaticResource CyanBrush}" FontSize="10" FontWeight="Bold"/></Border>
-                            <Border Width="1" Height="22" Background="{StaticResource LineBrush}" Margin="14,0"/>
-                            <StackPanel VerticalAlignment="Center"><TextBlock Text="Espace Atlas" FontWeight="SemiBold"/><TextBlock Text="{Binding LastModification}" Style="{StaticResource Caption}"/></StackPanel>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding LicenseBannerText}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="13" Foreground="#DCE3E6" TextTrimming="CharacterEllipsis" Margin="0,0,20,0"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Button Content="{Binding UpdateLabel}" Style="{StaticResource GhostButton}" Command="{Binding CheckUpdateCommand}" Margin="0,0,8,0" Padding="12,7" Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}"/>
                             <Button Content="Enregistrer" Command="{Binding SaveCommand}" Margin="0,0,12,0" Padding="15,7" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}"/>
                             <Button Content="—" Style="{StaticResource WindowButton}" Click="Minimize_Click"/>

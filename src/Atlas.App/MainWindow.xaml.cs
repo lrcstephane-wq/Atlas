@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private FurnitureCatalogWindow? _furnitureCatalogWindow;
+    private CustomerFurnitureCatalogWindow? _customerFurnitureCatalogWindow;
     private readonly DispatcherTimer _adminLockTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private readonly DateTimeOffset _sessionStarted = DateTimeOffset.UtcNow;
     private DateTimeOffset _lastActivity = DateTimeOffset.UtcNow;
@@ -44,8 +45,22 @@ public partial class MainWindow : Window
         _furnitureCatalogWindow.Closed += (_, _) => _furnitureCatalogWindow = null;
         _furnitureCatalogWindow.Show();
     }
-    private async void AccessAdministrator_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).OpenAdministratorSessionAsync(this);
-    private async void Logout_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).LogoutAdministratorAsync(this);
+
+    public void OpenCustomerFurnitureCatalog()
+    {
+        if (_customerFurnitureCatalogWindow is { IsLoaded: true })
+        {
+            if (_customerFurnitureCatalogWindow.WindowState == WindowState.Minimized) _customerFurnitureCatalogWindow.WindowState = WindowState.Normal;
+            _customerFurnitureCatalogWindow.Activate();
+            return;
+        }
+
+        _customerFurnitureCatalogWindow = new CustomerFurnitureCatalogWindow(_viewModel);
+        _customerFurnitureCatalogWindow.Closed += (_, _) => _customerFurnitureCatalogWindow = null;
+        _customerFurnitureCatalogWindow.Show();
+    }
+
+    private async void ChangeRole_Click(object sender, RoutedEventArgs e) => await ((App)Application.Current).ChangeRoleAsync(this);
     private void ToggleMaximize()
     {
         if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
@@ -75,6 +90,8 @@ public partial class MainWindow : Window
         _adminLockTimer.Stop();
         _furnitureCatalogWindow?.Close();
         _furnitureCatalogWindow = null;
+        _customerFurnitureCatalogWindow?.Close();
+        _customerFurnitureCatalogWindow = null;
     }
 
     private async void AdminLockTimer_OnTick(object? sender, EventArgs e)

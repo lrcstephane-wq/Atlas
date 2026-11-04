@@ -26,7 +26,10 @@ public sealed class CustomerFurnitureStore(string sharedRoot)
         catalog.Exclusions ??= [];
         catalog.Furniture ??= [];
         if (catalog.Locations.Count == 0 && !string.IsNullOrWhiteSpace(catalog.FurnitureRoot))
+        {
             catalog.Locations.Add(new CustomerFurnitureLocation { Name = "Meubles Client", RootPath = catalog.FurnitureRoot });
+            catalog.FurnitureRoot = string.Empty;
+        }
         if (catalog.ClientTags.Count == 0 && catalog.PersonalTags.Count > 0)
             catalog.ClientTags = catalog.PersonalTags;
         var legacyLocationId = catalog.Locations.FirstOrDefault()?.Id ?? string.Empty;
@@ -56,7 +59,10 @@ public sealed class CustomerFurnitureStore(string sharedRoot)
     public int Synchronize(CustomerFurnitureCatalog catalog)
     {
         if (catalog.Locations.Count == 0 && !string.IsNullOrWhiteSpace(catalog.FurnitureRoot))
+        {
             catalog.Locations.Add(new CustomerFurnitureLocation { Name = "Meubles Client", RootPath = catalog.FurnitureRoot });
+            catalog.FurnitureRoot = string.Empty;
+        }
         var existing = catalog.Furniture
             .Where(item => !string.IsNullOrWhiteSpace(item.RelativeTopPath))
             .GroupBy(ItemKey, StringComparer.OrdinalIgnoreCase)

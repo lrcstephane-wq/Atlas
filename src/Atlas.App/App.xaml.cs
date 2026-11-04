@@ -15,56 +15,63 @@ public partial class App : Application
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _bootstrap = await SharedCatalogStore.LoadBootstrapAsync();
-            while (true)
-            {
-                var launch = new LaunchWindow();
-                if (launch.ShowDialog() != true)
-                {
-                    Shutdown();
-                    return;
-                }
-
-                if (launch.SelectedMode == AtlasEntryMode.User)
-                {
-                    if (string.IsNullOrWhiteSpace(_bootstrap.SharedRoot) || !AtlasWorkspaceService.IsWorkspace(_bootstrap.SharedRoot))
-                    {
-                        AtlasDialog.Warning("L’espace Atlas doit d’abord être créé ou sélectionné par un Gestionnaire du site.", "Horizon indisponible");
-                        continue;
-                    }
-                    await OpenUserSessionAsync();
-                    return;
-                }
-
-                if (launch.SelectedMode == AtlasEntryMode.IdeoAdministrator)
-                {
-                    if (await OpenIdeoAdministratorSessionAsync()) return;
-                    continue;
-                }
-
-                var login = new LoginWindow(_bootstrap);
-                if (login.ShowDialog() != true || login.AuthenticatedUser is null)
-                {
-                    if (login.IdeoAccessRequested && await OpenIdeoAdministratorSessionAsync()) return;
-                    continue;
-                }
-                if (launch.SelectedMode == AtlasEntryMode.Creator && !login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
-                {
-                    AtlasDialog.Warning("Ce compte ne possède pas le profil Créateur.", "Accès refusé");
-                    continue;
-                }
-                if (launch.SelectedMode == AtlasEntryMode.SiteManager && !login.AuthenticatedUser.IsSiteManager)
-                {
-                    AtlasDialog.Warning("Ce compte ne possède pas le profil Gestionnaire du site.", "Accès refusé");
-                    continue;
-                }
-                await OpenSessionAsync(login.AuthenticatedUser, false);
-                return;
-            }
+            if (!await SelectAndOpenRoleAsync()) Shutdown();
         }
         catch (Exception exception)
         {
             AtlasDialog.Error(exception.Message, "Démarrage impossible");
             Shutdown();
+        }
+    }
+
+    public async Task ChangeRoleAsync(MainWindow currentWindow)
+    {
+        try { await SelectAndOpenRoleAsync(currentWindow); }
+        catch (Exception exception) { AtlasDialog.Error(exception.Message, "Changement de rôle impossible"); }
+    }
+
+    private async Task<bool> SelectAndOpenRoleAsync(MainWindow? currentWindow = null)
+    {
+        while (true)
+        {
+            var launch = new LaunchWindow { Owner = currentWindow };
+            if (launch.ShowDialog() != true) return false;
+
+            if (launch.SelectedMode == AtlasEntryMode.User)
+            {
+                if (string.IsNullOrWhiteSpace(_bootstrap.SharedRoot) || !AtlasWorkspaceService.IsWorkspace(_bootstrap.SharedRoot))
+                {
+                    AtlasDialog.Warning("L’espace Atlas doit d’abord être créé ou sélectionné par un Gestionnaire du site.", "Horizon indisponible");
+                    continue;
+                }
+                await OpenUserSessionAsync(currentWindow);
+                return true;
+            }
+
+            if (launch.SelectedMode == AtlasEntryMode.IdeoAdministrator)
+            {
+                if (await OpenIdeoAdministratorSessionAsync(currentWindow)) return true;
+                continue;
+            }
+
+            var login = new LoginWindow(_bootstrap) { Owner = currentWindow };
+            if (login.ShowDialog() != true || login.AuthenticatedUser is null)
+            {
+                if (login.IdeoAccessRequested && await OpenIdeoAdministratorSessionAsync(currentWindow)) return true;
+                continue;
+            }
+            if (launch.SelectedMode == AtlasEntryMode.Creator && !login.AuthenticatedUser.IsCreator && !login.AuthenticatedUser.IsAdministrator)
+            {
+                AtlasDialog.Warning("Ce compte ne possède pas le profil Créateur.", "Accès refusé");
+                continue;
+            }
+            if (launch.SelectedMode == AtlasEntryMode.SiteManager && !login.AuthenticatedUser.IsSiteManager)
+            {
+                AtlasDialog.Warning("Ce compte ne possède pas le profil Gestionnaire du site.", "Accès refusé");
+                continue;
+            }
+            await OpenSessionAsync(login.AuthenticatedUser, false, currentWindow);
+            return true;
         }
     }
 
