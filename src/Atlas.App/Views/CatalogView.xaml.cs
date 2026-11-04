@@ -16,7 +16,22 @@ public partial class CatalogView : UserControl
     {
         if (sender is not FrameworkElement { DataContext: FurnitureCardViewModel card } || DataContext is not MainViewModel vm) return;
         vm.SelectedClientFurnitureCard = card;
-        if (!vm.HasFullHorizonAccess) card.IsChosen = false;
+    }
+
+    private void FurnitureCard_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: FurnitureCardViewModel card } || DataContext is not MainViewModel vm || !vm.HasFullHorizonAccess) return;
+        vm.SelectedClientFurnitureCard = card;
+        card.IsChosen = !card.IsChosen;
+        e.Handled = true;
+    }
+
+    private void FurnitureChoice_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox { DataContext: FurnitureCardViewModel card } checkBox || DataContext is not MainViewModel vm) return;
+        vm.SelectedClientFurnitureCard = card;
+        if (!vm.HasFullHorizonAccess) checkBox.IsChecked = false;
+        e.Handled = true;
     }
 
     private void ClientFacetFavorite_OnClick(object sender, RoutedEventArgs e)
@@ -28,10 +43,7 @@ public partial class CatalogView : UserControl
 
     private void OpenMoreFilters_OnClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { ContextMenu: { } menu } button) return;
-        menu.DataContext = DataContext;
-        menu.PlacementTarget = button;
-        menu.IsOpen = true;
+        MoreFiltersPopup.IsOpen = !MoreFiltersPopup.IsOpen;
     }
 
     private void TopSolidDragCapsule_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
