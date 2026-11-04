@@ -36,12 +36,18 @@ La V0.3 pose deux espaces :
 - dictionnaire métier versionné : expressions régionales, fautes, quantités exactes, usages, marques et critères structurels ;
 - compléments de vocabulaire propres à chaque site, conservés automatiquement lors des mises à jour du socle Idéo ;
 - interprétation visible des recherches naturelles et historique partagé des demandes sans résultat ;
-- détection, téléchargement, contrôle SHA-256 et installation automatique des futures mises à jour via les GitHub Releases ;
-- distribution principale sous forme de dossier autonome archivé en ZIP, sans compression interne ni auto-extraction de l’exécutable, afin d’éviter les comportements de packaging assimilables à un logiciel malveillant.
+- détection, téléchargement et contrôle SHA-256 des futures mises à jour via les GitHub Releases ;
+- mises à jour automatiques uniquement sur les postes de développement Idéo ;
+- en Production, déclenchement exclusivement manuel et réservé au compte administrateur ;
+- distribution principale sous forme d’un véritable installateur Windows avec désinstallation standard ou suppression complète des données locales.
 
 ## Installation Windows
 
-Pour une première installation, télécharger `Atlas-full-win-x64.zip`, extraire entièrement le dossier puis lancer `Installer-Atlas.cmd`. Atlas est installé dans `C:\Ideo_Atlas\Application`. Ensuite, le bouton de mise à jour télécharge uniquement `Atlas-update.zip`, remplace les fichiers applicatifs modifiés puis relance Atlas automatiquement.
+Pour une première installation, télécharger puis lancer `Atlas-Setup-X.Y.Z-win-x64.exe`. Atlas est installé dans `C:\Ideo_Atlas\Application`, crée ses raccourcis et apparaît dans les applications installées de Windows.
+
+Une installation client est toujours configurée en mode Production : aucune mise à jour applicative ne se lance automatiquement et seul un administrateur Atlas voit le bouton permettant de la déclencher. Le même installateur peut réparer ou mettre à niveau l’application sans supprimer les données.
+
+La désinstallation Windows propose de conserver la licence et les données locales pour une réinstallation, ou de les supprimer complètement après une seconde confirmation. Les dossiers réseau externes ne sont jamais supprimés.
 
 L’exécutable reste non signé pendant la phase de développement : Windows peut donc encore afficher un avertissement d’éditeur inconnu. Une détection antivirus de type cheval de Troie ne doit en revanche jamais être ignorée ni autorisée manuellement.
 
@@ -69,4 +75,4 @@ dotnet build Atlas.sln --configuration Release
 dotnet run --project tests/Atlas.Core.SmokeTests/Atlas.Core.SmokeTests.csproj --configuration Release
 ```
 
-Les GitHub Actions produisent un `Atlas.exe` Windows autonome. Une release taguée `vX.Y.Z` devient la source des mises à jour automatiques.
+Les GitHub Actions produisent l’installateur `Atlas-Setup-X.Y.Z-win-x64.exe` et le paquet différentiel utilisé par le module de mise à jour. Une release taguée `vX.Y.Z` devient la version applicative disponible pour les administrateurs.

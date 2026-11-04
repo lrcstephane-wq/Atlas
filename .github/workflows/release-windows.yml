@@ -35,21 +35,25 @@ jobs:
       - name: Ajouter le module au pack
         shell: pwsh
         run: Copy-Item publish/updater/Atlas.Updater.exe publish/portable/Atlas.Updater.exe -Force
-      - name: Créer le pack complet et la mise à jour différentielle
+      - name: Créer la mise à jour différentielle
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path publish/full/Application -Force | Out-Null
-          Copy-Item publish/portable/* publish/full/Application -Recurse -Force
-          Copy-Item deployment/Installer-Atlas.ps1 publish/full/Installer-Atlas.ps1 -Force
-          Copy-Item deployment/Installer-Atlas.cmd publish/full/Installer-Atlas.cmd -Force
-          Compress-Archive -Path publish/full/* -DestinationPath publish/Atlas-full-win-x64.zip
           New-Item -ItemType Directory -Path publish/update | Out-Null
           $changed = @("Atlas.exe", "Atlas.dll", "Atlas.Core.dll", "Atlas.deps.json", "Atlas.runtimeconfig.json")
           foreach ($file in $changed) { Copy-Item "publish/portable/$file" "publish/update/$file" -Force }
           Compress-Archive -Path publish/update/* -DestinationPath publish/Atlas-update.zip
-          Copy-Item publish/Atlas-update.zip publish/Atlas-win-x64.zip
+      - name: Installer le compilateur de l’installateur Windows
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Compiler l’installateur Windows
+        shell: pwsh
+        run: |
+          $payload = (Resolve-Path publish/portable).Path
+          $output = (Resolve-Path publish).Path
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $compiler "/DAtlasVersion=${{ steps.version.outputs.value }}" "/DPayloadDir=$payload" "/DOutputDir=$output" deployment/Atlas.iss
       - name: Créer la GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
-        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-update.zip" "publish/Atlas-win-x64.zip" "publish/Atlas-full-win-x64.zip" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" "publish/Atlas-Setup-${{ steps.version.outputs.value }}-win-x64.exe" "publish/Atlas-update.zip" --target "${{ github.sha }}" --title "Biblidéo Atlas ${{ steps.version.outputs.value }}" --generate-notes

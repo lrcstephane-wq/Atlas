@@ -16,6 +16,17 @@ Assert(ComponentNameParser.SuggestDisplayName("Accessoires#V=Poignee_Bouton#I=00
 Assert(ComponentNameParser.SuggestDetailedDisplayName("Blum Porte Simple", "Facade#V=Blum_Porte_Simple#I=00#C=Recouvrement_Total") == "Blum Porte Simple · Recouvrement Total", "La composition doit distinguer les composants grâce à la valeur C.");
 Assert(ComponentNameParser.SuggestDetailedDisplayName("Blum Porte Simple · Recouvrement Total", "Facade#V=Blum_Porte_Simple#I=00#C=Recouvrement_Total") == "Blum Porte Simple · Recouvrement Total", "La valeur C ne doit pas être ajoutée deux fois.");
 
+var deploymentPolicyPath = Path.Combine(Path.GetTempPath(), $"atlas-deployment-{Guid.NewGuid():N}.json");
+Assert(AtlasDeploymentPolicyStore.Load(deploymentPolicyPath).Mode == AtlasDeploymentMode.Production,
+    "Une installation sans politique explicite doit rester en Production et ne jamais se mettre à jour automatiquement.");
+AtlasDeploymentPolicyStore.Save(new AtlasDeploymentPolicy { Mode = AtlasDeploymentMode.Development }, deploymentPolicyPath);
+Assert(AtlasDeploymentPolicyStore.Load(deploymentPolicyPath).AllowsAutomaticApplicationUpdates,
+    "Le mode Développement Idéo doit être le seul à autoriser les mises à jour automatiques.");
+File.WriteAllText(deploymentPolicyPath, "{\"SchemaVersion\":1,\"Mode\":\"development\"}");
+Assert(AtlasDeploymentPolicyStore.Load(deploymentPolicyPath).Mode == AtlasDeploymentMode.Development,
+    "La politique écrite par l’installateur Windows doit être comprise par Atlas.");
+File.Delete(deploymentPolicyPath);
+
 var demo = DemoCatalogFactory.Create();
 Assert(demo.Components.Count >= 2 && demo.Furniture.Count >= 1, "Le catalogue de démonstration doit permettre l’aperçu de la V0.1.");
 Assert(demo.Furniture[0].ComponentIds.All(id => demo.Components.Any(component => component.Id == id)), "La composition doit référencer des composants connus.");
@@ -441,8 +452,16 @@ Assert(settingsXaml.Contains("Contenus Atlas") && settingsXaml.Contains("Choisir
 Assert(viewModelSource.Contains("InstallContentPackageAsync") && viewModelSource.Contains("GenerateContentPackageAsync"),
     "L’application doit exposer les deux parcours séparés d’installation client et de publication Idéo.");
 Assert(settingsXaml.Contains("Déplacer l’espace Atlas") && settingsXaml.Contains("LocalLibraryRootOverride") && viewModelSource.Contains("AtlasWorkspaceService.CopyAndVerifyAsync"), "L’espace Atlas doit être déplaçable et les chemins communs surchargeables localement.");
-var installerScript = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "deployment", "Installer-Atlas.ps1"));
-Assert(installerScript.Contains("C:\\Ideo_Atlas") && installerScript.Contains("Ideo Solutions\\Atlas") && installerScript.Contains("Application"), "L’installation complète doit créer l’arborescence Atlas et le dossier machine de la licence.");
+var installerScript = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "deployment", "Atlas.iss"));
+Assert(installerScript.Contains("Ideo_Atlas\\Application") && installerScript.Contains("Ideo Solutions\\Atlas") && installerScript.Contains("Uninstallable=yes"),
+    "L’installateur Windows doit créer l’arborescence Atlas, le dossier machine de la licence et un désinstalleur déclaré à Windows.");
+Assert(installerScript.Contains("RemoveAllLocalData") && installerScript.Contains("Les dossiers réseau externes ne sont jamais supprimés")
+       && installerScript.Contains("ATLASMODE|production"),
+    "La désinstallation doit distinguer conservation et suppression complète, tandis qu’une installation client reste en Production par défaut.");
+Assert(mainWindowXaml.Contains("UpdateLabel") && mainWindowXaml.Contains("Visibility=\"{Binding IsAdministrator"),
+    "Le déclenchement manuel d’une mise à jour applicative ne doit être visible que pour l’administrateur.");
+Assert(viewModelSource.Contains("AllowsAutomaticApplicationUpdates") && viewModelSource.Contains("IsAdministrator && !IsBusy"),
+    "Les mises à jour automatiques doivent être réservées au développement Idéo et la commande manuelle à l’administrateur.");
 Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && catalogXaml.Contains("ClientUniverseFacets"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
 Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && viewModelSource.Contains("IsAdministrator || IsLicenseValid"), "L’administrateur doit contourner la licence sans exposer la clé privée aux installations clientes.");
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");

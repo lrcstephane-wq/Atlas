@@ -108,7 +108,7 @@
                             <StackPanel VerticalAlignment="Center"><TextBlock Text="Espace Atlas" FontWeight="SemiBold"/><TextBlock Text="{Binding LastModification}" Style="{StaticResource Caption}"/></StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Button Content="{Binding UpdateLabel}" Style="{StaticResource GhostButton}" Command="{Binding CheckUpdateCommand}" Margin="0,0,8,0" Padding="12,7"/>
+                            <Button Content="{Binding UpdateLabel}" Style="{StaticResource GhostButton}" Command="{Binding CheckUpdateCommand}" Margin="0,0,8,0" Padding="12,7" Visibility="{Binding IsAdministrator, Converter={StaticResource BoolVisibility}}"/>
                             <Button Content="Enregistrer" Command="{Binding SaveCommand}" Margin="0,0,12,0" Padding="15,7" Visibility="{Binding CanUseAdministrativeInterfaces, Converter={StaticResource BoolVisibility}}"/>
                             <Button Content="—" Style="{StaticResource WindowButton}" Click="Minimize_Click"/>
                             <Button x:Name="MaximizeButton" Content="□" Style="{StaticResource WindowButton}" Click="Maximize_Click"/>
