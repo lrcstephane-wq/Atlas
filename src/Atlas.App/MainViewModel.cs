@@ -1562,13 +1562,14 @@ public sealed class MainViewModel : ObservableObject
         if (furniture.Penderie) structure.Add("penderie");
         if (furniture.NicheOuverte) structure.Add($"niche ouverte {furniture.NombreNichesOuvertes}");
         var linkedComponents = (furniture.ComponentLines ?? [])
-            .Select(line => Components.FirstOrDefault(component => component.Id.Equals(line.ComponentId, StringComparison.OrdinalIgnoreCase)))
-            .Where(component => component is not null)
-            .SelectMany(component => new[]
+            .Select(line => (Line: line, Component: Components.FirstOrDefault(component => component.Id.Equals(line.ComponentId, StringComparison.OrdinalIgnoreCase))))
+            .Where(item => item.Component is not null)
+            .SelectMany(item => new[]
             {
-                component!.DisplayName, component.TechnicalName, component.Function, component.Description, component.UsageNotes,
-                component.EffectiveFamilyName, component.LibraryName, component.TypeCode, component.VariantCode, component.RangeCode,
-                component.ConstructionCode, component.CapabilitiesCsv, component.CompatibilityCsv
+                $"{Math.Max(1, item.Line.Quantity)} {item.Component!.DisplayName}", item.Component.TechnicalName,
+                item.Component.Function, item.Component.Description, item.Component.UsageNotes,
+                item.Component.EffectiveFamilyName, item.Component.LibraryName, item.Component.TypeCode, item.Component.VariantCode,
+                item.Component.RangeCode, item.Component.ConstructionCode, item.Component.CapabilitiesCsv, item.Component.CompatibilityCsv
             });
         yield return new CatalogSearchField(furniture.DisplayName, 1d);
         yield return new CatalogSearchField(furniture.Reference, 0.85d);
@@ -1593,7 +1594,7 @@ public sealed class MainViewModel : ObservableObject
     public SearchIntent InterpretSearch(string query) => SearchDictionaryService.Interpret(query, _searchDictionary,
         _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label).Concat(PersonalTags.Select(tag => tag.Label)));
 
-    public (SearchIntent Intent, int MatchCount, int TotalCount, IReadOnlyList<string> Examples) PreviewSearchQuery(string query)
+    public (SearchIntent Intent, int MatchCount, int TotalCount, IReadOnlyList<string> Examples, IReadOnlyList<string> RejectedExamples) PreviewSearchQuery(string query)
     {
         var protectedTerms = SearchDictionaryService.ProtectedTerms.Concat(_clientSearchVocabulary).ToHashSet(StringComparer.Ordinal);
         var dynamicTags = _taxonomy.Tags.Where(tag => tag.IsActive).Select(tag => tag.Label)
@@ -1601,8 +1602,8 @@ public sealed class MainViewModel : ObservableObject
         var intent = SearchDictionaryService.Interpret(query, _searchDictionary, dynamicTags, protectedTerms, liveTyping: true);
         var published = ClientFurnitureCards.Where(card => card.Record.Status == RecordStatus.Publiee).ToArray();
         if (string.IsNullOrWhiteSpace(query))
-            return (intent, published.Length, published.Length, published.Select(card => card.DisplayName).Take(8).ToArray());
-        var matches = published.Select(card =>
+            return (intent, published.Length, published.Length, published.Select(card => card.DisplayName).Take(8).ToArray(), []);
+        var evaluated = published.Select(card =>
             {
                 if (!_clientSearchCandidates.TryGetValue(card.Record.Id, out var candidate))
                 {
@@ -1611,13 +1612,16 @@ public sealed class MainViewModel : ObservableObject
                     _clientSearchCandidates[card.Record.Id] = candidate;
                 }
                 var evaluation = FurnitureSearchMatcher.Evaluate(candidate, intent, _searchDictionary, protectedTerms);
-                return (Card: card, evaluation.IsMatch, evaluation.Score);
+                return (Card: card, Evaluation: evaluation);
             })
-            .Where(item => item.IsMatch)
-            .OrderByDescending(item => item.Score)
+            .ToArray();
+        var matches = evaluated.Where(item => item.Evaluation.IsMatch)
+            .OrderByDescending(item => item.Evaluation.Score)
             .ThenBy(item => item.Card.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
-        return (intent, matches.Length, published.Length, matches.Take(8).Select(item => item.Card.DisplayName).ToArray());
+        var rejected = evaluated.Where(item => !item.Evaluation.IsMatch).Take(5)
+            .Select(item => $"{item.Card.DisplayName} — {item.Evaluation.RejectionReason}").ToArray();
+        return (intent, matches.Length, published.Length, matches.Take(8).Select(item => item.Card.DisplayName).ToArray(), rejected);
     }
 
     public async Task<bool> SaveSearchDictionaryAsync()
