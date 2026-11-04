@@ -16,27 +16,31 @@ public sealed class FurnitureCatalogWindowState
 
 public static class FurnitureCatalogWindowStateStore
 {
-    private static string StatePath => Path.Combine(Path.GetDirectoryName(SharedCatalogStore.LocalBootstrapPath)!, "catalogue-forge.window.json");
+    private static string StatePath(string catalogName) => Path.Combine(
+        Path.GetDirectoryName(SharedCatalogStore.LocalBootstrapPath)!,
+        $"catalogue-{catalogName}.window.json");
 
-    public static FurnitureCatalogWindowState? Load()
+    public static FurnitureCatalogWindowState? Load(string catalogName = "forge")
     {
         try
         {
-            return File.Exists(StatePath)
-                ? JsonSerializer.Deserialize<FurnitureCatalogWindowState>(File.ReadAllText(StatePath))
+            var path = StatePath(catalogName);
+            return File.Exists(path)
+                ? JsonSerializer.Deserialize<FurnitureCatalogWindowState>(File.ReadAllText(path))
                 : null;
         }
         catch { return null; }
     }
 
-    public static void Save(FurnitureCatalogWindowState state)
+    public static void Save(FurnitureCatalogWindowState state, string catalogName = "forge")
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(StatePath)!);
-            var temporary = StatePath + ".tmp";
+            var path = StatePath(catalogName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var temporary = path + ".tmp";
             File.WriteAllText(temporary, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporary, StatePath, true);
+            File.Move(temporary, path, true);
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
