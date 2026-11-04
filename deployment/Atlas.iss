@@ -1,5 +1,5 @@
 #ifndef AtlasVersion
-  #define AtlasVersion "0.18.2"
+  #define AtlasVersion "0.18.3"
 #endif
 
 #ifndef PayloadDir

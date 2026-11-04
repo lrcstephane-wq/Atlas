@@ -46,6 +46,7 @@ public sealed class UserAccount
     public bool IsActive { get; set; } = true;
     public DateTimeOffset? CreatedUtc { get; set; }
     public DateTimeOffset? LastLoginUtc { get; set; }
+    [JsonIgnore] public bool IsPermanentIdeoDevelopmentSession { get; set; }
 
     public bool CanEdit => Permissions.HasFlag(UserPermissions.Edit) || IsIdeoAdministrator;
     public bool CanValidate => Permissions.HasFlag(UserPermissions.Validate) || IsIdeoAdministrator;

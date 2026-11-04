@@ -155,13 +155,13 @@ public sealed class MainViewModel : ObservableObject
     public bool CanInstallContentPackage => CanManageSite;
     public bool IsCreatorFeatureLicensed => _licenseInfo.HasFeature(AtlasLicenseService.CreatorFeature);
     public bool CanManageCustomerFurniture => IsAdministrator || ((IsCreatorMode || IsSiteManagerMode) && IsLicenseValid && IsCreatorFeatureLicensed);
-    public string SessionLabel => IsAdministrator ? $"Administrateur Idéo · {CurrentUser.DisplayName}" : IsSiteManagerMode ? "Gestionnaire du site" : IsCreatorMode && IsCreatorFeatureLicensed ? "Mode Créateur" : IsCreatorMode ? "Mode Horizon · option Créateur inactive" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
+    public string SessionLabel => CurrentUser.IsPermanentIdeoDevelopmentSession ? "Administrateur Idéo permanent" : IsAdministrator ? $"Administrateur Idéo · {CurrentUser.DisplayName}" : IsSiteManagerMode ? "Gestionnaire du site" : IsCreatorMode && IsCreatorFeatureLicensed ? "Mode Créateur" : IsCreatorMode ? "Mode Horizon · option Créateur inactive" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
     public bool IsAdministrator => CurrentUser.IsAdministrator;
     public bool IsDevelopmentInstallation => _deploymentPolicy.Mode == AtlasDeploymentMode.Development;
     public bool CanConfigureAutomaticUpdates => IsAdministrator && IsDevelopmentInstallation;
-    public bool CanConfigureIdeoTools => IsDevelopmentInstallation && CanManageSite;
+    public bool CanConfigureIdeoTools => (IsDevelopmentInstallation && CanManageSite) || (IsAdministrator && HasLicenseSigningKey);
     public bool IsLicenseValid => _licenseInfo.IsValid;
     public bool IsLicenseRestricted => !IsAdministrator && !IsLicenseValid;
     public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
@@ -181,7 +181,7 @@ public sealed class MainViewModel : ObservableObject
     public DateTime? NewLicenseValidUntil { get => _newLicenseValidUntil; set => SetProperty(ref _newLicenseValidUntil, value); }
     public bool NewLicenseCreatorEnabled { get => _newLicenseCreatorEnabled; set => SetProperty(ref _newLicenseCreatorEnabled, value); }
     public string LicenseFeaturesLabel => IsCreatorFeatureLicensed ? "Module Créateur inclus" : "Aucun module complémentaire";
-    public bool HasLicenseSigningKey => File.Exists(AtlasLicenseService.SigningPrivateKeyPath(SharedRoot)) || File.Exists(LegacyLicenseSigningKeyPath);
+    public bool HasLicenseSigningKey => AtlasLicenseService.FindMatchingSigningPrivateKeyPath(SharedRoot) is not null;
     public bool CanUseIdeoTools => CanConfigureIdeoTools && HasLicenseSigningKey;
     public string LicenseSigningKeyStatus => HasLicenseSigningKey ? "Clé privée Idéo disponible uniquement sur ce poste administrateur." : "Clé privée Idéo absente : génération désactivée sur ce poste.";
     public string InstalledContentVersion => _installedContentState.ContentVersion;
@@ -669,8 +669,8 @@ public sealed class MainViewModel : ObservableObject
         if (!await SaveAsync()) throw new InvalidOperationException("Le catalogue n’a pas pu être enregistré avant la génération du pack.");
         if (!await SaveSearchDictionaryAsync()) throw new InvalidOperationException("Le dictionnaire n’a pas pu être enregistré avant la génération du pack.");
         _taxonomy = await ComponentTaxonomyStore.LoadAsync(SharedRoot);
-        var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
-        if (!File.Exists(privateKeyPath) && File.Exists(LegacyLicenseSigningKeyPath)) privateKeyPath = LegacyLicenseSigningKeyPath;
+        var privateKeyPath = AtlasLicenseService.FindMatchingSigningPrivateKeyPath(SharedRoot)
+                             ?? throw new FileNotFoundException("La clé privée Idéo valide est absente.");
         await new AtlasContentPackageService(SharedRoot).CreateAsync(outputPath, contentVersion, minimumApplicationVersion,
             _catalog, _searchDictionary, _taxonomy, _referenceData, SharedRoot, EffectiveFurnitureRoot, File.ReadAllText(privateKeyPath));
         StatusText = $"Pack de contenus Atlas {contentVersion.Trim()} généré.";
@@ -716,13 +716,8 @@ public sealed class MainViewModel : ObservableObject
         if (NewLicenseValidUntil is null) throw new InvalidOperationException("Choisissez la date de fin de validité.");
         var validUntil = DateOnly.FromDateTime(NewLicenseValidUntil.Value);
         if (validUntil < DateOnly.FromDateTime(DateTime.Today)) throw new InvalidOperationException("La date de fin ne peut pas être antérieure à aujourd’hui.");
-        var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
-        if (!File.Exists(privateKeyPath) && File.Exists(LegacyLicenseSigningKeyPath))
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(privateKeyPath)!);
-            File.Copy(LegacyLicenseSigningKeyPath, privateKeyPath, false);
-        }
-        if (!File.Exists(privateKeyPath)) throw new FileNotFoundException("La clé privée Idéo est absente de cet espace Atlas.", privateKeyPath);
+        var privateKeyPath = AtlasLicenseService.FindMatchingSigningPrivateKeyPath(SharedRoot)
+                             ?? throw new FileNotFoundException("La clé privée Idéo valide est absente de ce poste et de l’espace partagé.");
         var features = NewLicenseCreatorEnabled ? new[] { AtlasLicenseService.CreatorFeature } : Array.Empty<string>();
         GeneratedLicenseCode = AtlasLicenseService.Generate(NewLicenseCustomer, validUntil, File.ReadAllText(privateKeyPath), features: features, deviceId: NewLicenseDeviceId);
         StatusText = $"Licence générée pour {NewLicenseCustomer.Trim()} et le poste {NewLicenseDeviceId.Trim()} jusqu’au {validUntil:dd/MM/yyyy}" + (NewLicenseCreatorEnabled ? " avec le module Créateur." : ".");
@@ -748,8 +743,8 @@ public sealed class MainViewModel : ObservableObject
     public string GenerateIdeoAdminAccessCode()
     {
         if (!CanUseIdeoTools) throw new UnauthorizedAccessException("Le générateur d’accès Idéo est indisponible sur ce poste.");
-        var privateKeyPath = AtlasLicenseService.SigningPrivateKeyPath(SharedRoot);
-        if (!File.Exists(privateKeyPath) && File.Exists(LegacyLicenseSigningKeyPath)) privateKeyPath = LegacyLicenseSigningKeyPath;
+        var privateKeyPath = AtlasLicenseService.FindMatchingSigningPrivateKeyPath(SharedRoot)
+                             ?? throw new FileNotFoundException("La clé privée Idéo valide est absente.");
         GeneratedIdeoAccessCode = IdeoAdminAccessService.GenerateResponse(IdeoAccessRequestCode, IdeoOperatorName, File.ReadAllText(privateKeyPath));
         StatusText = $"Réponse Administrateur Idéo générée pour {IdeoOperatorName.Trim()}.";
         return GeneratedIdeoAccessCode;
@@ -2936,8 +2931,6 @@ public sealed class MainViewModel : ObservableObject
         finally { IsBusy = false; }
     }
     private void OpenSharedRoot() { try { Process.Start(new ProcessStartInfo("explorer.exe", _store.SharedRoot) { UseShellExecute = true }); } catch (Exception exception) { ShowError(exception); } }
-    private string LegacyLicenseSigningKeyPath => Path.Combine(_store.SharedRoot, "Configuration", "Atlas-Licence-ClePrivee.pem");
-
     private async Task CheckUpdateAsync(bool silent)
     {
         if (!IsAdministrator && !silent) throw new UnauthorizedAccessException("Seul un administrateur peut déclencher une mise à jour d’Atlas.");
