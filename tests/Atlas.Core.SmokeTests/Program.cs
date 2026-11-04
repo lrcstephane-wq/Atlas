@@ -246,6 +246,13 @@ try
     clientCatalog.Settings.FurnitureRoot = clientFurniture;
     clientCatalog.Furniture.Add(new FurnitureRecord { Id = "client-site-furniture", Reference = "USR-TEST", DisplayName = "Meuble propre au site" });
     await clientCatalogStore.SaveAsync(clientCatalog, clientCatalog.Revision, "Client");
+    var updatedClientFurniture = Path.Combine(contentTestRoot, "client-furniture-updated");
+    await clientCatalogStore.SaveFurnitureRootAsync(clientCatalog, updatedClientFurniture, "Gestionnaire du site");
+    var catalogAfterFurnitureRootUpdate = await clientCatalogStore.LoadAsync();
+    Assert(catalogAfterFurnitureRootUpdate.Settings.FurnitureRoot == updatedClientFurniture
+           && catalogAfterFurnitureRootUpdate.Furniture.Any(item => item.Id == "client-site-furniture"),
+        "Le Gestionnaire du site doit pouvoir modifier uniquement le dossier commun sans altérer le catalogue.");
+    clientFurniture = updatedClientFurniture;
     var clientDictionaryStore = new SearchDictionaryStore(clientRoot);
     var clientDictionary = await clientDictionaryStore.LoadAsync();
     clientDictionary.Synonyms.Add(new SearchSynonymEntry { Id = "client-synonym", ConceptId = "element-rayon", Term = "planche maison", IsOfficial = false });
@@ -531,7 +538,9 @@ Assert(viewModelSource.Contains("AllowsAutomaticApplicationUpdates") && viewMode
 Assert(catalogXaml.Contains("HasFullHorizonAccess") && catalogXaml.Contains("Catalogue en consultation uniquement") && catalogXaml.Contains("ClientUniverseFacets"), "Une licence absente ou expirée doit masquer recherche, filtres, univers et transfert TopSolid.");
 Assert(viewModelSource.Contains("AtlasLicenseService.SigningPrivateKeyPath") && viewModelSource.Contains("IsAdministrator || IsLicenseValid"), "L’administrateur doit contourner la licence sans exposer la clé privée aux installations clientes.");
 Assert(settingsXaml.Contains("ChooseUniverseImage_OnClick") && settingsXaml.Contains("Enregistrer les univers"), "Les paramètres doivent permettre d’associer et d’enregistrer une image à chaque univers.");
-Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand"), "Le dossier central des meubles doit être configurable depuis les paramètres de la Forge.");
+Assert(settingsXaml.Contains("Settings.FurnitureRoot") && settingsXaml.Contains("ChooseFurnitureRootCommand") && settingsXaml.Contains("SaveFurnitureRootCommand"), "Le Gestionnaire du site doit pouvoir configurer et enregistrer le dossier commun des meubles.");
+Assert(viewModelSource.Contains("ChooseFurnitureRootCommand = new(_ => ChooseFurnitureRoot(), _ => CanManageSite)") && viewModelSource.Contains("SaveFurnitureRootAsync"), "Le réglage du dossier commun des meubles doit être réservé au Gestionnaire du site ou à l’Administrateur Idéo.");
+Assert(settingsXaml.Contains("Width=\"260\"") && themeXaml.Contains("CalendarDayButton") && themeXaml.Contains("MinWidth\" Value=\"280"), "Le générateur de licence doit proposer une date compacte et un calendrier lisible.");
 Assert(settingsXaml.Contains("FurnitureTypeList") && settingsXaml.Contains("FurnitureUsageList") && settingsXaml.Contains("Renommer"), "Les paramètres doivent administrer les types de meubles et usages spécifiques.");
 Assert(settingsXaml.Contains("Header=\"Synonymes\"") && settingsXaml.Contains("Header=\"Expressions\"")
        && settingsXaml.Contains("Header=\"Mots ignorés\"") && settingsXaml.Contains("Header=\"Demandes enregistrées\"")

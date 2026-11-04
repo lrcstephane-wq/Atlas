@@ -66,6 +66,40 @@ public sealed class SharedCatalogStore
             $"{DateTimeOffset.Now:O}\t{catalog.ModifiedBy}\t{Environment.MachineName}\tSAVE\tr{catalog.Revision}{Environment.NewLine}", cancellationToken);
     }
 
+    public async Task SaveFurnitureRootAsync(AtlasCatalog catalog, string furnitureRoot, string editor, CancellationToken cancellationToken = default)
+    {
+        EnsureFolders();
+        await using var writeLock = await AcquireLockAsync(cancellationToken);
+        await MigrateLegacyAsync(cancellationToken);
+
+        var overlay = await ReadAsync<CatalogSiteOverlay>(CatalogPath, cancellationToken) ?? new CatalogSiteOverlay();
+        var currentRevision = overlay.Revision;
+        if (File.Exists(CatalogPath))
+        {
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            File.Copy(CatalogPath, Path.Combine(SharedRoot, "Backups", $"catalog-{stamp}-r{currentRevision}.atlas.json"), false);
+            TrimBackups();
+        }
+
+        overlay.Settings ??= new WorkspaceSettings();
+        overlay.Settings.FurnitureRoot = furnitureRoot?.Trim() ?? string.Empty;
+        overlay.Revision = currentRevision + 1;
+        overlay.ModifiedUtc = DateTimeOffset.UtcNow;
+        overlay.ModifiedBy = string.IsNullOrWhiteSpace(editor) ? Environment.UserName : editor;
+
+        var temporary = CatalogPath + $".{Environment.MachineName}.{Guid.NewGuid():N}.tmp";
+        await using (var stream = File.Create(temporary))
+            await JsonSerializer.SerializeAsync(stream, overlay, JsonOptions, cancellationToken);
+        File.Move(temporary, CatalogPath, true);
+
+        catalog.Settings.FurnitureRoot = overlay.Settings.FurnitureRoot;
+        catalog.Revision = overlay.Revision;
+        catalog.ModifiedUtc = overlay.ModifiedUtc;
+        catalog.ModifiedBy = overlay.ModifiedBy;
+        await File.AppendAllTextAsync(Path.Combine(SharedRoot, "Logs", $"atlas-{DateTime.Now:yyyyMM}.log"),
+            $"{DateTimeOffset.Now:O}\t{catalog.ModifiedBy}\t{Environment.MachineName}\tFURNITURE_ROOT\tr{catalog.Revision}{Environment.NewLine}", cancellationToken);
+    }
+
     public static string LocalBootstrapPath => AtlasPaths.BootstrapPath;
 
     public static async Task<LocalBootstrap> LoadBootstrapAsync()

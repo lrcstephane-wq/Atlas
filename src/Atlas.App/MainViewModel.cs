@@ -89,7 +89,8 @@ public sealed class MainViewModel : ObservableObject
         ReloadCommand = new(_ => _ = ReloadAsync(), _ => !IsBusy);
         ScanCommand = new(_ => _ = ScanAsync(), _ => CanEdit && !IsBusy);
         ChooseLibraryCommand = new(_ => ChooseLibrary(), _ => CanEdit);
-        ChooseFurnitureRootCommand = new(_ => ChooseFurnitureRoot(), _ => CanEdit);
+        ChooseFurnitureRootCommand = new(_ => ChooseFurnitureRoot(), _ => CanManageSite);
+        SaveFurnitureRootCommand = new(_ => _ = SaveFurnitureRootAsync(), _ => CanManageSite && !IsBusy);
         ChooseLocalLibraryOverrideCommand = new(_ => ChooseLocalLibraryOverride(), _ => CanManageSite);
         ChooseLocalFurnitureOverrideCommand = new(_ => ChooseLocalFurnitureOverride(), _ => CanManageSite);
         ClearLocalPathOverridesCommand = new(_ => ClearLocalPathOverrides(), _ => CanManageSite);
@@ -567,6 +568,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ScanCommand { get; }
     public RelayCommand ChooseLibraryCommand { get; }
     public RelayCommand ChooseFurnitureRootCommand { get; }
+    public RelayCommand SaveFurnitureRootCommand { get; }
     public RelayCommand ChooseLocalLibraryOverrideCommand { get; }
     public RelayCommand ChooseLocalFurnitureOverrideCommand { get; }
     public RelayCommand ClearLocalPathOverridesCommand { get; }
@@ -2873,6 +2875,29 @@ public sealed class MainViewModel : ObservableObject
         StatusText = "Dossier central des meubles configuré.";
     }
 
+    private async Task SaveFurnitureRootAsync()
+    {
+        if (!CanManageSite)
+            throw new UnauthorizedAccessException("Seul un Gestionnaire du site ou un Administrateur Idéo peut configurer le dossier commun des meubles.");
+
+        IsBusy = true;
+        try
+        {
+            Settings.FurnitureRoot = Settings.FurnitureRoot?.Trim() ?? string.Empty;
+            await _store.SaveFurnitureRootAsync(_catalog, Settings.FurnitureRoot, CurrentUser.DisplayName);
+            OnPropertyChanged(nameof(EffectiveFurnitureRoot));
+            OnPropertyChanged(nameof(LastModification));
+            RebuildClientCards();
+            LoadFurniturePreview();
+            NotifySelectedFurnitureState();
+            StatusText = string.IsNullOrWhiteSpace(Settings.FurnitureRoot)
+                ? "Dossier commun des meubles effacé. Atlas utilise désormais le chemin de repli."
+                : $"Dossier commun des meubles enregistré : {Settings.FurnitureRoot}";
+        }
+        catch (Exception exception) { ShowError(exception); }
+        finally { IsBusy = false; }
+    }
+
     private void ChooseLocalLibraryOverride()
     {
         var dialog = new OpenFolderDialog { Title = "Choisir la bibliothèque utilisée uniquement sur ce poste", Multiselect = false };
@@ -2966,7 +2991,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
-        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand, ChooseCustomerFurnitureRootCommand, SynchronizeCustomerFurnitureCommand, SaveCustomerFurnitureCommand, ChooseCustomerFurnitureImageCommand, OpenCustomerFurnitureFolderCommand, AddPersonalTagCommand, DeletePersonalTagCommand, AddClientUniverseCommand, DeleteClientUniverseCommand, DeleteCustomerFurnitureLocationCommand, ExcludeCustomerFurnitureCommand, RestoreCustomerFurnitureCommand, MoveWorkspaceCommand }) command.RaiseCanExecuteChanged();
+        foreach (var command in new[] { SaveCommand, ReloadCommand, ScanCommand, ValidateComponentCommand, AddComponentCommand, AddMarkedComponentsCommand, RemoveComponentCommand, RemoveMarkedCompositionCommand, PublishFurnitureCommand, PreviousFurnitureStepCommand, NextFurnitureStepCommand, CheckUpdateCommand, ChooseFurnitureTopCommand, ChooseFurnitureImageCommand, OpenFurnitureFolderCommand, PrepareTopSolidBridgeCommand, DuplicateFurnitureCommand, ArchiveFurnitureCommand, RestoreFurnitureCommand, PermanentlyDeleteFurnitureCommand, ViewFurnitureInHorizonCommand, ChooseCustomerFurnitureRootCommand, SynchronizeCustomerFurnitureCommand, SaveCustomerFurnitureCommand, ChooseCustomerFurnitureImageCommand, OpenCustomerFurnitureFolderCommand, AddPersonalTagCommand, DeletePersonalTagCommand, AddClientUniverseCommand, DeleteClientUniverseCommand, DeleteCustomerFurnitureLocationCommand, ExcludeCustomerFurnitureCommand, RestoreCustomerFurnitureCommand, MoveWorkspaceCommand, SaveFurnitureRootCommand }) command.RaiseCanExecuteChanged();
     }
 
     private sealed class ClientFurnitureSearchComparer(Func<string> query) : System.Collections.IComparer
