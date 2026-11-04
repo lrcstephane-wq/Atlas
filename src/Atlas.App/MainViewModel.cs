@@ -103,7 +103,7 @@ public sealed class MainViewModel : ObservableObject
         DeletePersonalTagCommand = new(tag => DeletePersonalTag(tag as PersonalTagRecord), _ => CanManageCustomerFurniture);
         AddClientUniverseCommand = new(_ => AddClientUniverse(), _ => CanManageCustomerFurniture && !string.IsNullOrWhiteSpace(NewClientUniverseName));
         DeleteClientUniverseCommand = new(item => DeleteClientUniverse(item as PersonalTagRecord), _ => CanManageCustomerFurniture);
-        DeleteCustomerFurnitureLocationCommand = new(item => DeleteCustomerFurnitureLocation(item as CustomerFurnitureLocation), _ => CanManageCustomerFurniture);
+        DeleteCustomerFurnitureLocationCommand = new(item => _ = DeleteCustomerFurnitureLocationAsync(item as CustomerFurnitureLocation), _ => CanManageCustomerFurniture);
         ExcludeCustomerFurnitureCommand = new(_ => _ = ExcludeCustomerFurnitureAsync(), _ => CanManageCustomerFurniture && SelectedCustomerFurniture is not null);
         RestoreCustomerFurnitureCommand = new(item => _ = RestoreCustomerFurnitureAsync(item as CustomerFurnitureExclusion), _ => CanManageCustomerFurniture);
         ChooseSharedRootCommand = new(_ => ChooseSharedRoot(), _ => CanManageSite);
@@ -120,6 +120,7 @@ public sealed class MainViewModel : ObservableObject
         PinClientFilterPanelCommand = new(_ => TogglePinnedClientFilterPanel());
         CloseClientFilterPanelCommand = new(_ => CloseClientFilterPanel());
         ClearClientSelectionCommand = new(_ => ClearClientSelection(), _ => ClientSelectionCount > 0);
+        RemoveClientSelectionCommand = new(item => RemoveClientSelection(item as FurnitureCardViewModel), item => item is FurnitureCardViewModel card && card.IsChosen);
         PrepareTopSolidBridgeCommand = new(_ => PrepareTopSolidBridge(), _ => HasFullHorizonAccess && ClientSelectionCount > 0 && !IsBusy);
         OpenTopSolidBridgeFolderCommand = new(_ => OpenTopSolidBridgeFolder(), _ => IsTopSolidBridgeReady && Directory.Exists(TopSolidBridgeFolder));
         CreateFurnitureCommand = new(_ => CreateFurniture(), _ => CanEdit);
@@ -155,7 +156,8 @@ public sealed class MainViewModel : ObservableObject
     public bool CanManageSite => CurrentUser.IsSiteManager;
     public bool CanInstallContentPackage => CanManageSite;
     public bool IsCreatorFeatureLicensed => _licenseInfo.HasFeature(AtlasLicenseService.CreatorFeature);
-    public bool CanManageCustomerFurniture => IsAdministrator || ((IsCreatorMode || IsSiteManagerMode) && IsLicenseValid && IsCreatorFeatureLicensed);
+    public bool CanViewCustomerFurniture => IsAdministrator || IsSiteManagerMode || (IsCreatorMode && IsLicenseValid && IsCreatorFeatureLicensed);
+    public bool CanManageCustomerFurniture => IsAdministrator || (IsCreatorMode && IsLicenseValid && IsCreatorFeatureLicensed);
     public string SessionLabel => CurrentUser.IsPermanentIdeoDevelopmentSession ? "Administrateur Idéo permanent" : IsAdministrator ? $"Administrateur Idéo · {CurrentUser.DisplayName}" : IsSiteManagerMode ? "Gestionnaire du site" : IsCreatorMode && IsCreatorFeatureLicensed ? "Mode Créateur" : IsCreatorMode ? "Mode Horizon · option Créateur inactive" : IsLicenseValid ? "Mode Horizon · licence active" : "Mode Horizon · consultation";
     public bool CanEdit => CurrentUser.CanEdit;
     public bool CanValidate => CurrentUser.CanValidate;
@@ -168,6 +170,10 @@ public sealed class MainViewModel : ObservableObject
     public bool HasFullHorizonAccess => IsAdministrator || IsLicenseValid;
     public string LicenseCustomer => string.IsNullOrWhiteSpace(_licenseInfo.Customer) ? "Non renseigné" : _licenseInfo.Customer;
     public string LicenseValidUntil => _licenseInfo.ValidUntil is { } date ? date.ToString("dd/MM/yyyy") : "—";
+    public string LicenseBannerText => IsLicenseValid && _licenseInfo.ValidUntil is { } validUntil
+        ? $"Atlas porte votre conception avec Biblidéo ! — Votre licence est active jusqu’au {validUntil:dd/MM/yyyy}"
+        : "Atlas aimerait vous aider à porter votre conception avec Biblidéo ! — Courage, bientôt vous aurez une super licence !";
+    public string RoleActionLabel => IsUserMode ? "Se connecter / changer de rôle" : "Changer de rôle";
     public string DeviceId => MachineIdentityService.CurrentDeviceId;
     public string LicensedDeviceId => string.IsNullOrWhiteSpace(_licenseInfo.DeviceId) ? "Ancienne licence non liée à un poste" : _licenseInfo.DeviceId;
     public string LicenseStatusMessage => IsAdministrator && !IsLicenseValid ? $"{_licenseInfo.Message} L’administrateur conserve un accès complet." : _licenseInfo.Message;
@@ -291,7 +297,7 @@ public sealed class MainViewModel : ObservableObject
             var requestedPage = value;
             if (IsLicenseRestricted && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             else if (IsUserMode && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
-            else if (IsCreatorMode && string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase) && !CanManageCustomerFurniture) requestedPage = "Catalog";
+            else if (string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase) && !CanViewCustomerFurniture) requestedPage = "Catalog";
             else if (IsCreatorMode && !string.Equals(value, "Catalog", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             else if (IsSiteManagerMode && !string.Equals(value, "Catalog", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase) && !string.Equals(value, "MyFurniture", StringComparison.OrdinalIgnoreCase)) requestedPage = "Catalog";
             if (!SetProperty(ref _currentPage, requestedPage)) return;
@@ -327,7 +333,7 @@ public sealed class MainViewModel : ObservableObject
     }
     public double NavigationWidth => IsNavigationExpanded ? 224 : 76;
     public bool ShowAdministrativeNavigationLabels => CanUseAdministrativeInterfaces && IsNavigationExpanded;
-    public bool ShowUserSessionActions => IsUserMode && IsNavigationExpanded;
+    public bool ShowUserSessionActions => IsNavigationExpanded;
     public bool ShowAdministrativeSessionActions => IsAdministrativeMode && IsNavigationExpanded;
     public bool ShowAuthenticatedSessionActions => !IsUserMode && IsNavigationExpanded;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
@@ -380,6 +386,9 @@ public sealed class MainViewModel : ObservableObject
     public bool HasClientResults => ClientResultCount > 0;
     public int ClientSelectionCount => ClientFurnitureCards.Count(item => item.IsChosen);
     public string ClientSelectionLabel => ClientSelectionCount == 0 ? "Aucun meuble sélectionné" : ClientSelectionCount == 1 ? "1 meuble sélectionné" : $"{ClientSelectionCount} meubles sélectionnés";
+    public IReadOnlyList<FurnitureCardViewModel> ClientSelectionItems => ClientFurnitureCards.Where(item => item.IsChosen).ToArray();
+    public bool HasMultipleClientSelection => ClientSelectionCount > 1;
+    public string PrepareClientSelectionLabel => ClientSelectionCount <= 1 ? "Préparer dans TopSolid" : $"Préparer les {ClientSelectionCount} meubles dans TopSolid";
     public bool IsTopSolidBridgeReady { get => _isTopSolidBridgeReady; private set => SetProperty(ref _isTopSolidBridgeReady, value); }
     public string TopSolidBridgeFolder { get => _topSolidBridgeFolder; private set => SetProperty(ref _topSolidBridgeFolder, value); }
     public IReadOnlyList<string> TopSolidBridgeFiles { get => _topSolidBridgeFiles; private set => SetProperty(ref _topSolidBridgeFiles, value); }
@@ -561,6 +570,23 @@ public sealed class MainViewModel : ObservableObject
         : File.Exists(CustomerFurnitureStore.ResolvePath(_customerCatalog, SelectedCustomerFurniture)) ? "Fichier .TOP disponible" : "Fichier .TOP introuvable";
     public int CustomerFurnitureCount => CustomerFurniture.Count;
 
+    public string ResolveCustomerFurnitureSourcePath(CustomerFurnitureItem? item) =>
+        item is null ? string.Empty : CustomerFurnitureStore.ResolvePath(_customerCatalog, item);
+
+    public string ResolveCustomerFurnitureImagePath(CustomerFurnitureItem? item) =>
+        item is null ? string.Empty : CustomerFurnitureStore.ResolvePath(_customerCatalog, item, item.ImageRelativePath);
+
+    public string CustomerFurnitureLocationLabel(CustomerFurnitureItem? item) => item is null
+        ? string.Empty
+        : CustomerFurnitureLocations.FirstOrDefault(location => location.Id.Equals(item.LocationId, StringComparison.OrdinalIgnoreCase))?.Name ?? "Emplacement inconnu";
+
+    public void OpenCustomerFurniture(CustomerFurnitureItem? item)
+    {
+        if (item is null || !CanViewCustomerFurniture) return;
+        SelectedCustomerFurniture = item;
+        CurrentPage = "MyFurniture";
+    }
+
     public RelayCommand NavigateCommand { get; }
     public RelayCommand ToggleNavigationCommand { get; }
     public RelayCommand SaveCommand { get; }
@@ -598,6 +624,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand PinClientFilterPanelCommand { get; }
     public RelayCommand CloseClientFilterPanelCommand { get; }
     public RelayCommand ClearClientSelectionCommand { get; }
+    public RelayCommand RemoveClientSelectionCommand { get; }
     public RelayCommand PrepareTopSolidBridgeCommand { get; }
     public RelayCommand OpenTopSolidBridgeFolderCommand { get; }
     public RelayCommand CreateFurnitureCommand { get; }
@@ -758,6 +785,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsLicenseRestricted));
         OnPropertyChanged(nameof(HasFullHorizonAccess));
         OnPropertyChanged(nameof(CanUseAdministrativeInterfaces));
+        OnPropertyChanged(nameof(CanViewCustomerFurniture));
         OnPropertyChanged(nameof(CanManageCustomerFurniture));
         OnPropertyChanged(nameof(CanManageSite));
         OnPropertyChanged(nameof(CanInstallContentPackage));
@@ -766,6 +794,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowAdministrativeNavigationLabels));
         OnPropertyChanged(nameof(LicenseCustomer));
         OnPropertyChanged(nameof(LicenseValidUntil));
+        OnPropertyChanged(nameof(LicenseBannerText));
         OnPropertyChanged(nameof(LicensedDeviceId));
         OnPropertyChanged(nameof(LicenseStatusMessage));
         OnPropertyChanged(nameof(LicenseStatusColor));
@@ -1202,8 +1231,20 @@ public sealed class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ClientSelectionCount));
         OnPropertyChanged(nameof(ClientSelectionLabel));
+        OnPropertyChanged(nameof(ClientSelectionItems));
+        OnPropertyChanged(nameof(HasMultipleClientSelection));
+        OnPropertyChanged(nameof(PrepareClientSelectionLabel));
         ClearClientSelectionCommand.RaiseCanExecuteChanged();
+        RemoveClientSelectionCommand.RaiseCanExecuteChanged();
         PrepareTopSolidBridgeCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RemoveClientSelection(FurnitureCardViewModel? card)
+    {
+        if (card is null) return;
+        card.IsChosen = false;
+        InvalidateTopSolidBridge();
+        NotifyClientSelectionChanged();
     }
 
     private void ClearClientSelection()
@@ -2809,17 +2850,25 @@ public sealed class MainViewModel : ObservableObject
         RebuildSelectedCustomerTaxonomyOptions();
     }
 
-    private void DeleteCustomerFurnitureLocation(CustomerFurnitureLocation? location)
+    private async Task DeleteCustomerFurnitureLocationAsync(CustomerFurnitureLocation? location)
     {
         if (location is null) return;
         var count = CustomerFurniture.Count(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
         if (!AtlasDialog.Confirm($"Retirer l’emplacement « {location.Name} » d’Atlas ?", "Emplacement Client", $"{count} meuble(s) disparaîtront d’Atlas. Aucun fichier réseau ne sera supprimé.")) return;
-        CustomerFurnitureLocations.Remove(location);
-        _customerCatalog.Locations.RemoveAll(value => value.Id.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
-        _customerCatalog.Furniture.RemoveAll(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
-        foreach (var item in CustomerFurniture.Where(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase)).ToArray()) CustomerFurniture.Remove(item);
-        SelectedCustomerFurnitureLocation = CustomerFurnitureLocations.FirstOrDefault();
-        RebuildClientCards();
+        try
+        {
+            CustomerFurnitureLocations.Remove(location);
+            _customerCatalog.Locations.RemoveAll(value => value.Id.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
+            _customerCatalog.Furniture.RemoveAll(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase));
+            foreach (var item in CustomerFurniture.Where(value => value.LocationId.Equals(location.Id, StringComparison.OrdinalIgnoreCase)).ToArray()) CustomerFurniture.Remove(item);
+            SelectedCustomerFurnitureLocation = CustomerFurnitureLocations.FirstOrDefault();
+            _customerCatalog.FurnitureRoot = string.Empty;
+            await _customerFurnitureStore.SaveAsync(_customerCatalog);
+            RebuildClientCards();
+            OnPropertyChanged(nameof(CustomerFurnitureCount));
+            StatusText = $"L’emplacement « {location.Name} » a été retiré d’Atlas. Les fichiers réseau sont conservés.";
+        }
+        catch (Exception exception) { ShowError(exception); }
     }
 
     private async Task ExcludeCustomerFurnitureAsync()
