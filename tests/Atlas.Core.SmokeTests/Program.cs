@@ -553,6 +553,7 @@ Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Tex
 Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"235\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
 var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
 var searchDictionaryServiceSource = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.Core", "Services", "SearchDictionaryService.cs"));
+var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsCreatorMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsLicenseRestricted"), "Les modes utilisateur, Créateur et les sessions sans licence doivent conserver leurs périmètres propres.");
 Assert(appCode.Contains("IdeoAdminAccessWindow") && appCode.Contains("UserPermissions.IdeoAdministrator")
        && !appCode.Contains("CreateFirstAdministratorAsync"),
@@ -617,7 +618,6 @@ Assert(catalogXaml.Contains("Grid.Column=\"2\"") && catalogXaml.Contains("ItemsS
 Assert(catalogXaml.Contains("COMPOSITION DU MEUBLE") && catalogXaml.Contains("SelectedClientCompositionLines") && catalogXaml.Contains("Binding Quantity"), "Horizon doit afficher automatiquement les composants Biblidéo déjà liés au meuble et leurs quantités.");
 Assert(viewModelSource.Contains("RefreshSelectedClientComposition") && viewModelSource.Contains("SelectedClientFurniture.ComponentLines"), "La composition Horizon doit provenir directement de la fiche meuble existante, sans seconde saisie.");
 Assert(furnitureXaml.Contains("Actualiser l’image…") && viewModelSource.Contains("ChooseFurnitureImageCommand") && viewModelSource.Contains("File.Copy(dialog.FileName, targetImage, true)"), "La fiche d’identité doit permettre de remplacer l’image du meuble indépendamment du fichier .TOP.");
-var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(settingsXaml.Contains("LicensePanel") && settingsXaml.Contains("Vérifier et installer la licence") && settingsXaml.Contains("Date de fin de validité"), "Les paramètres doivent permettre au client d’installer son code et à l’administrateur de choisir librement l’échéance.");
 Assert(settingsXaml.Contains("Autoriser le module Créateur") && settingsXaml.Contains("LicenseFeaturesLabel"), "Le générateur doit permettre d’inclure explicitement le module Créateur et d’afficher les options signées.");
 Assert(settingsXaml.Contains("IDENTIFIANT DE CE POSTE") && settingsXaml.Contains("NewLicenseDeviceId") && viewModelSource.Contains("deviceId: NewLicenseDeviceId"), "La licence doit être générée pour l’identifiant transmis par un poste précis.");
