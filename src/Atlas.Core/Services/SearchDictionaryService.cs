@@ -197,7 +197,7 @@ public sealed class SearchDictionaryStore(string sharedRoot)
 
 public static class SearchDictionaryService
 {
-    public const int OfficialVersion = 3;
+    public const int OfficialVersion = 4;
     public static IReadOnlySet<string> ProtectedTerms { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         "miroir", "rayon", "hayon", "four", "joue", "fond", "chant", "façade", "vasque", "caisse", "socle"
@@ -215,6 +215,7 @@ public static class SearchDictionaryService
         document.Expressions ??= [];
         document.IgnoredTerms ??= [];
         document.UnknownQueries ??= [];
+        document.Concepts.RemoveAll(item => item.Id.Equals("expression-rangement-rayons", StringComparison.OrdinalIgnoreCase));
 
         // Migration transparente du schéma v1 : les ajouts saisis par le client deviennent de vraies lignes de synonymes.
         foreach (var concept in document.Concepts)
@@ -650,7 +651,6 @@ public static class SearchDictionaryService
         Official("element-tiroir", "Tiroir", "Éléments", SearchConceptTarget.DrawerCount, "", "tiroirs, iroir, coulissant de rangement, coulissants de rangement, tiroir simple, tiroirs simples"),
         Official("element-tiroir-anglais", "Tiroir à l’anglaise", "Éléments", SearchConceptTarget.InnerDrawerCount, "", "tiroirs à l’anglaise, tiroir anglais, tiroirs anglais, tiroir intérieur, tiroirs intérieurs, coulissant intérieur"),
         Official("element-rayon", "Rayon", "Éléments", SearchConceptTarget.ShelfCount, "", "rayons, tablette, tablettes, étagère, étagères, planche de rangement, planches de rangement"),
-        Official("expression-rangement-rayons", "Armoire de rangement", "Expressions", SearchConceptTarget.ShelfCount, "", "placard de rangement, rangement avec étagères"),
         Official("element-penderie", "Penderie", "Éléments", SearchConceptTarget.Hanging, "", "penderies, tringle, tringles, barre de penderie, barres de penderie"),
         Official("element-relevant", "Relevant", "Éléments", SearchConceptTarget.LiftUpCount, "", "relevants, hayon, hayons, porte relevable, portes relevables, ouvrant vers le haut"),
         Official("element-abattant", "Abattant", "Éléments", SearchConceptTarget.FlapCount, "", "abattants, porte abattante, portes abattantes, ouvrant vers le bas"),
