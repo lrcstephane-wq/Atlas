@@ -611,6 +611,7 @@ var appRoot = Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.App");
 var mainWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWindow.xaml"));
 var catalogXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "CatalogView.xaml"));
 var themeXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Themes", "AtlasTheme.xaml"));
+var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
 Assert(mainWindowXaml.Contains("WindowChrome") && !mainWindowXaml.Contains("AllowsTransparency=\"True\""), "La fenêtre principale doit conserver un chrome redimensionnable qui respecte la barre des tâches.");
 Assert(mainWindowXaml.Contains("StateChanged=\"Window_StateChanged\""), "La fenêtre principale doit adapter son cadre au mode agrandi.");
 var mainWindowCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainWindow.xaml.cs"));
@@ -619,7 +620,8 @@ var launchWindowXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Launch
 var appCode = await File.ReadAllTextAsync(Path.Combine(appRoot, "App.xaml.cs"));
 Assert(launchWindowXaml.Contains("Administrateur") && launchWindowXaml.Contains("Créateur") && launchWindowXaml.Contains("Utilisateur") && launchWindowXaml.Contains("OUVRIR HORIZON"), "Le lancement doit proposer explicitement les trois modes Atlas.");
 Assert(appCode.Contains("OpenAdministratorSessionAsync") && appCode.Contains("LogoutAdministratorAsync") && appCode.Contains("atlas-horizon-user"), "Atlas doit pouvoir ouvrir et fermer une session administrateur sans redémarrage.");
-Assert(catalogXaml.Contains("FilterPanelTemplate") && catalogXaml.Contains("IsClientFilterPanelPinned") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Horizon doit proposer des panneaux de filtres recherchables, épinglables et défilants.");
+Assert(catalogXaml.Contains("FilterPanelTemplate") && catalogXaml.Contains("IsClientFilterPanelDocked") && catalogXaml.Contains("sys:Double.PositiveInfinity") && catalogXaml.Contains("VerticalScrollBarVisibility=\"Auto\""), "Le panneau de filtre épinglé doit utiliser toute la hauteur disponible, contrairement au panneau flottant limité.");
+Assert(catalogXaml.Contains("ClearActiveClientFilterCommand") && catalogXaml.Contains("ClientMoreFiltersLabel") && viewModelSource.Contains("OrderByDescending(option => option.IsSelected)"), "Les filtres doivent placer les choix actifs en tête, afficher leurs compteurs et pouvoir effacer uniquement le groupe courant.");
 Assert(catalogXaml.Contains("MinWidth=\"300\"") && catalogXaml.Contains("MaxWidth=\"370\""), "Horizon doit protéger les dimensions du panneau produit.");
 Assert(catalogXaml.Contains("ClientUniverseFacets") && catalogXaml.Contains("UniformToFill"), "Horizon doit présenter les univers comme une galerie illustrée au-dessus du catalogue.");
 Assert(catalogXaml.Contains("UniverseCard") && catalogXaml.Contains("Height=\"82\""), "La galerie des univers doit rester compacte et lisible sans occuper le menu principal.");
@@ -629,7 +631,6 @@ Assert(mainWindowXaml.Contains("Content=\"›\"") && mainWindowXaml.Contains("In
 Assert(mainWindowXaml.Contains("<views:CatalogView") && !mainWindowXaml.Contains("<views:HorizonShell"), "Horizon doit rester intégré dans la coque Atlas commune.");
 Assert(mainWindowXaml.Contains("Grid.Row=\"3\"") && mainWindowXaml.Contains("Text=\"SYSTÈME\""), "Les paramètres doivent rester ancrés en bas du menu commun.");
 Assert(catalogXaml.Contains("ReferenceCaption") && catalogXaml.Contains("TargetItemWidth=\"235\""), "La fiche client doit exposer une référence adaptée à sa source et la grille doit rester dense.");
-var viewModelSource = await File.ReadAllTextAsync(Path.Combine(appRoot, "MainViewModel.cs"));
 var searchDictionaryServiceSource = await File.ReadAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "src", "Atlas.Core", "Services", "SearchDictionaryService.cs"));
 var settingsXaml = await File.ReadAllTextAsync(Path.Combine(appRoot, "Views", "SettingsView.xaml"));
 Assert(viewModelSource.Contains("IsUserMode") && viewModelSource.Contains("IsCreatorMode") && viewModelSource.Contains("IsAdministrativeMode") && viewModelSource.Contains("IsLicenseRestricted"), "Les modes utilisateur, Créateur et les sessions sans licence doivent conserver leurs périmètres propres.");
