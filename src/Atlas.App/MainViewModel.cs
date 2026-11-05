@@ -56,7 +56,7 @@ public sealed class MainViewModel : ObservableObject
     private FurnitureFamilyRecord? _selectedFurnitureFamily;
     private CustomerFurnitureItem? _selectedCustomerFurniture;
     private LibraryFilterViewModel? _selectedLibraryFilter;
-    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _suppressClientFacetRefresh, _isClientFilterPanelOpen, _isClientFilterPanelPinned;
+    private bool _isNavigationExpanded = true, _isComponentMosaic = true, _isBusy, _suppressClientFacetRefresh, _isClientFilterPanelOpen, _isClientFilterPanelPinned, _isClientFilterDockingAvailable = true;
     private string _activeClientFilterGroup = "Types", _clientFacetSearch = string.Empty;
     private bool _isTopSolidBridgeReady;
     private string _topSolidBridgeFolder = string.Empty;
@@ -122,6 +122,7 @@ public sealed class MainViewModel : ObservableObject
         SelectVisibleComponentsCommand = new(_ => MarkVisibleComponents(true), _ => CanEdit);
         ClearMarkedComponentsCommand = new(_ => MarkVisibleComponents(false), _ => CanEdit);
         ClearClientFiltersCommand = new(_ => ClearClientFilters());
+        ClearActiveClientFilterCommand = new(_ => ClearActiveClientFilter());
         OpenClientFilterPanelCommand = new(group => OpenClientFilterPanel(group?.ToString()));
         PinClientFilterPanelCommand = new(_ => TogglePinnedClientFilterPanel());
         CloseClientFilterPanelCommand = new(_ => CloseClientFilterPanel());
@@ -345,7 +346,16 @@ public sealed class MainViewModel : ObservableObject
     public bool ShowAuthenticatedSessionActions => !IsUserMode && IsNavigationExpanded;
     public bool IsComponentMosaic { get => _isComponentMosaic; set => SetProperty(ref _isComponentMosaic, value); }
     public bool IsClientFilterPanelOpen { get => _isClientFilterPanelOpen; set => SetProperty(ref _isClientFilterPanelOpen, value); }
-    public bool IsClientFilterPanelPinned { get => _isClientFilterPanelPinned; private set => SetProperty(ref _isClientFilterPanelPinned, value); }
+    public bool IsClientFilterPanelPinned
+    {
+        get => _isClientFilterPanelPinned;
+        private set
+        {
+            if (!SetProperty(ref _isClientFilterPanelPinned, value)) return;
+            OnPropertyChanged(nameof(IsClientFilterPanelDocked));
+        }
+    }
+    public bool IsClientFilterPanelDocked => IsClientFilterPanelPinned && _isClientFilterDockingAvailable;
     public string ActiveClientFilterGroup
     {
         get => _activeClientFilterGroup;
@@ -356,6 +366,7 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(ActiveClientFilterTitle));
             OnPropertyChanged(nameof(ActiveClientFilterOptions));
             OnPropertyChanged(nameof(ActiveClientFilterSelectionLabel));
+            OnPropertyChanged(nameof(HasActiveClientFilterSelection));
         }
     }
     public string ActiveClientFilterTitle => ActiveClientFilterGroup switch
@@ -373,6 +384,7 @@ public sealed class MainViewModel : ObservableObject
             return count == 0 ? "Aucune sélection" : count == 1 ? "1 filtre actif" : $"{count} filtres actifs";
         }
     }
+    public bool HasActiveClientFilterSelection => ClientFacetGroup(ActiveClientFilterGroup).Any(option => option.IsSelected);
     public string ClientFacetSearch
     {
         get => _clientFacetSearch;
@@ -383,7 +395,25 @@ public sealed class MainViewModel : ObservableObject
         }
     }
     public IEnumerable<CatalogFacetViewModel> ActiveClientFilterOptions => ClientFacetGroup(ActiveClientFilterGroup)
-        .Where(option => string.IsNullOrWhiteSpace(ClientFacetSearch) || option.Label.Contains(ClientFacetSearch.Trim(), StringComparison.OrdinalIgnoreCase));
+        .Where(option => string.IsNullOrWhiteSpace(ClientFacetSearch) || option.Label.Contains(ClientFacetSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(option => option.IsSelected)
+        .ThenByDescending(option => option.IsFavorite)
+        .ThenByDescending(option => option.Count)
+        .ThenBy(option => option.Label, StringComparer.CurrentCultureIgnoreCase);
+    public string ClientTypeFilterLabel => ClientFilterButtonLabel("Types", "Type de meuble");
+    public string ClientUsageFilterLabel => ClientFilterButtonLabel("Usages", "Usage");
+    public string ClientAtlasTagFilterLabel => ClientFilterButtonLabel("Tags Atlas", "Tags Atlas");
+    public string ClientUniverseFilterLabel => ClientFilterButtonLabel("Univers Client", "Univers Client");
+    public string ClientPersonalTagFilterLabel => ClientFilterButtonLabel("Tags Client", "Tags Client");
+    public string ClientMoreFiltersLabel
+    {
+        get
+        {
+            var count = new[] { "Familles", "Source", "Formes", "Construction", "Assemblage", "Dos" }
+                .Sum(group => ClientFacetGroup(group).Count(option => option.IsSelected));
+            return count == 0 ? "Autres filtres ···" : $"Autres filtres · {count}";
+        }
+    }
     public bool IsFamilyMode => CreationMode == "Family";
     public string EnvironmentLabel => Settings.Environment == CatalogEnvironment.NonConfigure ? "ENV. À CONFIGURER" : $"ENV. {Settings.Environment}";
     public int ComponentCount => Components.Count(item => !item.IsDemo);
@@ -641,6 +671,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SelectVisibleComponentsCommand { get; }
     public RelayCommand ClearMarkedComponentsCommand { get; }
     public RelayCommand ClearClientFiltersCommand { get; }
+    public RelayCommand ClearActiveClientFilterCommand { get; }
     public RelayCommand OpenClientFilterPanelCommand { get; }
     public RelayCommand PinClientFilterPanelCommand { get; }
     public RelayCommand CloseClientFilterPanelCommand { get; }
@@ -1215,13 +1246,21 @@ public sealed class MainViewModel : ObservableObject
     {
         if (!HasFullHorizonAccess || string.IsNullOrWhiteSpace(group)) return;
         ActiveClientFilterGroup = group;
-        if (!IsClientFilterPanelPinned) IsClientFilterPanelOpen = true;
+        if (!IsClientFilterPanelDocked) IsClientFilterPanelOpen = true;
     }
 
     private void TogglePinnedClientFilterPanel()
     {
         IsClientFilterPanelPinned = !IsClientFilterPanelPinned;
-        IsClientFilterPanelOpen = false;
+        IsClientFilterPanelOpen = IsClientFilterPanelPinned && !IsClientFilterPanelDocked;
+    }
+
+    public void SetClientFilterDockingAvailable(bool isAvailable)
+    {
+        if (_isClientFilterDockingAvailable == isAvailable) return;
+        _isClientFilterDockingAvailable = isAvailable;
+        OnPropertyChanged(nameof(IsClientFilterPanelDocked));
+        if (IsClientFilterPanelPinned) IsClientFilterPanelOpen = !IsClientFilterPanelDocked;
     }
 
     private void CloseClientFilterPanel()
@@ -1234,8 +1273,37 @@ public sealed class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ActiveClientFilterOptions));
         OnPropertyChanged(nameof(ActiveClientFilterSelectionLabel));
+        OnPropertyChanged(nameof(HasActiveClientFilterSelection));
         OnPropertyChanged(nameof(SelectedClientFacets));
+        NotifyClientFilterButtonLabelsChanged();
         if (!_suppressClientFacetRefresh) RefreshClientFurnitureView();
+    }
+
+    private string ClientFilterButtonLabel(string group, string label)
+    {
+        var count = ClientFacetGroup(group).Count(option => option.IsSelected);
+        return count == 0 ? label : $"{label} · {count}";
+    }
+
+    private void NotifyClientFilterButtonLabelsChanged()
+    {
+        OnPropertyChanged(nameof(ClientTypeFilterLabel));
+        OnPropertyChanged(nameof(ClientUsageFilterLabel));
+        OnPropertyChanged(nameof(ClientAtlasTagFilterLabel));
+        OnPropertyChanged(nameof(ClientUniverseFilterLabel));
+        OnPropertyChanged(nameof(ClientPersonalTagFilterLabel));
+        OnPropertyChanged(nameof(ClientMoreFiltersLabel));
+    }
+
+    private void ClearActiveClientFilter()
+    {
+        _suppressClientFacetRefresh = true;
+        try
+        {
+            foreach (var option in ClientFacetGroup(ActiveClientFilterGroup)) option.IsSelected = false;
+        }
+        finally { _suppressClientFacetRefresh = false; }
+        ClientFacetChanged();
     }
 
     private void ClearClientFilters()

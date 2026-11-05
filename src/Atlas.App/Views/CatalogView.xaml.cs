@@ -8,9 +8,22 @@ namespace Atlas.App.Views;
 
 public partial class CatalogView : UserControl
 {
+    private const double MinimumDockedFilterWidth = 1180;
     private Point _dragStart;
 
-    public CatalogView() => InitializeComponent();
+    public CatalogView()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => UpdateFilterDockingMode();
+        SizeChanged += (_, _) => UpdateFilterDockingMode();
+        DataContextChanged += (_, _) => UpdateFilterDockingMode();
+    }
+
+    private void UpdateFilterDockingMode()
+    {
+        if (DataContext is MainViewModel vm)
+            vm.SetClientFilterDockingAvailable(ActualWidth >= MinimumDockedFilterWidth);
+    }
 
     private void FurnitureCard_OnClick(object sender, RoutedEventArgs e)
     {
